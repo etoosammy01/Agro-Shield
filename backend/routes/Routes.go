@@ -3,6 +3,7 @@ package routes
 import (
 	"backend/handlers"
 	app "backend/internal"
+	"backend/internal/services"
 	"backend/middleware"
 	"net/http"
 )
@@ -93,6 +94,8 @@ func RegisterRoutes(container *app.Container) {
 		container.Crop,
 		container.Order,
 		container.AI,
+		container.Negotiation,
+		services.NewWeatherService(),
 	)
 
 	http.HandleFunc(

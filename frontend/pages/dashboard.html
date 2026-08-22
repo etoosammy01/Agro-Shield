@@ -1,469 +1,1470 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
     <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Dashboard | Agro-Shield</title>
 
-    <link
-        rel="stylesheet"
-        href="/static/css/style.css"
-    >
-
-    <link
-        rel="stylesheet"
-        href="/static/css/dashboard.css"
-    >
-
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/dashboard.css">
 </head>
-
 
 <body>
 
-
-<header class="navbar">
-
-    <div class="logo">
-        🌾 Agro-Shield
-    </div>
-
-
-    <nav>
-
-        <a href="/dashboard">
-            Dashboard
+    <!-- =========================================================
+         NAVIGATION
+    ========================================================== -->
+    <header class="navbar">
+        <a class="logo" href="/dashboard">
+            Agro-Shield
         </a>
 
-        {{if not .IsBuyer}}
-        <a href="/storage">
-            Storage
-        </a>
-        {{end}}
+        <nav aria-label="Main navigation">
 
-        <a href="/marketplace">
-            Marketplace
-        </a>
+            <a class="active" href="/dashboard">
+                Dashboard
+            </a>
 
-        <a href="/negotiations">
-            Negotiations
-        </a>
-
-        {{if not .IsBuyer}}
-        <a href="/ai-assistant">
-            AI Assistant
-        </a>
-        {{end}}
-
-    </nav>
-
-</header>
-
-
-
-<main class="dashboard">
-
-
-    <!-- =========================================
-         WELCOME SECTION
-    ========================================== -->
-
-    <section class="welcome">
-
-
-        <div class="welcome-text">
-
-            <h1>
-                <span id="greeting">
-                    Welcome Back
-                </span>,
-                {{.FullName}} 👋
-            </h1>
-
-            {{if .IsBuyer}}
-
-            <p>
-                Browse the marketplace and find fresh
-                produce from local farmers.
-            </p>
-
-            {{else}}
-
-            <p>
-                Monitor your farm operations from one place.
-            </p>
-
+            {{if not .IsBuyer}}
+                <a href="/storage">
+                    Storage
+                </a>
             {{end}}
 
-        </div>
+            <a href="/marketplace">
+                Marketplace
+            </a>
+
+            <a href="/negotiations">
+                Negotiations
+            </a>
+
+            {{if not .IsBuyer}}
+                <a href="/ai-assistant">
+                    AI Assistant
+                </a>
+            {{end}}
+
+            <a href="/profile">
+                Profile
+            </a>
+
+            <a href="/logout">
+                Log out
+            </a>
+
+        </nav>
+    </header>
 
 
+    <main class="dashboard">
 
-        <!-- =====================================
-             PROFILE MENU
-        ====================================== -->
+        <!-- =====================================================
+             DASHBOARD HEADER
+        ====================================================== -->
+        <!-- <section class="dashboard-header">
 
-        <div class="profile-menu">
+            <div class="dashboard-intro">
 
+                <p class="eyebrow" id="today">
+                    Today
+                </p>
 
-            <button
-                type="button"
-                class="profile-trigger"
-                id="profile-arrow"
-                aria-expanded="false"
-                aria-label="Open profile menu"
-            >
+                <h1>
+                    <span id="greeting">
+                        Welcome back
+                    </span>,
+                    {{.FullName}}
+                </h1>
 
-                {{if .PhotoURL}}
+                {{if .IsBuyer}}
 
-                <img
-                    src="{{.PhotoURL}}"
-                    alt="{{.FullName}}"
-                    class="avatar"
-                >
+                    <p class="header-copy">
+                        Find fresh produce from trusted local farmers
+                        and keep track of your purchases.
+                    </p>
 
                 {{else}}
 
-                <div class="avatar avatar-placeholder">
-                    <span>👤</span>
-                </div>
+                    <p class="header-copy">
+                        Here's what is happening with your farm,
+                        produce, sales, and crop health today.
+                    </p>
 
                 {{end}}
 
-
-                <span
-                    class="profile-arrow"
-                    aria-hidden="true"
-                ></span>
-
-            </button>
+            </div>
 
 
+            <div class="header-actions">
 
-            <!-- =================================
-                 DROPDOWN
-            ================================== -->
+                {{if .IsBuyer}}
 
-            <div
-                class="profile-dropdown"
-                id="profile-dropdown"
-            >
+                    <a
+                        class="primary-action"
+                        href="/marketplace"
+                    >
+                        Browse marketplace
+                    </a>
 
-                <a href="/profile">
-                    <span class="dropdown-icon">
-                        👤
+                {{else}}
+
+                    <a
+                        class="primary-action"
+                        href="/storage"
+                    >
+                        Add produce
+                    </a>
+
+                {{end}}
+
+            </div>
+
+        </section>
+ -->
+
+        <section class="dashboard-header">
+
+            <div class="dashboard-intro">
+
+                <div class="dashboard-datetime">
+
+                    <p class="eyebrow" id="today">
+                        Today
+                    </p>
+
+                    <p class="current-time" id="currentTime"></p>
+
+                </div>
+
+                <h1>
+                    <span id="greeting">
+                        Welcome back
+                    </span>,
+                    {{.FullName}}
+                </h1>
+
+                {{if .IsBuyer}}
+
+                    <p class="header-copy">
+                        Find fresh produce from trusted local farmers
+                        and keep track of your purchases.
+                    </p>
+
+                {{else}}
+
+                    <p class="header-copy">
+                        Here's what is happening with your farm,
+                        produce, sales, and produce health today.
+                    </p>
+
+                {{end}}
+
+            </div>
+
+
+            <div class="header-actions">
+
+                {{if .IsBuyer}}
+
+                    <a
+                        class="primary-action"
+                        href="/marketplace"
+                    >
+                        Browse marketplace
+                    </a>
+
+                {{else}}
+
+                    <a
+                        class="primary-action"
+                        href="/storage"
+                    >
+                        Add produce
+                    </a>
+
+                {{end}}
+
+            </div>
+
+        </section>
+
+        <!-- =====================================================
+             NOTIFICATION / ATTENTION BANNER
+        ====================================================== -->
+
+        {{if not .IsBuyer}}
+
+            <section class="attention-banner priority-{{.PrimaryPriority.Tone}}">
+
+                <div class="attention-icon">
+                    {{if eq .PrimaryPriority.Tone "danger"}}!{{else if eq .PrimaryPriority.Tone "warning"}}!{{else}}&#10003;{{end}}
+                </div>
+
+                <div class="attention-content">
+
+                    <span class="attention-label">
+                        {{.PrimaryPriority.Label}}
                     </span>
 
-                    <span>
-                        Profile
-                    </span>
-                </a>
+                    <h2>
+                        {{.PrimaryPriority.Title}}
+                    </h2>
 
+                    <p>
+                        {{.PrimaryPriority.Detail}}
+                    </p>
 
-                <a href="/settings"> 
-                    <span class="dropdown-icon">
-                        ⚙️
-                    </span>
-
-                    <span>
-                        Settings
-                    </span>
-                </a>
-
+                </div>
 
                 <a
-                    href="/logout"
-                    class="logout-link"
+                    href="{{.PrimaryPriority.Href}}"
+                    class="secondary-action"
                 >
+                    {{.PrimaryPriority.Action}}
+                </a>
 
-                    <span class="dropdown-icon">
-                        🚪
+            </section>
+
+        {{end}}
+
+
+        <!-- =====================================================
+             KEY METRICS
+        ====================================================== -->
+        <section
+            class="metrics"
+            aria-label="Account overview"
+        >
+
+            {{if .IsBuyer}}
+
+                <!-- Purchases -->
+                <a
+                    href="/profile"
+                    class="metric-card"
+                >
+                    <span class="metric-label">
+                        Purchases made
                     </span>
 
-                    <span>
-                        Log Out
+                    <strong
+                        class="counter"
+                        data-target="{{.PurchasesMade}}"
+                    >
+                        0
+                    </strong>
+
+                    <span class="metric-detail">
+                        Completed orders
+                    </span>
+                </a>
+
+
+                <!-- Spending -->
+                <a
+                    href="/profile"
+                    class="metric-card"
+                >
+                    <span class="metric-label">
+                        Total spent
                     </span>
 
+                    <strong>
+                        ₦{{printf "%.2f" .TotalSpent}}
+                    </strong>
+
+                    <span class="metric-detail">
+                        Across all purchases
+                    </span>
+                </a>
+
+
+                <!-- Marketplace -->
+                <a
+                    href="/marketplace"
+                    class="metric-card"
+                >
+                    <span class="metric-label">
+                        Available produce
+                    </span>
+
+                    <strong>
+                        {{.AvailableProduce}}
+                    </strong>
+
+                    <span class="metric-detail">
+                        Units currently available
+                    </span>
+                </a>
+
+
+                <!-- Trust -->
+                <div class="metric-card">
+                    <span class="metric-label">
+                        Account status
+                    </span>
+
+                    <strong class="status-positive">
+                        Verified
+                    </strong>
+
+                    <span class="metric-detail">
+                        Trusted Agro-Shield buyer
+                    </span>
+                </div>
+
+            {{else}}
+
+                <!-- Storage -->
+                <a
+                    href="/storage"
+                    class="metric-card"
+                >
+                    <span class="metric-label">
+                        Produce in storage
+                    </span>
+
+                    <strong
+                        class="counter"
+                        data-target="{{.ProduceInStorage}}"
+                    >
+                        0
+                    </strong>
+
+                    <span class="metric-detail">
+                        Units available to manage
+                    </span>
+                </a>
+
+
+                <!-- Listings -->
+                <a
+                    href="/marketplace"
+                    class="metric-card"
+                >
+                    <span class="metric-label">
+                        Active listings
+                    </span>
+
+                    <strong
+                        class="counter"
+                        data-target="{{.ListingsActive}}"
+                    >
+                        0
+                    </strong>
+
+                    <span class="metric-detail">
+                        Visible to marketplace buyers
+                    </span>
+                </a>
+
+
+                <!-- AI -->
+                <a
+                    href="/ai-diagnosis-history"
+                    class="metric-card"
+                >
+                    <span class="metric-label">
+                        AI health checks
+                    </span>
+
+                    <strong
+                        class="counter"
+                        data-target="{{.AIDiagnosesThisMonth}}"
+                    >
+                        0
+                    </strong>
+
+                    <span class="metric-detail">
+                        Completed this month
+                    </span>
+                </a>
+
+
+                <!-- Revenue -->
+                <a
+                    href="/marketplace"
+                    class="metric-card"
+                >
+                    <span class="metric-label">
+                        Sales revenue
+                    </span>
+
+                    <strong>
+                        ₦{{printf "%.2f" .Revenue}}
+                    </strong>
+
+                    <span class="metric-detail">
+                        Across completed sales
+                    </span>
+                </a>
+
+            {{end}}
+
+        </section>
+
+
+        <!-- =====================================================
+             FARM HEALTH + WEATHER
+        ====================================================== -->
+
+        {{if not .IsBuyer}}
+
+            <section class="dashboard-grid">
+
+                <!-- Farm Health -->
+                <section class="panel farm-health">
+
+                    <div class="section-heading">
+
+                        <div>
+                            <p class="eyebrow">
+                                Overview
+                            </p>
+
+                            <h2>
+                                Farm health
+                            </h2>
+                        </div>
+
+                        <span class="health-status">
+                            {{.HealthStatus}}
+                        </span>
+
+                    </div>
+
+
+                    <div class="health-score">
+
+                        <div class="health-score-number">
+                            {{.HealthScore}}
+                            <span>/100</span>
+                        </div>
+
+                        <div class="health-score-copy">
+                            <strong>
+                                Your farm is doing well
+                            </strong>
+
+                            <p>
+                                Storage, produce health, listings,
+                                and sales are all being monitored.
+                            </p>
+                        </div>
+
+                    </div>
+
+
+                    <div class="health-bars">
+
+                        <div class="health-item">
+
+                            <div class="health-item-header">
+                                <span>
+                                    Storage
+                                </span>
+
+                                <strong>{{with index .HealthMetrics 0}}{{.Percent}}{{end}}%</strong>
+                            </div>
+
+                            <div class="progress">
+                                <span
+                                    class="progress-value"
+                                    data-width="{{with index .HealthMetrics 0}}{{.Percent}}{{end}}%"
+                                ></span>
+                            </div>
+
+                        </div>
+
+
+                        <div class="health-item">
+
+                            <div class="health-item-header">
+                                <span>
+                                    Listings
+                                </span>
+
+                                <strong>{{with index .HealthMetrics 1}}{{.Percent}}{{end}}%</strong>
+                            </div>
+
+                            <div class="progress">
+                                <span
+                                    class="progress-value"
+                                    data-width="{{with index .HealthMetrics 1}}{{.Percent}}{{end}}%"
+                                ></span>
+                            </div>
+
+                        </div>
+
+
+                        <div class="health-item">
+
+                            <div class="health-item-header">
+                                <span>
+                                    {{with index .HealthMetrics 2}}{{.Name}}{{end}}
+                                </span>
+
+                                <strong>{{with index .HealthMetrics 2}}{{.Percent}}{{end}}%</strong>
+                            </div>
+
+                            <div class="progress">
+                                <span
+                                    class="progress-value"
+                                    data-width="{{with index .HealthMetrics 2}}{{.Percent}}{{end}}%"
+                                ></span>
+                            </div>
+
+                        </div>
+
+
+                        <div class="health-item">
+
+                            <div class="health-item-header">
+                                <span>
+                                    Sales activity
+                                </span>
+
+                                <strong>{{with index .HealthMetrics 3}}{{.Percent}}{{end}}%</strong>
+                            </div>
+
+                            <div class="progress">
+                                <span
+                                    class="progress-value"
+                                    data-width="{{with index .HealthMetrics 3}}{{.Percent}}{{end}}%"
+                                ></span>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </section>
+
+
+                <!-- Weather -->
+                <section class="panel weather-card">
+
+                    <div class="section-heading">
+
+                        <div>
+                            <p class="eyebrow">
+                                Conditions
+                            </p>
+
+                            <h2>
+                                Today's weather
+                            </h2>
+                        </div>
+
+                    </div>
+
+
+                    <div class="weather-main">
+
+                        <div class="weather-icon">{{if .Weather.Available}}☀{{else}}—{{end}}</div>
+
+                        <div>
+                            <strong class="temperature">
+                                {{if .Weather.Available}}{{.Weather.Temperature}}{{else}}Unavailable{{end}}
+                            </strong>
+
+                            <span>
+                                {{if .Weather.Available}}{{.Weather.Summary}}{{else}}Weather unavailable{{end}}
+                            </span>
+                        </div>
+
+                    </div>
+
+
+                    <div class="weather-details">
+
+                        <div>
+                            <span>
+                                Humidity
+                            </span>
+
+                            <strong>
+                                {{if .Weather.Available}}{{.Weather.Humidity}}{{else}}—{{end}}
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>
+                                Rain chance
+                            </span>
+
+                            <strong>
+                                {{if .Weather.Available}}{{.Weather.RainChance}}{{else}}—{{end}}
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>
+                                Conditions
+                            </span>
+
+                            <strong>
+                                {{if .Weather.Available}}{{.Weather.Conditions}}{{else}}Unavailable{{end}}
+                            </strong>
+                        </div>
+
+                    </div>
+
+
+                    <div class="weather-recommendation">
+                        <strong>
+                            Farm recommendation
+                        </strong>
+
+                        <p>
+                            {{if .Weather.Available}}{{.Weather.Recommendation}}{{else}}Add a location to your profile to receive local weather conditions.{{end}}
+                        </p>
+                    </div>
+
+                </section>
+
+            </section>
+
+        {{end}}
+
+
+        <!-- =====================================================
+             AI INSIGHT + MARKET OPPORTUNITY
+        ====================================================== -->
+
+        {{if not .IsBuyer}}
+
+            <section class="dashboard-grid">
+
+                <!-- AI Insight -->
+                <section class="panel ai-insight">
+
+                    <div class="section-heading">
+
+                        <div>
+                            <p class="eyebrow">
+                                AI insight
+                            </p>
+
+                            <h2>
+                                Produce health
+                            </h2>
+                        </div>
+
+                        <a href="/ai-assistant">
+                            Open AI
+                        </a>
+
+                    </div>
+
+
+                    <div class="ai-diagnosis">
+
+                        <div class="crop-icon">
+                            🍅
+                        </div>
+
+                        <div class="diagnosis-content">
+
+                            <span class="diagnosis-label">
+                                Latest diagnosis
+                            </span>
+
+                            <h3>
+                                Tomato crop
+                            </h3>
+
+                            <p>
+                                Possible early blight detected.
+                            </p>
+
+                            <div class="confidence">
+
+                                <div class="confidence-header">
+                                    <span>
+                                        AI confidence
+                                    </span>
+
+                                    <strong>
+                                        87%
+                                    </strong>
+                                </div>
+
+                                <div class="progress">
+                                    <span
+                                        class="progress-value"
+                                        style="width: 87%;"
+                                    ></span>
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="ai-recommendation">
+
+                        <span>
+                            Recommended action
+                        </span>
+
+                        <p>
+                            Inspect affected leaves and reduce
+                            excessive moisture around the crop.
+                        </p>
+
+                    </div>
+
+
+                    <a
+                        href="/ai-diagnosis-history"
+                        class="panel-action"
+                    >
+                        View diagnosis history
+                    </a>
+
+                </section>
+
+
+                <!-- Market Opportunity -->
+                <section class="panel market-opportunity">
+
+                    <div class="section-heading">
+
+                        <div>
+                            <p class="eyebrow">
+                                Marketplace
+                            </p>
+
+                            <h2>
+                                Market opportunity
+                            </h2>
+                        </div>
+
+                        <a href="/marketplace">
+                            Marketplace
+                        </a>
+
+                    </div>
+
+
+                    <div class="opportunity-content">
+
+                        <div class="opportunity-icon">
+                            ↗
+                        </div>
+
+                        <div>
+
+                            <span class="opportunity-label">
+                                High demand
+                            </span>
+
+                            <h3>
+                                Tomato demand is increasing
+                            </h3>
+
+                            <p>
+                                Buyers are currently looking for
+                                fresh tomatoes in your market.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="opportunity-stats">
+
+                        <div>
+                            <span>
+                                Buyer interest
+                            </span>
+
+                            <strong>
+                                High
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>
+                                Suggested range
+                            </span>
+
+                            <strong>
+                                ₦85k–₦95k
+                            </strong>
+                        </div>
+
+                    </div>
+
+
+                    <a
+                        href="/marketplace"
+                        class="panel-action"
+                    >
+                        List your tomatoes
+                    </a>
+
+                </section>
+
+            </section>
+
+        {{end}}
+
+
+        <!-- =====================================================
+             STORAGE OVERVIEW
+        ====================================================== -->
+
+        {{if not .IsBuyer}}
+
+            <section class="panel storage-overview">
+
+                <div class="section-heading">
+
+                    <div>
+                        <p class="eyebrow">
+                            Inventory
+                        </p>
+
+                        <h2>
+                            Storage overview
+                        </h2>
+                    </div>
+
+                    <a href="/storage">
+                        Manage storage
+                    </a>
+
+                </div>
+
+
+                <div class="produce-list">
+
+                    <div class="produce-row">
+
+                        <div class="produce-info">
+
+                            <span class="produce-icon">
+                                🍅
+                            </span>
+
+                            <div>
+                                <h3>
+                                    Tomatoes
+                                </h3>
+
+                                <span>
+                                    Fresh stock
+                                </span>
+                            </div>
+
+                        </div>
+
+                        <div class="produce-quantity">
+                            <strong>
+                                80
+                            </strong>
+
+                            <span>
+                                units
+                            </span>
+                        </div>
+
+                        <span class="stock-status healthy">
+                            Healthy
+                        </span>
+
+                    </div>
+
+
+                    <div class="produce-row">
+
+                        <div class="produce-info">
+
+                            <span class="produce-icon">
+                                🌽
+                            </span>
+
+                            <div>
+                                <h3>
+                                    Maize
+                                </h3>
+
+                                <span>
+                                    Fresh stock
+                                </span>
+                            </div>
+
+                        </div>
+
+                        <div class="produce-quantity">
+                            <strong>
+                                50
+                            </strong>
+
+                            <span>
+                                units
+                            </span>
+                        </div>
+
+                        <span class="stock-status healthy">
+                            Healthy
+                        </span>
+
+                    </div>
+
+
+                    <div class="produce-row">
+
+                        <div class="produce-info">
+
+                            <span class="produce-icon">
+                                🥔
+                            </span>
+
+                            <div>
+                                <h3>
+                                    Cassava
+                                </h3>
+
+                                <span>
+                                    Stored stock
+                                </span>
+                            </div>
+
+                        </div>
+
+                        <div class="produce-quantity">
+                            <strong>
+                                35
+                            </strong>
+
+                            <span>
+                                units
+                            </span>
+                        </div>
+
+                        <span class="stock-status attention">
+                            Attention
+                        </span>
+
+                    </div>
+
+
+                    <div class="produce-row">
+
+                        <div class="produce-info">
+
+                            <span class="produce-icon">
+                                🍚
+                            </span>
+
+                            <div>
+                                <h3>
+                                    Rice
+                                </h3>
+
+                                <span>
+                                    Fresh stock
+                                </span>
+                            </div>
+
+                        </div>
+
+                        <div class="produce-quantity">
+                            <strong>
+                                20
+                            </strong>
+
+                            <span>
+                                units
+                            </span>
+                        </div>
+
+                        <span class="stock-status healthy">
+                            Healthy
+                        </span>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+        {{end}}
+
+
+        <!-- =====================================================
+             PRIORITIES + NOTIFICATIONS
+        ====================================================== -->
+
+        <section class="dashboard-grid">
+
+            <!-- Priorities -->
+            <section class="panel priorities">
+
+                <div class="section-heading">
+
+                    <div>
+                        <p class="eyebrow">
+                            Focus
+                        </p>
+
+                        <h2>
+                            Today's priorities
+                        </h2>
+                    </div>
+
+                </div>
+
+
+                {{if .Priorities}}
+
+                    {{range .Priorities}}
+
+                        <article
+                            class="priority priority-{{.Tone}}"
+                        >
+
+                            <div>
+
+                                <span class="priority-label">
+                                    {{.Label}}
+                                </span>
+
+                                <h3>
+                                    {{.Title}}
+                                </h3>
+
+                                <p>
+                                    {{.Detail}}
+                                </p>
+
+                            </div>
+
+                            <a href="{{.Href}}">
+                                {{.Action}}
+                            </a>
+
+                        </article>
+
+                    {{end}}
+
+                {{else}}
+
+                    <article class="priority priority-success">
+
+                        <div>
+
+                            <span class="priority-label">
+                                On track
+                            </span>
+
+                            <h3>
+                                Your account has no urgent actions
+                            </h3>
+
+                            <p>
+                                Use the marketplace and your account
+                                tools to keep momentum going.
+                            </p>
+
+                        </div>
+
+                    </article>
+
+                {{end}}
+
+            </section>
+
+
+            <!-- Notifications -->
+            <section class="panel notifications">
+
+                <div class="section-heading">
+
+                    <div>
+                        <p class="eyebrow">
+                            Updates
+                        </p>
+
+                        <h2>
+                            Notifications
+                        </h2>
+                    </div>
+
+                    <span class="notification-count">{{len .Notifications}}</span>
+
+                </div>
+
+
+                <div class="notification-list">
+                    {{range .Notifications}}
+                    <a href="{{.Href}}" class="notification-row">
+                        <span class="notification-dot {{.Tone}}"></span>
+                        <div><strong>{{.Title}}</strong><p>{{.Detail}}</p></div>
+                        <span>→</span>
+                    </a>
+                    {{else}}<div class="empty-state"><p>No new notifications.</p></div>{{end}}
+                </div>
+
+            </section>
+
+        </section>
+
+
+        <!-- =====================================================
+             RECENT ACTIVITY
+        ====================================================== -->
+
+        <section class="panel activity">
+
+            <div class="section-heading">
+
+                <div>
+                    <p class="eyebrow">
+                        Latest
+                    </p>
+
+                    <h2>
+                        Recent activity
+                    </h2>
+                </div>
+
+                <a href="{{if .IsBuyer}}/purchases{{else}}/marketplace{{end}}">
+                    View all
                 </a>
 
             </div>
 
-        </div>
 
-    </section>
+            {{if .RecentOrders}}
 
+                <div class="activity-list">
 
+                    {{range .RecentOrders}}
 
-    <!-- =========================================
-         STATISTICS
-    ========================================== -->
+                        <article class="activity-row">
 
-<section class="stats">
+                            <div class="activity-mark">
+                            </div>
 
-    {{if .IsBuyer}}
 
-    <a href="/purchases" class="stat-card">
+                            <div class="activity-main">
 
-        <h3>
-            Purchases Made
-        </h3>
+                                <h3>
+                                    {{.CropName}}
+                                </h3>
 
-        <h2
-            class="counter"
-            data-target="{{.PurchasesMade}}"
-        >
-            0
-        </h2>
+                                <p>
 
-        <p>
-            Total Orders
-        </p>
+                                    {{if $.IsBuyer}}
+                                        From {{.SellerName}}
+                                    {{else}}
+                                        Purchased by {{.BuyerName}}
+                                    {{end}}
 
-    </a>
+                                    ·
+                                    {{printf "%.0f" .Quantity}}
+                                    units
 
+                                </p>
 
-    <a href="/purchases" class="stat-card">
+                            </div>
 
-        <h3>
-            Total Spent
-        </h3>
 
-        <h2>
-            ₦{{printf "%.2f" .TotalSpent}}
-        </h2>
+                            <div class="activity-value">
 
-        <p>
-            All Time
-        </p>
+                                <strong>
+                                    ₦{{printf "%.2f" .TotalPrice}}
+                                </strong>
 
-    </a>
+                                <span>
+                                    {{.Status}}
+                                </span>
 
+                            </div>
 
-    {{else}}
+                        </article>
 
+                    {{end}}
 
-    <a href="/storage" class="stat-card">
-
-        <h3>
-            Produce in Storage
-        </h3>
-
-        <h2
-            class="counter"
-            data-target="{{.ProduceInStorage}}"
-        >
-            0
-        </h2>
-
-        <p>
-            Items Available
-        </p>
-
-    </a>
-
-
-    <a href="/marketplace" class="stat-card">
-
-        <h3>
-            Marketplace Listings
-        </h3>
-
-        <h2
-            class="counter"
-            data-target="{{.ListingsActive}}"
-        >
-            0
-        </h2>
-
-        <p>
-            Active Listings
-        </p>
-
-    </a>
-
-
-    <a href="/ai-assistant" class="stat-card">
-
-        <h3>
-            AI Diagnoses
-        </h3>
-
-        <h2
-            class="counter"
-            data-target="{{.AIDiagnosesThisMonth}}"
-        >
-            0
-        </h2>
-
-        <p>
-            This Month
-        </p>
-
-    </a>
-
-
-    <a href="/marketplace" class="stat-card">
-
-        <h3>
-            Revenue
-        </h3>
-
-        <h2>
-            ₦{{printf "%.2f" .Revenue}}
-        </h2>
-
-        <p>
-            Total Sales
-        </p>
-
-    </a>
-
-
-    {{end}}
-
-</section>
-
-
-    <!-- =========================================
-         QUICK ACTIONS
-    ========================================== -->
-
-    <section class="quick-actions">
-
-        <h2>
-            Quick Actions
-        </h2>
-
-
-        <div class="actions">
-
-
-            {{if .IsBuyer}}
-
-
-            <a
-                href="/marketplace"
-                class="action-card"
-            >
-
-                <h3>
-                    🛒 Marketplace
-                </h3>
-
-                <p>
-                    Browse produce to buy
-                </p>
-
-            </a>
-
-
-
-            <a
-                href="/profile"
-                class="action-card"
-            >
-
-                <h3>
-                    👤 Profile
-                </h3>
-
-                <p>
-                    View your purchase history
-                </p>
-
-            </a>
-
+                </div>
 
             {{else}}
 
+                <div class="empty-state">
 
-            <a
-                href="/storage"
-                class="action-card"
-            >
+                    <h3>
+                        No activity yet
+                    </h3>
 
-                <h3>
-                    📦 Manage Your Storage
-                </h3>
+                    <p>
 
-                <p>
-                    Register and manage produce
-                </p>
+                        {{if .IsBuyer}}
+                            Your completed purchases will appear here.
+                        {{else}}
+                            Your completed sales will appear here.
+                        {{end}}
 
-            </a>
+                    </p>
 
-
-
-            <a
-                href="/marketplace"
-                class="action-card"
-            >
-
-                <h3>
-                    🛒 Marketplace
-                </h3>
-
-                <p>
-                    See what's listed for sale
-                </p>
-
-            </a>
-
-
-
-            <a
-                href="/ai-assistant"
-                class="action-card"
-            >
-
-                <h3>
-                    🤖 AI Assistant
-                </h3>
-
-                <p>
-                    Analyze crop images
-                </p>
-
-            </a>
-
-
-
-            <a
-                href="/profile"
-                class="action-card"
-            >
-
-                <h3>
-                    👤 Profile
-                </h3>
-
-                <p>
-                    Manage your account
-                </p>
-
-            </a>
-
+                </div>
 
             {{end}}
 
-
-        </div>
-
-    </section>
+        </section>
 
 
-</main>
+        <!-- =====================================================
+             TRUST / PLATFORM STATUS
+        ====================================================== -->
+
+        <section class="trust-strip">
+
+            <div class="trust-item">
+
+                <span class="trust-icon">
+                    ✓
+                </span>
+
+                <div>
+                    <strong>
+                        Verified marketplace
+                    </strong>
+
+                    <span>
+                        Built for trusted agricultural trade
+                    </span>
+                </div>
+
+            </div>
 
 
+            <div class="trust-item">
 
-<script src="/static/js/dashboard.js"></script>
+                <span class="trust-icon">
+                    AI
+                </span>
+
+                <div>
+                    <strong>
+                        AI-assisted produce health
+                    </strong>
+
+                    <span>
+                        Get insights before problems grow
+                    </span>
+                </div>
+
+            </div>
+
+
+            <div class="trust-item">
+
+                <span class="trust-icon">
+                    🔒
+                </span>
+
+                <div>
+                    <strong>
+                        Secure transactions
+                    </strong>
+
+                    <span>
+                        Your marketplace activity is protected
+                    </span>
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =====================================================
+             QUICK ACTIONS
+        ====================================================== -->
+
+        <section class="quick-actions">
+
+            <div class="section-heading">
+
+                <div>
+                    <p class="eyebrow">
+                        Shortcuts
+                    </p>
+
+                    <h2>
+                        Continue working
+                    </h2>
+                </div>
+
+            </div>
+
+
+            <div class="action-grid">
+
+                {{if .IsBuyer}}
+
+                    <a
+                        href="/marketplace"
+                        class="action-card"
+                    >
+
+                        <span>
+                            Market
+                        </span>
+
+                        <h3>
+                            Explore produce
+                        </h3>
+
+                        <p>
+                            Browse fresh listings from farmers.
+                        </p>
+
+                    </a>
+
+
+                    <a
+                        href="/profile"
+                        class="action-card"
+                    >
+
+                        <span>
+                            Orders
+                        </span>
+
+                        <h3>
+                            View purchases
+                        </h3>
+
+                        <p>
+                            Review your orders and transactions.
+                        </p>
+
+                    </a>
+
+
+                    <a
+                        href="/profile"
+                        class="action-card"
+                    >
+
+                        <span>
+                            Account
+                        </span>
+
+                        <h3>
+                            Manage profile
+                        </h3>
+
+                        <p>
+                            Update your account and preferences.
+                        </p>
+
+                    </a>
+
+                {{else}}
+
+                    <a
+                        href="/storage"
+                        class="action-card"
+                    >
+
+                        <span>
+                            Storage
+                        </span>
+
+                        <h3>
+                            Manage produce
+                        </h3>
+
+                        <p>
+                            Register stock and update availability.
+                        </p>
+
+                    </a>
+
+
+                    <a
+                        href="/marketplace"
+                        class="action-card"
+                    >
+
+                        <span>
+                            Market
+                        </span>
+
+                        <h3>
+                            List produce
+                        </h3>
+
+                        <p>
+                            Put your produce in front of buyers.
+                        </p>
+
+                    </a>
+
+
+                    <a
+                        href="/ai-assistant"
+                        class="action-card"
+                    >
+
+                        <span>
+                            Produce health
+                        </span>
+
+                        <h3>
+                            Ask the AI assistant
+                        </h3>
+
+                        <p>
+                            Analyse a produce image or get agricultural advice.
+                        </p>
+
+                    </a>
+
+
+                    <a
+                        href="/negotiations"
+                        class="action-card"
+                    >
+
+                        <span>
+                            Sales
+                        </span>
+
+                        <h3>
+                            Manage negotiations
+                        </h3>
+
+                        <p>
+                            Review offers and negotiate with buyers.
+                        </p>
+
+                    </a>
+
+                {{end}}
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <!-- =========================================================
+         DASHBOARD JAVASCRIPT
+    ========================================================== -->
+    <script src="/static/js/dashboard.js"></script>
 
 </body>
-
 </html>
