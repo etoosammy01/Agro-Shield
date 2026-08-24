@@ -37,6 +37,7 @@ func NewStorageHandler(crop *services.CropService) *Storage {
 type StoragePageData struct {
 	FullName string
 	Crops    []models.Crop
+	EditCrop *models.Crop
 	Error    string
 }
 
@@ -69,22 +70,29 @@ func (h *Storage) StorageHandler(w http.ResponseWriter, r *http.Request) {
 
 	case http.MethodGet:
 		log.Println("User visited storage")
-
-		h.render(
-			w,
-			farmer.ID,
-			farmer.FullName,
-			"",
-		)
+		var editCrop *models.Crop
+		if editID := strings.TrimSpace(r.URL.Query().Get("edit")); editID != "" {
+			cropID, err := strconv.Atoi(editID)
+			if err == nil && cropID > 0 {
+				candidate, getErr := h.crop.GetCrop(cropID)
+				if getErr == nil && candidate != nil && candidate.FarmerID == farmer.ID {
+					editCrop = candidate
+				}
+			}
+		}
+		h.renderPage(w, farmer.ID, farmer.FullName, "", editCrop)
 
 	case http.MethodPost:
-		if err := r.ParseMultipartForm(10 << 20); err != nil {
-			h.render(
-				w,
-				farmer.ID,
-				farmer.FullName,
-				"Couldn't process the form",
-			)
+		// Product creation/updates may include an image upload and therefore
+		// use multipart/form-data. Listing and deletion forms are ordinary
+		// URL-encoded forms; parsing them as multipart rejects valid requests.
+		if strings.HasPrefix(strings.ToLower(r.Header.Get("Content-Type")), "multipart/form-data") {
+			if err := r.ParseMultipartForm(10 << 20); err != nil {
+				h.render(w, farmer.ID, farmer.FullName, "Couldn't process the form")
+				return
+			}
+		} else if err := r.ParseForm(); err != nil {
+			h.render(w, farmer.ID, farmer.FullName, "Couldn't process the form")
 			return
 		}
 
@@ -274,6 +282,11 @@ func (h *Storage) updateCrop(
 
 	// Image upload is optional during an update.
 	imageURL := strings.TrimSpace(r.FormValue("image_url"))
+	if uploadedURL, uploadErr := saveUploadedFile(r, "produce_image", "crops"); uploadErr != nil {
+		log.Println("updated produce image upload failed:", uploadErr)
+	} else if strings.TrimSpace(uploadedURL) != "" {
+		imageURL = uploadedURL
+	}
 
 	if err := h.crop.UpdateCrop(
 		farmerID,
@@ -450,6 +463,10 @@ func (h *Storage) render(
 	fullName string,
 	errMsg string,
 ) {
+	h.renderPage(w, farmerID, fullName, errMsg, nil)
+}
+
+func (h *Storage) renderPage(w http.ResponseWriter, farmerID int, fullName, errMsg string, editCrop *models.Crop) {
 	crops, err := h.crop.MyCrops(farmerID)
 	if err != nil {
 		log.Println("failed to load crops:", err)
@@ -465,6 +482,7 @@ func (h *Storage) render(
 	data := StoragePageData{
 		FullName: fullName,
 		Crops:    crops,
+		EditCrop: editCrop,
 		Error:    errMsg,
 	}
 

@@ -44,7 +44,7 @@
                 <td>{{if eq .BuyerID $.UserID}}{{.SellerName}}{{else}}{{.BuyerName}}{{end}}</td>
                 <td><span class="status status-{{.Status}}">{{.Status}}</span></td>
                 <td>{{.RoundCount}}/{{.MaxRounds}}</td>
-                <td><a href="/negotiation?id={{.ID}}">Open Chat</a></td>
+                <td><a class="open-chat-btn" href="/negotiation?id={{.ID}}">Open chat</a></td>
             </tr>
             {{else}}
             <tr><td colspan="5">No negotiations yet. Start one from a Marketplace listing.</td></tr>

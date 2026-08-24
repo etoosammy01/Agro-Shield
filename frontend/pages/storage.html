@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Storage | Agro-Shield</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/storage.css">
+    <link rel="stylesheet" href="/static/css/storage.css?v=20260824-modal-fit">
 </head>
 <body>
 
@@ -51,11 +51,12 @@
                 <th>Price/Unit</th>
                 <th>Listed for Sale</th>
                 <th>Date Stored</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody id="storage-body">
             {{range .Crops}}
-            <tr>
+            <tr data-product-name="{{.Name}}">
                 <td>{{if .ImageURL}}<img src="{{.ImageURL}}" alt="{{.Name}}" class="thumb">{{else}}—{{end}}</td>
                 <td>{{.Name}}</td>
                 <td>{{.Quantity}}</td>
@@ -64,50 +65,67 @@
                 <td>₦{{printf "%.2f" .PricePerUnit}}</td>
                 <td>{{if .ListedForSale}}Yes{{else}}No{{end}}</td>
                 <td>{{.CreatedAt.Format "02 Jan 2006"}}</td>
+                <td class="product-actions">
+                    <a class="product-action edit-action" href="/storage?edit={{.ID}}">Edit</a>
+                    <form method="POST" action="/storage">
+                        <input type="hidden" name="action" value="{{if .ListedForSale}}unlist{{else}}relist{{end}}">
+                        <input type="hidden" name="crop_id" value="{{.ID}}">
+                        <button type="submit" class="product-action listing-action">{{if .ListedForSale}}Unlist{{else}}List{{end}}</button>
+                    </form>
+                    <form method="POST" action="/storage" class="delete-form">
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="crop_id" value="{{.ID}}">
+                        <button type="submit" class="product-action delete-action">Delete</button>
+                    </form>
+                </td>
             </tr>
             {{else}}
-            <tr><td colspan="8">No product in storage yet — add your first item above.</td></tr>
+            <tr><td colspan="9">No product in storage yet — add your first item above.</td></tr>
             {{end}}
         </tbody>
     </table>
 
-    <div id="modal" class="modal">
+    <div id="modal" class="modal{{if .EditCrop}} modal-open{{end}}">
         <form id="storage-form" method="POST" action="/storage" enctype="multipart/form-data">
-            <h2>Add Products</h2>
+            <h2 id="modal-title">{{if .EditCrop}}Edit Product{{else}}Add Product{{end}}</h2>
+            <input type="hidden" name="action" id="form-action" value="{{if .EditCrop}}update{{else}}create{{end}}">
+            <input type="hidden" name="crop_id" id="crop-id" value="{{if .EditCrop}}{{.EditCrop.ID}}{{end}}">
+            <input type="hidden" name="image_url" id="image-url" value="{{if .EditCrop}}{{.EditCrop.ImageURL}}{{end}}">
 
             <label>Product Name</label>
-            <input type="text" name="produce" placeholder="e.g. Maize" required>
+            <input type="text" name="produce" id="produce" value="{{if .EditCrop}}{{.EditCrop.Name}}{{end}}" placeholder="e.g. Maize" required>
 
             <label>Quantity</label>
-            <input type="number" step="0.01" min="0.01" name="quantity" required>
+            <input type="number" step="0.01" min="0.01" name="quantity" id="quantity" value="{{if .EditCrop}}{{.EditCrop.Quantity}}{{end}}" required>
 
             <label>Unit</label>
-            <input type="text" name="unit" placeholder="Bags, Kg, Tons..." required>
+            <input type="text" name="unit" id="unit" value="{{if .EditCrop}}{{.EditCrop.Unit}}{{end}}" placeholder="Bags, Kg, Tons..." required>
 
             <label>Storage Location</label>
-            <input type="text" name="location" placeholder="Warehouse A" required>
+            <input type="text" name="location" id="location" value="{{if .EditCrop}}{{.EditCrop.Location}}{{end}}" placeholder="Warehouse A" required>
 
             <label>Price per Unit (₦)</label>
-            <input type="number" step="0.01" min="0" name="price" placeholder="Required if listing for sale">
+            <input type="number" step="0.01" min="0" name="price" id="price" value="{{if .EditCrop}}{{.EditCrop.PricePerUnit}}{{end}}" placeholder="Required if listing for sale" required>
 
             <label>Photo</label>
-            <input type="file" name="produce_image" accept="image/*" required>
+            <input type="file" name="produce_image" id="produce-image" accept="image/*" {{if not .EditCrop}}required{{end}}>
+            <small id="image-help">{{if .EditCrop}}Leave empty to keep the current image.{{else}}A product photo is required.{{end}}</small>
 
             <label class="checkbox-row">
-                <input type="checkbox" name="list_for_sale">
+                <input type="checkbox" name="list_for_sale" id="list-for-sale" {{if .EditCrop}}{{if .EditCrop.ListedForSale}}checked{{end}}{{end}}>
                 List this on the Marketplace
             </label>
 
             <div class="modal-actions">
                 <button type="submit">Save</button>
-                <button type="button" id="close-btn">Cancel</button>
+                <a href="/storage" id="close-btn" class="cancel-action">Cancel</a>
             </div>
         </form>
     </div>
 
 </main>
 
-<script src="/static/js/storage.js"></script>
+<script src="/static/js/storage.js?v=20260824-product-actions"></script>
 
 </body>
 </html>

@@ -703,6 +703,24 @@
     font-size: 0.85rem;
 }
 
+.produce-demand-summary {
+    display: grid;
+    gap: 6px;
+    margin-top: 14px;
+    padding: 14px;
+    border: 1px solid #e4ece7;
+    border-radius: 14px;
+    background: #fbfdfb;
+}
+.produce-demand-summary span,
+.produce-demand-summary small { color: #667085; line-height: 1.45; }
+.market-insights-heading { display:flex; justify-content:space-between; align-items:center; margin-top:14px; }
+.market-insights-heading a { color:#287a4b; font-size:.9rem; }
+.cart-nav-link { display:inline-flex; align-items:center; gap:6px; }
+.cart-badge { min-width:20px; height:20px; padding:0 6px; display:inline-flex; align-items:center; justify-content:center; border-radius:999px; background:#287a4b; color:#fff; font-size:.75rem; font-weight:700; }
+.notification-nav-link { display:inline-flex; align-items:center; gap:5px; }
+.notification-nav-badge { min-width:18px; height:18px; padding:0 5px; display:inline-flex; align-items:center; justify-content:center; border-radius:999px; background:#c0392b; color:#fff; font-size:.7rem; font-weight:700; }
+
 
 /* =========================================================
    11. STORAGE OVERVIEW

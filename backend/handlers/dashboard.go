@@ -15,16 +15,18 @@ import (
 )
 
 type Dashboard struct {
-	crop        *services.CropService
-	order       *services.OrderService
-	ai          *services.AIService
-	negotiation *services.NegotiationService
-	weather     *services.WeatherService
-	events      *repository.MarketEventRepository
+	crop         *services.CropService
+	order        *services.OrderService
+	cart         *services.CartService
+	ai           *services.AIService
+	negotiation  *services.NegotiationService
+	weather      *services.WeatherService
+	notification *services.NotificationService
+	events       *repository.MarketEventRepository
 }
 
-func NewDashboardHandler(crop *services.CropService, order *services.OrderService, ai *services.AIService, negotiation *services.NegotiationService, weather *services.WeatherService, events *repository.MarketEventRepository) *Dashboard {
-	return &Dashboard{crop: crop, order: order, ai: ai, negotiation: negotiation, weather: weather, events: events}
+func NewDashboardHandler(crop *services.CropService, order *services.OrderService, cart *services.CartService, ai *services.AIService, negotiation *services.NegotiationService, weather *services.WeatherService, notification *services.NotificationService, events *repository.MarketEventRepository) *Dashboard {
+	return &Dashboard{crop: crop, order: order, cart: cart, ai: ai, negotiation: negotiation, weather: weather, notification: notification, events: events}
 }
 
 // DashboardData is what dashboard.html renders against. Farmer-only fields
@@ -38,6 +40,7 @@ type DashboardData struct {
 
 	// Farmer stats
 	ProduceInStorage     int
+	StorageCrops         []models.Crop
 	ListingsActive       int
 	AIDiagnosesThisMonth int
 	Revenue              float64
@@ -46,10 +49,13 @@ type DashboardData struct {
 	PurchasesMade        int
 	TotalSpent           float64
 	AvailableProduce     int
+	CartItemCount        int
+	CartTotal            float64
 	HealthScore          int
 	HealthStatus         string
 	HealthMetrics        []HealthMetric
 	Notifications        []DashboardNotification
+	UnreadNotifications  int
 	Weather              services.Weather
 	LatestDiagnosis      *models.Diagnosis
 	MarketListings       int
@@ -61,6 +67,7 @@ type DashboardData struct {
 	MarketNegotiations30 int
 	Demand               models.ProduceDemandSummary
 	ProduceDemands       []models.ProduceDemandSummary
+	ProduceDemandPreview []models.ProduceDemandSummary
 
 	Priorities      []DashboardPriority
 	PrimaryPriority DashboardPriority
@@ -84,7 +91,9 @@ func (h *Dashboard) DashBoard(w http.ResponseWriter, r *http.Request) {
 
 		data := DashboardData{FullName: "user"}
 		if h.events != nil {
-			_ = h.events.ReconcileCheckoutAbandonments(24 * time.Hour)
+			if err := h.events.ReconcileCheckoutAbandonments(24 * time.Hour); err != nil {
+				log.Printf("dashboard checkout reconciliation failed: %v", err)
+			}
 		}
 
 		farmer, ok := middleware.FarmerFromContext(r)
@@ -106,6 +115,13 @@ func (h *Dashboard) DashBoard(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if farmer.IsBuyer() {
+				if h.cart != nil {
+					if items, err := h.cart.MyCart(farmer.ID); err != nil {
+						log.Printf("dashboard cart summary unavailable for buyer %d: %v", farmer.ID, err)
+					} else {
+						data.CartItemCount, data.CartTotal = cartSummary(items)
+					}
+				}
 				if available, err := h.crop.AvailableCrops(); err == nil {
 					data.AvailableProduce = len(available)
 				}
@@ -121,12 +137,28 @@ func (h *Dashboard) DashBoard(w http.ResponseWriter, r *http.Request) {
 				var farmerCrops []models.Crop
 				if got, err := h.crop.MyCrops(farmer.ID); err == nil {
 					farmerCrops = got
+					data.StorageCrops = got
+					data.ProduceInStorage = len(got)
+					for _, crop := range got {
+						if crop.ListedForSale {
+							data.ListingsActive++
+						}
+					}
 				}
 				if h.events != nil && len(farmerCrops) > 0 {
 					cutoff := time.Now().Add(-30 * 24 * time.Hour)
 					previous := cutoff.Add(-30 * 24 * time.Hour)
-					data.Demand, _ = h.events.FarmerDemandSummary(farmer.ID, farmer.Location, cutoff, previous)
-					data.ProduceDemands, _ = h.events.GroupedDemandSummaries(farmer.ID, farmer.Location, cutoff, previous)
+					if summary, err := h.events.FarmerDemandSummary(farmer.ID, farmer.Location, cutoff, previous); err != nil {
+						log.Printf("dashboard demand summary unavailable for farmer %d: %v", farmer.ID, err)
+					} else {
+						data.Demand = summary
+					}
+					if summaries, err := h.events.GroupedDemandSummaries(farmer.ID, farmer.Location, cutoff, previous); err != nil {
+						log.Printf("dashboard produce comparisons unavailable for farmer %d: %v", farmer.ID, err)
+					} else {
+						data.ProduceDemands = summaries
+						data.ProduceDemandPreview = prioritizeDemandSummaries(summaries, 3)
+					}
 				}
 				if available, err := h.crop.AvailableCrops(); err == nil {
 					data.MarketListings = len(available)
@@ -147,14 +179,6 @@ func (h *Dashboard) DashBoard(w http.ResponseWriter, r *http.Request) {
 							data.MarketPriceMedian = prices[middle]
 						}
 						data.MarketHasPrices = true
-					}
-				}
-				if crops, err := h.crop.MyCrops(farmer.ID); err == nil {
-					for _, c := range crops {
-						data.ProduceInStorage += int(c.Quantity)
-						if c.ListedForSale {
-							data.ListingsActive++
-						}
 					}
 				}
 				if count, err := h.ai.CountThisMonth(farmer.ID); err == nil {
@@ -202,6 +226,11 @@ func (h *Dashboard) DashBoard(w http.ResponseWriter, r *http.Request) {
 				data.HealthMetrics, data.HealthScore, data.HealthStatus = farmHealth(data, diagnoses)
 			}
 			data.Notifications = dashboardNotifications(data, farmer.IsBuyer())
+			if h.notification != nil {
+				if count, err := h.notification.GetUnreadCount(farmer.ID); err == nil {
+					data.UnreadNotifications = count
+				}
+			}
 			if len(data.Priorities) > 0 {
 				data.PrimaryPriority = data.Priorities[0]
 			}
@@ -215,6 +244,66 @@ func (h *Dashboard) DashBoard(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		log.Println("user's Choices")
 	}
+}
+
+func cartSummary(items []models.CartItem) (int, float64) {
+	total := 0.0
+	for _, item := range items {
+		total += item.TotalPrice
+	}
+	return len(items), total
+}
+
+func (h *Dashboard) MarketInsights(w http.ResponseWriter, r *http.Request) {
+	farmer, ok := middleware.FarmerFromContext(r)
+	if !ok || farmer == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	cutoff := time.Now().Add(-30 * 24 * time.Hour)
+	summaries, err := h.events.GroupedDemandSummaries(farmer.ID, farmer.Location, cutoff, cutoff.Add(-30*24*time.Hour))
+	if err != nil {
+		log.Printf("market insights unavailable for farmer %d: %v", farmer.ID, err)
+		http.Error(w, "Unable to load market insights", http.StatusInternalServerError)
+		return
+	}
+	data := struct {
+		FullName  string
+		Summaries []models.ProduceDemandSummary
+	}{farmer.FullName, prioritizeDemandSummaries(summaries, len(summaries))}
+	if err := render.RenderTemplates(w, "market-insights.html", data); err != nil {
+		log.Printf("market insights render error: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
+}
+
+func prioritizeDemandSummaries(items []models.ProduceDemandSummary, limit int) []models.ProduceDemandSummary {
+	if limit <= 0 || len(items) == 0 {
+		return nil
+	}
+	result := append([]models.ProduceDemandSummary(nil), items...)
+	sort.SliceStable(result, func(i, j int) bool {
+		rank := func(s models.ProduceDemandSummary) int {
+			if s.PriceDifferencePercent > 15 && s.Orders == 0 {
+				return 5
+			}
+			if s.CartAdds > 0 && s.Orders == 0 {
+				return 4
+			}
+			if s.Views+s.CartAdds+s.Orders+s.Negotiations == 0 {
+				return 3
+			}
+			if s.Orders > 0 {
+				return 1
+			}
+			return 2
+		}
+		return rank(result[i]) > rank(result[j])
+	})
+	if len(result) > limit {
+		result = result[:limit]
+	}
+	return result
 }
 
 func limitOrders(orders []models.Order, max int) []models.Order {

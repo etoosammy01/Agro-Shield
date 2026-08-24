@@ -40,6 +40,12 @@
                 Negotiations
             </a>
 
+            {{if .IsBuyer}}
+                <a href="/cart" class="cart-nav-link">
+                    Cart{{if .CartItemCount}} <span class="cart-badge">{{.CartItemCount}}</span>{{end}}
+                </a>
+            {{end}}
+
             {{if not .IsBuyer}}
                 <a href="/ai-assistant">
                     AI Assistant
@@ -48,6 +54,11 @@
 
             <a href="/profile">
                 Profile
+            </a>
+
+            <a href="/notifications" class="notification-nav-link" aria-label="Notifications">
+                <span aria-hidden="true">🔔</span>
+                {{if .UnreadNotifications}}<span class="notification-nav-badge">{{.UnreadNotifications}}</span>{{end}}
             </a>
 
             <a href="/logout">
@@ -100,6 +111,12 @@
             <div class="header-actions">
 
                 {{if .IsBuyer}}
+
+                    <a href="/cart" class="action-card">
+                        <span>Cart</span>
+                        <h3>Review cart{{if .CartItemCount}} ({{.CartItemCount}}){{end}}</h3>
+                        <p>{{if .CartItemCount}}Negotiated total: ₦{{printf "%.2f" .CartTotal}}{{else}}Accepted negotiated offers will appear here.{{end}}</p>
+                    </a>
 
                     <a
                         class="primary-action"
@@ -723,13 +740,21 @@
                         {{if .LatestDiagnosis}}View diagnosis history{{else}}Start health check{{end}}
                     </a>
 
-                    {{range .ProduceDemands}}
+                    {{if .ProduceDemandPreview}}
+                    <div class="market-insights-heading"><strong>Top market insights</strong><a href="/market-insights">View all</a></div>
+                    {{range .ProduceDemandPreview}}
                     <div class="produce-demand-summary">
                         <strong>{{.ProduceType}}</strong> · {{.Activity}}
                         <span>{{.Views}} views · {{.CartAdds}} cart adds · {{.Negotiations}} negotiations · {{.Orders}} orders</span>
                         {{if .PriceAvailable}}<span>Local prices: ₦{{printf "%.0f" .LocalPriceMin}}–₦{{printf "%.0f" .LocalPriceMax}} · median ₦{{printf "%.0f" .LocalPriceMedian}}</span>{{end}}
+                        {{if .PricePosition}}<span>Your average price: ₦{{printf "%.0f" .FarmerPrice}} · {{.PricePosition}} ({{printf "%+.0f%%" .PriceDifferencePercent}})</span>{{end}}
+                        {{if .StateListings}}<span>State comparison: {{.StateListings}} listings · median ₦{{printf "%.0f" .StatePriceMedian}}</span>{{end}}
+                        {{if .NearbyListings}}<span>Nearby LGA comparison: {{.NearbyListings}} listings · median ₦{{printf "%.0f" .NearbyPriceMedian}}</span>{{end}}
+                        {{if .NationalListings}}<span>National comparison: {{.NationalListings}} listings · median ₦{{printf "%.0f" .NationalPriceMedian}}</span>{{end}}
+                        {{if .ExternalPriceAvailable}}<span>Verified external observations: {{.ExternalListings}} · median ₦{{printf "%.0f" .ExternalPriceMedian}}</span>{{end}}
                         <small>{{.Recommendation}}</small>
                     </div>
+                    {{end}}
                     {{end}}
 
                 </section>
@@ -872,22 +897,22 @@
 
 
                 <div class="produce-list">
-
+                    {{range .StorageCrops}}
                     <div class="produce-row">
 
                         <div class="produce-info">
 
                             <span class="produce-icon">
-                                🍅
+                                {{if .ListedForSale}}🌾{{else}}📦{{end}}
                             </span>
 
                             <div>
                                 <h3>
-                                    Tomatoes
+                                    {{.Name}}
                                 </h3>
 
                                 <span>
-                                    Fresh stock
+                                    {{if .ListedForSale}}Listed for sale{{else}}Stored stock{{end}}
                                 </span>
                             </div>
 
@@ -895,130 +920,24 @@
 
                         <div class="produce-quantity">
                             <strong>
-                                80
+                                {{printf "%.0f" .Quantity}}
                             </strong>
 
                             <span>
-                                units
+                                {{.Unit}}
                             </span>
                         </div>
 
                         <span class="stock-status healthy">
-                            Healthy
+                            {{if eq .Quantity 0.0}}Empty{{else if .ListedForSale}}Listed{{else}}Stored{{end}}
                         </span>
 
                     </div>
 
 
-                    <div class="produce-row">
-
-                        <div class="produce-info">
-
-                            <span class="produce-icon">
-                                🌽
-                            </span>
-
-                            <div>
-                                <h3>
-                                    Maize
-                                </h3>
-
-                                <span>
-                                    Fresh stock
-                                </span>
-                            </div>
-
-                        </div>
-
-                        <div class="produce-quantity">
-                            <strong>
-                                50
-                            </strong>
-
-                            <span>
-                                units
-                            </span>
-                        </div>
-
-                        <span class="stock-status healthy">
-                            Healthy
-                        </span>
-
-                    </div>
-
-
-                    <div class="produce-row">
-
-                        <div class="produce-info">
-
-                            <span class="produce-icon">
-                                🥔
-                            </span>
-
-                            <div>
-                                <h3>
-                                    Cassava
-                                </h3>
-
-                                <span>
-                                    Stored stock
-                                </span>
-                            </div>
-
-                        </div>
-
-                        <div class="produce-quantity">
-                            <strong>
-                                35
-                            </strong>
-
-                            <span>
-                                units
-                            </span>
-                        </div>
-
-                        <span class="stock-status attention">
-                            Attention
-                        </span>
-
-                    </div>
-
-
-                    <div class="produce-row">
-
-                        <div class="produce-info">
-
-                            <span class="produce-icon">
-                                🍚
-                            </span>
-
-                            <div>
-                                <h3>
-                                    Rice
-                                </h3>
-
-                                <span>
-                                    Fresh stock
-                                </span>
-                            </div>
-
-                        </div>
-
-                        <div class="produce-quantity">
-                            <strong>
-                                20
-                            </strong>
-
-                            <span>
-                                units
-                            </span>
-                        </div>
-
-                        <span class="stock-status healthy">
-                            Healthy
-                        </span>
-
-                    </div>
+                    {{else}}
+                    <div class="empty-state"><p>No produce in storage yet.</p><a href="/storage">Add your first product</a></div>
+                    {{end}}
 
                 </div>
 
@@ -1110,38 +1029,6 @@
 
             </section>
 
-
-            <!-- Notifications -->
-            <section class="panel notifications">
-
-                <div class="section-heading">
-
-                    <div>
-                        <p class="eyebrow">
-                            Updates
-                        </p>
-
-                        <h2>
-                            Notifications
-                        </h2>
-                    </div>
-
-                    <span class="notification-count">{{len .Notifications}}</span>
-
-                </div>
-
-
-                <div class="notification-list">
-                    {{range .Notifications}}
-                    <a href="{{.Href}}" class="notification-row">
-                        <span class="notification-dot {{.Tone}}"></span>
-                        <div><strong>{{.Title}}</strong><p>{{.Detail}}</p></div>
-                        <span>→</span>
-                    </a>
-                    {{else}}<div class="empty-state"><p>No new notifications.</p></div>{{end}}
-                </div>
-
-            </section>
 
         </section>
 

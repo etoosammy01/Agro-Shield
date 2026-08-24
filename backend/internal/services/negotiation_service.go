@@ -528,6 +528,10 @@ func (s *NegotiationService) Accept(
 		)
 	}
 
+	if offer.SenderID == accepterID {
+		return errors.New("you cannot accept your own offer")
+	}
+
 	// --------------------------------------------------------
 	// Get crop.
 	// --------------------------------------------------------
@@ -754,6 +758,10 @@ func (s *NegotiationService) Reject(
 		)
 	}
 
+	if offer.SenderID == rejecterID {
+		return errors.New("you cannot reject your own offer")
+	}
+
 	// --------------------------------------------------------
 	// Reject only this offer.
 	// --------------------------------------------------------
@@ -790,6 +798,34 @@ func (s *NegotiationService) Reject(
 		)
 	}
 
+	return nil
+}
+
+// End closes an open negotiation without accepting an offer.
+func (s *NegotiationService) End(negotiationID, userID int) error {
+	negotiation, err := s.repo.GetByID(negotiationID)
+	if err != nil {
+		return err
+	}
+	if negotiation == nil {
+		return errors.New("negotiation not found")
+	}
+	if userID != negotiation.BuyerID && userID != negotiation.FarmerID {
+		return errors.New("you're not part of this negotiation")
+	}
+	if negotiation.Status != "open" {
+		return errors.New("this negotiation is already finalized")
+	}
+	if err := s.repo.UpdateStatus(negotiationID, "rejected"); err != nil {
+		return err
+	}
+	if s.notification != nil {
+		recipientID := negotiation.FarmerID
+		if userID == negotiation.FarmerID {
+			recipientID = negotiation.BuyerID
+		}
+		_ = s.notification.CreateNotification(recipientID, "Negotiation ended", "The other participant ended a negotiation.", "negotiation_ended")
+	}
 	return nil
 }
 

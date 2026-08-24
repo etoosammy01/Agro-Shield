@@ -18,8 +18,8 @@ func NewFarmerRepository(db *sql.DB) *FarmerRepository {
 func (r *FarmerRepository) Create(farmer *models.Farmer) error {
 	query := `
 	INSERT INTO farmers
-	(full_name, phone, email, password_hash, location, role, photo_url)
-	VALUES ($1, $2, $3, $4, $5, $6, $7)
+	(full_name, phone, email, password_hash, location, lga, state, country, role, photo_url)
+	VALUES ($1, $2, $3, $4, $5, $5, 'Benue', 'Nigeria', $6, $7)
 	RETURNING id
 	`
 	_, err := r.db.Exec(
@@ -44,6 +44,7 @@ func (r *FarmerRepository) GetByPhone(phone string) (*models.Farmer, error) {
 		COALESCE(email, '') AS email,
 		password_hash,
 		location,
+		COALESCE(lga, location), COALESCE(state, ''), COALESCE(country, 'Nigeria'),
 		role,
 		COALESCE(photo_url, '') AS photo_url,
 		created_at,
@@ -59,6 +60,7 @@ func (r *FarmerRepository) GetByPhone(phone string) (*models.Farmer, error) {
 		&farmer.Email,
 		&farmer.PasswordHash,
 		&farmer.Location,
+		&farmer.LGA, &farmer.State, &farmer.Country,
 		&farmer.Role,
 		&farmer.PhotoURL,
 		&farmer.CreatedAt,
@@ -82,6 +84,7 @@ func (r *FarmerRepository) GetByID(id int) (*models.Farmer, error) {
 		COALESCE(email, '') AS email,
 		password_hash,
 		location,
+		COALESCE(lga, location), COALESCE(state, ''), COALESCE(country, 'Nigeria'),
 		role,
 		COALESCE(photo_url, '') AS photo_url,
 		created_at,
@@ -97,6 +100,7 @@ func (r *FarmerRepository) GetByID(id int) (*models.Farmer, error) {
 		&farmer.Email,
 		&farmer.PasswordHash,
 		&farmer.Location,
+		&farmer.LGA, &farmer.State, &farmer.Country,
 		&farmer.Role,
 		&farmer.PhotoURL,
 		&farmer.CreatedAt,

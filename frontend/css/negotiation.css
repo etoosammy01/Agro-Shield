@@ -145,6 +145,19 @@
     font-size:12px;
 }
 
+.offer-status{display:inline-block;margin-bottom:6px;font-size:12px;text-transform:capitalize;font-weight:bold;color:#666;}
+.offer-status-pending{color:#8a6d00;}
+.offer-status-accepted{color:green;}
+.offer-status-rejected{color:#a10000;}
+.offer-actions{display:flex;gap:8px;margin-top:10px;}
+.offer-actions form{flex:1;}
+.offer-actions button{width:100%;padding:8px;border:0;border-radius:6px;font-weight:bold;cursor:pointer;}
+.chat-form{display:flex;gap:10px;margin-bottom:14px;}
+.chat-form input{flex:1;padding:12px;border:1px solid lightgray;border-radius:8px;}
+.chat-form button,.open-chat-btn{background:green;color:white;border:0;padding:10px 16px;border-radius:8px;font-weight:bold;text-decoration:none;cursor:pointer;}
+.end-form{margin-top:14px;}
+.end-form button{padding:12px 18px;border:0;border-radius:8px;font-weight:bold;cursor:pointer;}
+
 .offer-form{
     display:flex;
     gap:10px;
@@ -213,4 +226,13 @@
 
 .reject-btn:hover{
     background:#f1b3ba;
+}
+
+@media (max-width: 600px){
+    .negotiations,.negotiation-thread{padding:28px 16px;}
+    .negotiations{overflow-x:auto;}
+    .negotiations table{min-width:680px;}
+    .thread-header{align-items:flex-start;flex-direction:column;gap:14px;}
+    .offer-form,.chat-form{flex-wrap:wrap;}
+    .offer-form input[name="message"],.chat-form input{min-width:100%;}
 }

@@ -3,6 +3,7 @@ package repository
 import (
 	"backend/internal/models"
 	"database/sql"
+	"fmt"
 )
 
 // CropRepository handles all database operations related to crops/products.
@@ -24,6 +25,12 @@ func NewCropRepository(db *sql.DB) *CropRepository {
 // - Insert a farmer's new product into the crops table.
 // - Return the newly generated product ID.
 func (r *CropRepository) Create(crop *models.Crop) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
 	query := `
 		INSERT INTO crops (
 			farmer_id,
@@ -33,13 +40,13 @@ func (r *CropRepository) Create(crop *models.Crop) error {
 			location,
 			price_per_unit,
 			listed_for_sale,
-			image_url, initial_listed_quantity, first_listed_at
+			image_url, lga, state, country, initial_listed_quantity, first_listed_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CASE WHEN $7 THEN $3 ELSE NULL END, CASE WHEN $7 THEN CURRENT_TIMESTAMP ELSE NULL END)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $5, COALESCE((SELECT state FROM farmers WHERE id=$1),'Benue'), COALESCE((SELECT country FROM farmers WHERE id=$1),'Nigeria'), CASE WHEN $7 THEN $3 ELSE NULL END, CASE WHEN $7 THEN CURRENT_TIMESTAMP ELSE NULL END)
 		RETURNING id
 	`
 
-	err := r.db.QueryRow(
+	err = tx.QueryRow(
 		query,
 		crop.FarmerID,
 		crop.Name,
@@ -50,8 +57,15 @@ func (r *CropRepository) Create(crop *models.Crop) error {
 		crop.ListedForSale,
 		crop.ImageURL,
 	).Scan(&crop.ID)
-
-	return err
+	if err != nil {
+		return err
+	}
+	if crop.PricePerUnit > 0 {
+		if _, err = tx.Exec(`INSERT INTO produce_price_history (crop_id,price_per_unit,unit,source) VALUES ($1,$2,$3,'Agro-Shield')`, crop.ID, crop.PricePerUnit, crop.Unit); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // ListByFarmer retrieves all products belonging to a specific farmer.
@@ -71,6 +85,7 @@ func (r *CropRepository) ListByFarmer(farmerID int) ([]models.Crop, error) {
 			price_per_unit,
 			listed_for_sale,
 			image_url,
+			initial_listed_quantity, first_listed_at, first_order_at, sold_out_at,
 			created_at,
 			updated_at
 		FROM crops
@@ -99,6 +114,7 @@ func (r *CropRepository) ListByFarmer(farmerID int) ([]models.Crop, error) {
 			&crop.PricePerUnit,
 			&crop.ListedForSale,
 			&crop.ImageURL,
+			&crop.InitialListedQuantity, &crop.FirstListedAt, &crop.FirstOrderAt, &crop.SoldOutAt,
 			&crop.CreatedAt,
 			&crop.UpdatedAt,
 		); err != nil {
@@ -191,6 +207,7 @@ func (r *CropRepository) GetByID(id int) (*models.Crop, error) {
 			price_per_unit,
 			listed_for_sale,
 			image_url,
+			initial_listed_quantity, first_listed_at, first_order_at, sold_out_at,
 			created_at,
 			updated_at
 		FROM crops
@@ -209,6 +226,7 @@ func (r *CropRepository) GetByID(id int) (*models.Crop, error) {
 		&crop.PricePerUnit,
 		&crop.ListedForSale,
 		&crop.ImageURL,
+		&crop.InitialListedQuantity, &crop.FirstListedAt, &crop.FirstOrderAt, &crop.SoldOutAt,
 		&crop.CreatedAt,
 		&crop.UpdatedAt,
 	)
@@ -231,6 +249,12 @@ func (r *CropRepository) GetByID(id int) (*models.Crop, error) {
 // - Update product information and marketplace status.
 // - Update the updated_at timestamp.
 func (r *CropRepository) Update(crop *models.Crop) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
 	query := `
 		UPDATE crops
 		SET
@@ -241,12 +265,15 @@ func (r *CropRepository) Update(crop *models.Crop) error {
 			price_per_unit = $5,
 			listed_for_sale = $6,
 			image_url = $7,
+			lga = $4,
+			state = COALESCE((SELECT state FROM farmers WHERE id=$9), state, 'Benue'),
+			country = COALESCE((SELECT country FROM farmers WHERE id=$9), country, 'Nigeria'),
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = $8
 		  AND farmer_id = $9
 	`
 
-	result, err := r.db.Exec(
+	result, err := tx.Exec(
 		query,
 		crop.Name,
 		crop.Quantity,
@@ -271,8 +298,14 @@ func (r *CropRepository) Update(crop *models.Crop) error {
 	if rowsAffected == 0 {
 		return sql.ErrNoRows
 	}
+	if crop.PricePerUnit > 0 {
+		_, err = tx.Exec(`INSERT INTO produce_price_history (crop_id,price_per_unit,unit,source) VALUES ($1,$2,$3,'Agro-Shield')`, crop.ID, crop.PricePerUnit, crop.Unit)
+		if err != nil {
+			return err
+		}
+	}
 
-	return nil
+	return tx.Commit()
 }
 
 // Unlist removes a product from the marketplace.
@@ -384,7 +417,19 @@ func (r *CropRepository) Delete(cropID, farmerID int) error {
 //
 // The database performs the quantity check itself.
 func (r *CropRepository) ReduceQuantity(cropID int, amount float64) error {
-	result, err := r.db.Exec(`
+	if cropID <= 0 || amount <= 0 {
+		return fmt.Errorf("quantity reduction must be positive")
+	}
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var before float64
+	if err := tx.QueryRow(`SELECT quantity FROM crops WHERE id=$1 FOR UPDATE`, cropID).Scan(&before); err != nil {
+		return err
+	}
+	result, err := tx.Exec(`
 		UPDATE crops
 		SET
 			quantity = quantity - $1,
@@ -408,6 +453,9 @@ func (r *CropRepository) ReduceQuantity(cropID int, amount float64) error {
 	if rowsAffected == 0 {
 		return sql.ErrNoRows
 	}
-
-	return nil
+	_, err = tx.Exec(`INSERT INTO inventory_history (crop_id, quantity_before, quantity_change, quantity_after, reason) VALUES ($1,$2,$3,$4,'order')`, cropID, before, -amount, before-amount)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }

@@ -529,6 +529,13 @@ func (h *Negotiation) ThreadHandler(
 				return
 			}
 
+		case "end":
+
+			if err := h.service.End(negotiationID, farmer.ID); err != nil {
+				h.render(w, negotiationID, farmer.ID, err.Error())
+				return
+			}
+
 		// ====================================================
 		// UNKNOWN ACTION
 		// ====================================================
@@ -603,6 +610,11 @@ func (h *Negotiation) render(
 			http.StatusNotFound,
 		)
 
+		return
+	}
+
+	if userID != negotiation.BuyerID && userID != negotiation.FarmerID {
+		http.Error(w, "You are not part of this negotiation", http.StatusForbidden)
 		return
 	}
 

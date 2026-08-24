@@ -93,9 +93,11 @@ func RegisterRoutes(container *app.Container) {
 	dashboardHandler := handlers.NewDashboardHandler(
 		container.Crop,
 		container.Order,
+		container.Cart,
 		container.AI,
 		container.Negotiation,
 		services.NewWeatherService(),
+		container.Notification,
 		container.MarketEvents,
 	)
 
@@ -109,6 +111,14 @@ func RegisterRoutes(container *app.Container) {
 					dashboardHandler.DashBoard,
 				),
 			),
+		),
+	)
+
+	http.HandleFunc(
+		"/market-insights",
+		middleware.OnlyPath(
+			"/market-insights",
+			middleware.OnlyGet(middleware.RequireAuth(container.FarmerRepo, dashboardHandler.MarketInsights)),
 		),
 	)
 
@@ -290,6 +300,10 @@ func RegisterRoutes(container *app.Container) {
 		container.AI,
 	)
 
+	diagnosisHistoryHandler := handlers.NewAIDiagnosisHistoryHandler(
+		container.AI,
+	)
+
 	http.HandleFunc(
 		"/ai-assistant",
 		middleware.OnlyPath(
@@ -297,6 +311,19 @@ func RegisterRoutes(container *app.Container) {
 			middleware.RequireAuth(
 				container.FarmerRepo,
 				aiHandler.Handler,
+			),
+		),
+	)
+
+	http.HandleFunc(
+		"/ai-diagnosis-history",
+		middleware.OnlyPath(
+			"/ai-diagnosis-history",
+			middleware.OnlyGet(
+				middleware.RequireAuth(
+					container.FarmerRepo,
+					diagnosisHistoryHandler.Handler,
+				),
 			),
 		),
 	)

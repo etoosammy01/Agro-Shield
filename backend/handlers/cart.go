@@ -50,6 +50,7 @@ type CartPageData struct {
 	Items  []models.CartItem
 	UserID int
 	Error  string
+	Total  float64
 }
 
 // ============================================================
@@ -251,6 +252,7 @@ func (h *Cart) render(
 		UserID: buyerID,
 		Error:  errMsg,
 	}
+	_, data.Total = cartSummary(items)
 
 	// ========================================================
 	// 3. RENDER CART HTML

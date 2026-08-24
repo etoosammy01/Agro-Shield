@@ -84,6 +84,21 @@ tbody tr:hover{
     border-radius:6px;
 }
 
+.product-actions{display:flex !important;gap:8px;align-items:center;white-space:nowrap;}
+.product-actions form{margin:0;}
+.product-action{display:inline-flex !important;align-items:center;justify-content:center;min-width:62px;appearance:none;border:1px solid transparent !important;border-radius:9px !important;padding:9px 12px !important;font-family:Arial,Helvetica,sans-serif !important;font-size:12px !important;font-weight:700 !important;line-height:1 !important;text-decoration:none !important;cursor:pointer;transition:transform .15s,box-shadow .15s,background .15s;}
+.product-action:hover{transform:translateY(-1px);box-shadow:0 3px 8px rgba(16,24,40,.12);}
+.edit-action{background:#eaf2ff !important;color:#175ca8 !important;border-color:#bfd6f2 !important;}
+.listing-action{background:#e9f8ef !important;color:#187044 !important;border-color:#bfe2cc !important;}
+.delete-action{background:#fff0f0 !important;color:#a33131 !important;border-color:#efc4c4 !important;}
+#image-help{color:#667085;font-size:.8rem;}
+
+@media (max-width: 900px){
+    .storage{padding:30px 16px;overflow-x:auto;}
+    .storage table{min-width:1100px;}
+    .storage-header{gap:16px;}
+}
+
 /* Add Produce modal (this was missing before — the button had nowhere to open) */
 .modal{
     display:none;
@@ -94,28 +109,38 @@ tbody tr:hover{
     height:100%;
     background:rgba(0,0,0,0.5);
     justify-content:center;
-    align-items:center;
+    align-items:flex-start;
+    overflow-y:auto;
+    padding:32px 16px;
     z-index:100;
 }
 
+.modal.modal-open{display:flex;}
+
 .modal form{
     background:white;
-    padding:40px;
-    border-radius:12px;
+    padding:28px;
+    border-radius:16px;
     width:100%;
     max-width:440px;
+    max-height:calc(100vh - 64px);
+    overflow-y:auto;
+    margin:auto;
     display:flex;
     flex-direction:column;
-    gap:14px;
+    gap:10px;
+    box-shadow:0 24px 60px rgba(0,0,0,.24);
 }
 
 .modal form h2{
-    margin-bottom:10px;
+    margin-bottom:6px;
+    line-height:1.2;
 }
 
 .modal form label{
     font-weight:bold;
     font-size:14px;
+    line-height:1.35;
 }
 
 .modal form input[type="text"],
@@ -125,6 +150,8 @@ tbody tr:hover{
     border-radius:8px;
     width:100%;
 }
+
+.modal form input[type="file"]{width:100%;line-height:1.4;}
 
 .checkbox-row{
     display:flex;
@@ -160,4 +187,11 @@ tbody tr:hover{
 .modal-actions button[type="button"]{
     background:whitesmoke;
     color:black;
+}
+
+.cancel-action{flex:1;display:flex;align-items:center;justify-content:center;padding:14px;border-radius:8px;background:whitesmoke;color:#222;text-decoration:none;font-weight:bold;}
+
+@media (max-width: 600px){
+    .modal{padding:18px 10px;}
+    .modal form{max-height:calc(100vh - 36px);padding:20px;border-radius:13px;}
 }

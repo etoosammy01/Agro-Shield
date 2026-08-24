@@ -3,16 +3,17 @@ package models
 import "time"
 
 type Farmer struct {
-	ID           int
-	FullName     string
-	Phone        string
-	Email        string
-	PasswordHash string
-	Location     string
-	Role         string // "farmer" or "buyer"
-	PhotoURL     string // passport photograph
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID                  int
+	FullName            string
+	Phone               string
+	Email               string
+	PasswordHash        string
+	Location            string
+	LGA, State, Country string
+	Role                string // "farmer" or "buyer"
+	PhotoURL            string // passport photograph
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
 }
 
 func (f *Farmer) IsBuyer() bool {

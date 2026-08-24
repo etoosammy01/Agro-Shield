@@ -48,3 +48,26 @@ func TestBuyerPriorities(t *testing.T) {
 		t.Fatalf("expected returning buyer on-track state, got %#v", priority)
 	}
 }
+
+func TestPrioritizeDemandSummariesLimitsAndRanksActions(t *testing.T) {
+	items := []models.ProduceDemandSummary{
+		{ProduceType: "Healthy", Orders: 2},
+		{ProduceType: "No activity"},
+		{ProduceType: "Price alert", PriceDifferencePercent: 20},
+		{ProduceType: "Cart interest", CartAdds: 2},
+	}
+	got := prioritizeDemandSummaries(items, 3)
+	if len(got) != 3 {
+		t.Fatalf("expected 3 insights, got %d", len(got))
+	}
+	if got[0].ProduceType != "Price alert" || got[1].ProduceType != "Cart interest" || got[2].ProduceType != "No activity" {
+		t.Fatalf("unexpected insight order: %#v", got)
+	}
+}
+
+func TestCartSummary(t *testing.T) {
+	count, total := cartSummary([]models.CartItem{{TotalPrice: 1250}, {TotalPrice: 750}})
+	if count != 2 || total != 2000 {
+		t.Fatalf("got count=%d total=%v", count, total)
+	}
+}

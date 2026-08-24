@@ -15,7 +15,8 @@ type Crop struct {
 	Unit     string
 
 	// Location where the product is available.
-	Location string
+	Location            string
+	LGA, State, Country string
 
 	// Price charged per unit of the product.
 	PricePerUnit float64

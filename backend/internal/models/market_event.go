@@ -31,4 +31,14 @@ type ProduceDemandSummary struct {
 	LocalPriceMin, LocalPriceMedian, LocalPriceMax                 float64
 	PriceAvailable                                                 bool
 	Recommendation                                                 string
+	FarmerPrice, PriceDifferencePercent                            float64
+	PricePosition                                                  string
+	StateListings, NationalListings                                int
+	NearbyListings                                                 int
+	StatePriceMedian, NationalPriceMedian                          float64
+	NearbyPriceMedian                                              float64
+	ExternalListings                                               int
+	ExternalPriceMedian                                            float64
+	ExternalPriceAvailable                                         bool
+	ComparisonScope                                                string
 }
