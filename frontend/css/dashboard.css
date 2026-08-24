@@ -564,7 +564,8 @@
 .ai-diagnosis {
     display: flex;
     gap: 16px;
-    padding: 17px;
+    align-items: flex-start;
+    padding: 16px;
     border-radius: 16px;
     background: #f7faf8;
 }
@@ -601,9 +602,14 @@
 }
 
 .diagnosis-content p {
-    margin: 5px 0 14px;
+    display: -webkit-box;
+    overflow: hidden;
+    margin: 6px 0 0;
     color: #667085;
     font-size: 0.78rem;
+    line-height: 1.5;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
 }
 
 .confidence {
@@ -611,8 +617,8 @@
 }
 
 .ai-recommendation {
-    margin-top: 16px;
-    padding: 14px 16px;
+    margin-top: 12px;
+    padding: 11px 14px;
     border-left: 3px solid #1f7a4d;
     border-radius: 0 12px 12px 0;
     background: #f8fbf9;
@@ -629,10 +635,14 @@
 }
 
 .ai-recommendation p {
+    display: -webkit-box;
+    overflow: hidden;
     margin: 0;
     color: #667085;
     font-size: 0.78rem;
     line-height: 1.55;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
 }
 
 
