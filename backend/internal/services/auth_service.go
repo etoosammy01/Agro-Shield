@@ -21,7 +21,7 @@ func NewAuthService(repo *repository.FarmerRepository) *AuthService {
 
 // Register creates a new farmer or buyer account. role should be "farmer" or
 // "buyer" — anything else defaults to "farmer".
-func (s *AuthService) Register(firstName, lastName, phone, email, password, location, role string) error {
+func (s *AuthService) Register(firstName, lastName, phone, email, password, location, role, photoURL string) error {
 
 	if firstName == "" || lastName == "" {
 		return errors.New("name is required")
@@ -31,6 +31,9 @@ func (s *AuthService) Register(firstName, lastName, phone, email, password, loca
 	}
 	if password == "" {
 		return errors.New("password is required")
+	}
+	if photoURL == "" {
+		return errors.New("profile picture is required")
 	}
 	if len(password) < 8 {
 		return errors.New("password must be at least 8 characters")
@@ -59,6 +62,7 @@ func (s *AuthService) Register(firstName, lastName, phone, email, password, loca
 		PasswordHash: string(hash),
 		Location:     location,
 		Role:         role,
+		PhotoURL:     photoURL,
 	}
 
 	return s.repo.Create(farmer)

@@ -36,8 +36,11 @@
 
 <div class="auth-right">
 
-<form id="register-form" action="/register" method="POST">
+<form id="register-form" action="/register" method="POST" enctype="multipart/form-data">
 <h2>Create Account</h2>
+
+<label for="profile-picture">Profile Picture</label>
+<input id="profile-picture" name="profile_picture" type="file" accept="image/*" required>
 
 <label>I am a</label>
 <div class="row role-select">

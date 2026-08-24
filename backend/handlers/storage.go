@@ -181,6 +181,10 @@ func (h *Storage) createCrop(
 	if err != nil {
 		log.Println("produce image upload failed:", err)
 	}
+	if strings.TrimSpace(imageURL) == "" {
+		h.render(w, farmerID, fullName, "crop picture is required")
+		return
+	}
 
 	if err := h.crop.AddCrop(
 		farmerID,

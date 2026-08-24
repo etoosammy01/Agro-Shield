@@ -75,7 +75,7 @@ func RunMigration(db *sql.DB) error {
 
 		role TEXT NOT NULL DEFAULT 'farmer',
 
-		photo_url TEXT,
+		photo_url TEXT NOT NULL,
 
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
@@ -108,6 +108,12 @@ func RunMigration(db *sql.DB) error {
 
 	log.Println("✅ Farmers email column migrated successfully")
 
+	// Pictures are required for every farmer and crop. This also upgrades
+	// databases created before the NOT NULL constraints were introduced.
+	if _, err = db.Exec(`ALTER TABLE farmers ALTER COLUMN photo_url SET NOT NULL`); err != nil {
+		return fmt.Errorf("farmers.photo_url must be populated before migration: %w", err)
+	}
+
 	// ========================================================
 	// 5. CROPS TABLE
 	//
@@ -132,7 +138,7 @@ func RunMigration(db *sql.DB) error {
 
 		listed_for_sale BOOLEAN NOT NULL DEFAULT FALSE,
 
-		image_url TEXT,
+		image_url TEXT NOT NULL,
 
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
@@ -151,6 +157,9 @@ func RunMigration(db *sql.DB) error {
 	}
 
 	log.Println("✅ Crops table migrated successfully")
+	if _, err = db.Exec(`ALTER TABLE crops ALTER COLUMN image_url SET NOT NULL`); err != nil {
+		return fmt.Errorf("crops.image_url must be populated before migration: %w", err)
+	}
 
 	// ========================================================
 	// 6. DIAGNOSES TABLE

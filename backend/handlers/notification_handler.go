@@ -127,7 +127,7 @@ func (h *NotificationHandler) NotificationsHandler(
 	// --------------------------------------------------------
 
 	tmpl, err := template.ParseFiles(
-		"../frontend/pages/notifications.html",
+		"../frontend/pages/notification.html",
 	)
 
 	if err != nil {
