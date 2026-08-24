@@ -339,7 +339,9 @@
 }
 
 .weather-source {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
     margin-top: 0.35rem;
     color: #718096;
     font-size: 0.78rem;
@@ -347,8 +349,11 @@
 }
 
 .weather-location-icon {
-    color: #1f7a4d;
-    font-size: 0.9rem;
+    display: block;
+    width: 0.95rem;
+    height: 0.95rem;
+    object-fit: contain;
+    flex: 0 0 auto;
 }
 
 
