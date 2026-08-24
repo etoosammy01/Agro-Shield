@@ -49,6 +49,7 @@ type DashboardData struct {
 	HealthMetrics    []HealthMetric
 	Notifications    []DashboardNotification
 	Weather          services.Weather
+	LatestDiagnosis  *models.Diagnosis
 
 	Priorities      []DashboardPriority
 	PrimaryPriority DashboardPriority
@@ -123,6 +124,10 @@ func (h *Dashboard) DashBoard(w http.ResponseWriter, r *http.Request) {
 				var diagnoses []models.Diagnosis
 				if got, err := h.ai.History(farmer.ID); err == nil {
 					diagnoses = got
+					if len(diagnoses) > 0 {
+						latest := diagnoses[0]
+						data.LatestDiagnosis = &latest
+					}
 				}
 				var negotiations []models.Negotiation
 				if h.negotiation != nil {

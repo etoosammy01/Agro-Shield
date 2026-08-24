@@ -540,6 +540,15 @@
     font-size: 0.76rem;
 }
 
+.weather-recommendation-source {
+    display: block;
+    margin-bottom: 7px;
+    color: #8a948d;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
 .weather-recommendation p {
     margin: 0;
     color: #667085;

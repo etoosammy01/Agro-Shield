@@ -624,7 +624,11 @@
                             Farm recommendation
                         </strong>
 
-                            <p>
+                        {{if .Weather.Available}}
+                            <span class="weather-recommendation-source">Based on current conditions</span>
+                        {{end}}
+
+                        <p>
                             {{if .Weather.Available}}
                                 {{.Weather.Recommendation}}
                             {{else}}
@@ -673,69 +677,60 @@
 
                     <div class="ai-diagnosis">
 
+                        {{with .LatestDiagnosis}}
+
                         <div class="crop-icon">
-                            🍅
+                            AI
                         </div>
 
                         <div class="diagnosis-content">
 
                             <span class="diagnosis-label">
-                                Latest diagnosis
+                                Latest diagnosis · {{.CreatedAt.Format "2 Jan 2006"}}
                             </span>
 
                             <h3>
-                                Tomato crop
+                                {{if .Category}}{{.Category}}{{else}}Produce health check{{end}}
                             </h3>
 
                             <p>
-                                Possible early blight detected.
+                                {{.Result}}
                             </p>
-
-                            <div class="confidence">
-
-                                <div class="confidence-header">
-                                    <span>
-                                        AI confidence
-                                    </span>
-
-                                    <strong>
-                                        87%
-                                    </strong>
-                                </div>
-
-                                <div class="progress">
-                                    <span
-                                        class="progress-value"
-                                        style="width: 87%;"
-                                    ></span>
-                                </div>
-
-                            </div>
 
                         </div>
 
+                        {{else}}
+                            <div class="crop-icon">AI</div>
+                            <div class="diagnosis-content">
+                                <span class="diagnosis-label">No diagnosis yet</span>
+                                <h3>Run your first produce health check</h3>
+                                <p>Describe a crop problem or upload media to receive an AI-assisted analysis.</p>
+                            </div>
+                        {{end}}
+
                     </div>
 
 
+                    {{with .LatestDiagnosis}}
                     <div class="ai-recommendation">
 
                         <span>
-                            Recommended action
+                            Submitted description
                         </span>
 
                         <p>
-                            Inspect affected leaves and reduce
-                            excessive moisture around the crop.
+                            {{if .Description}}{{.Description}}{{else}}No additional description was provided.{{end}}
                         </p>
 
                     </div>
+                    {{end}}
 
 
                     <a
                         href="/ai-diagnosis-history"
                         class="panel-action"
                     >
-                        View diagnosis history
+                        {{if .LatestDiagnosis}}View diagnosis history{{else}}Start health check{{end}}
                     </a>
 
                 </section>
