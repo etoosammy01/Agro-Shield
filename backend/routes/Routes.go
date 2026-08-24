@@ -166,6 +166,8 @@ func RegisterRoutes(container *app.Container) {
 	storageHandler := handlers.NewStorageHandler(
 		container.Crop,
 	)
+	salesHandler := handlers.NewSalesHandler(container.Order)
+	http.HandleFunc("/sales", middleware.OnlyPath("/sales", middleware.RequireAuth(container.FarmerRepo, salesHandler.Handler)))
 
 	http.HandleFunc(
 		"/storage",

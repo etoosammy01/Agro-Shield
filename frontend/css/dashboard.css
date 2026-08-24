@@ -93,6 +93,24 @@
         border-color 180ms ease;
 }
 
+.primary-action:focus-visible,
+.secondary-action:focus-visible,
+.panel-action:focus-visible,
+.metric-card:focus-visible,
+.action-card:focus-visible,
+.section-heading a:focus-visible {
+    outline: 3px solid rgba(31, 122, 77, .28);
+    outline-offset: 3px;
+}
+
+.primary-action:active,
+.secondary-action:active,
+.panel-action:active,
+.metric-card:active,
+.action-card:active {
+    transform: translateY(1px) scale(.99);
+}
+
 .primary-action {
     color: #fff;
     background: #1f7a4d;
@@ -134,8 +152,8 @@
     display: flex;
     align-items: center;
     gap: 18px;
-    margin-bottom: 28px;
-    padding: 20px 22px;
+    margin-bottom: 20px;
+    padding: 22px 24px;
     border: 1px solid #eadfbf;
     border-radius: 18px;
     background: linear-gradient(
@@ -144,6 +162,24 @@
         #fffaf0
     );
     box-shadow: 0 8px 28px rgba(120, 90, 20, 0.06);
+}
+
+.priority-action {
+    flex: 0 0 auto;
+    min-width: 170px;
+    box-shadow: 0 8px 20px rgba(31, 122, 77, 0.18);
+}
+
+.dashboard-header .header-actions .primary-action {
+    background: #f1f8f4;
+    color: #1f7a4d;
+    border: 1px solid #cce7d7;
+    box-shadow: none;
+}
+
+.dashboard-header .header-actions .primary-action:hover {
+    background: #e5f2ea;
+    box-shadow: none;
 }
 
 .attention-icon {
@@ -222,7 +258,7 @@
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 16px;
-    margin-bottom: 28px;
+    margin-bottom: 20px;
 }
 
 .metric-card {
@@ -232,14 +268,15 @@
     min-height: 150px;
     padding: 22px;
     overflow: hidden;
-    border: 1px solid #e6e9e7;
+    border: 1px solid #cfdad3;
     border-radius: 18px;
     background: #fff;
     box-shadow: 0 8px 28px rgba(18, 38, 28, 0.045);
     transition:
         transform 200ms ease,
         box-shadow 200ms ease,
-        border-color 200ms ease;
+        border-color 200ms ease,
+        background-color 200ms ease;
 }
 
 .metric-card::after {
@@ -254,9 +291,10 @@
 }
 
 .metric-card:hover {
-    transform: translateY(-4px);
-    border-color: #d4dfd8;
-    box-shadow: 0 16px 36px rgba(18, 38, 28, 0.08);
+    transform: translateY(-6px);
+    border-color: #6eae88;
+    background: #fbfefc;
+    box-shadow: 0 18px 40px rgba(18, 38, 28, 0.14), 0 0 0 3px rgba(31, 122, 77, .08);
 }
 
 .metric-label {
@@ -298,7 +336,7 @@
 .panel {
     min-width: 0;
     padding: 24px;
-    border: 1px solid #e6e9e7;
+    border: 1px solid #cfdad3;
     border-radius: 20px;
     background: #fff;
     box-shadow: 0 8px 30px rgba(18, 38, 28, 0.045);
@@ -708,10 +746,12 @@
     gap: 6px;
     margin-top: 14px;
     padding: 14px;
-    border: 1px solid #e4ece7;
+    border: 1px solid #cfdad3;
     border-radius: 14px;
     background: #fbfdfb;
+    transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
+.produce-demand-summary:hover { transform: translateY(-2px); border-color: #79b392; box-shadow: 0 8px 20px rgba(18,38,28,.08); }
 .produce-demand-summary span,
 .produce-demand-summary small { color: #667085; line-height: 1.45; }
 .market-insights-heading { display:flex; justify-content:space-between; align-items:center; margin-top:14px; }
@@ -976,6 +1016,12 @@
     gap: 14px;
     padding: 16px 0;
     border-top: 1px solid #edf0ee;
+    transition: background-color 160ms ease, padding-left 160ms ease;
+}
+
+.activity-row:hover {
+    padding-left: 8px;
+    background: #f7fbf8;
 }
 
 .activity-row:first-child {
@@ -1131,7 +1177,7 @@
     min-height: 150px;
     padding: 20px;
     overflow: hidden;
-    border: 1px solid #e6e9e7;
+    border: 1px solid #cfdad3;
     border-radius: 18px;
     background: #fff;
     box-shadow: 0 7px 25px rgba(18, 38, 28, 0.035);
@@ -1154,9 +1200,10 @@
 }
 
 .action-card:hover {
-    transform: translateY(-4px);
-    border-color: #d5e1d9;
-    box-shadow: 0 15px 35px rgba(18, 38, 28, 0.075);
+    transform: translateY(-6px);
+    border-color: #6eae88;
+    background: #fbfefc;
+    box-shadow: 0 18px 40px rgba(18, 38, 28, 0.13), 0 0 0 3px rgba(31, 122, 77, .08);
 }
 
 .action-card:hover::after {
@@ -1382,6 +1429,13 @@
     .attention-banner {
         padding: 16px;
         border-radius: 16px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .priority-action {
+        width: 100%;
+        margin-top: 4px;
     }
 
     .attention-content {

@@ -1,4 +1,13 @@
 document.addEventListener("DOMContentLoaded", () => {
+    const imageButton = document.getElementById("add-image");
+    const imageInput = document.getElementById("image");
+    const imageStatus = document.getElementById("image-status");
+    if (imageButton && imageInput) {
+        imageButton.addEventListener("click", () => imageInput.click());
+        imageInput.addEventListener("change", () => {
+            if (imageStatus) imageStatus.textContent = imageInput.files.length ? `${imageInput.files[0].name} attached` : "";
+        });
+    }
     setupAudioRecorder();
     setupVideoRecorder();
 });
@@ -63,6 +72,10 @@ function setupAudioRecorder() {
     let chunks = [];
 
     startButton.addEventListener("click", async () => {
+        if (recorder && recorder.state === "recording") {
+            stopRecording();
+            return;
+        }
         if (!navigator.mediaDevices ||
             !navigator.mediaDevices.getUserMedia) {
             status.textContent =
@@ -132,7 +145,9 @@ function setupAudioRecorder() {
 
             recorder.start();
 
-            startButton.disabled = true;
+            startButton.disabled = false;
+            startButton.classList.add("recording");
+            startButton.setAttribute("aria-label", "Stop voice recording");
             stopButton.disabled = false;
             status.textContent = "Recording voice...";
         } catch (error) {
@@ -146,17 +161,20 @@ function setupAudioRecorder() {
         }
     });
 
-    stopButton.addEventListener("click", () => {
+    const stopRecording = () => {
         if (!recorder || recorder.state === "inactive") {
             return;
         }
 
         recorder.stop();
 
-        startButton.disabled = false;
+        startButton.classList.remove("recording");
+        startButton.setAttribute("aria-label", "Start voice recording");
         stopButton.disabled = true;
         status.textContent = "Preparing voice recording...";
-    });
+    };
+
+    stopButton.addEventListener("click", stopRecording);
 }
 
 function setupVideoRecorder() {

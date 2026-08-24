@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 
 	"backend/internal/models"
@@ -42,8 +44,11 @@ type DashboardData struct {
 	ProduceInStorage     int
 	StorageCrops         []models.Crop
 	ListingsActive       int
+	ListingsWithPhotos   int
 	AIDiagnosesThisMonth int
 	Revenue              float64
+	Revenue30            float64
+	CompletedSales       int
 
 	// Buyer stats
 	PurchasesMade        int
@@ -54,7 +59,6 @@ type DashboardData struct {
 	HealthScore          int
 	HealthStatus         string
 	HealthMetrics        []HealthMetric
-	Notifications        []DashboardNotification
 	UnreadNotifications  int
 	Weather              services.Weather
 	LatestDiagnosis      *models.Diagnosis
@@ -78,8 +82,6 @@ type HealthMetric struct {
 	Name    string
 	Percent int
 }
-type DashboardNotification struct{ Tone, Title, Detail, Href string }
-
 type DashboardPriority struct {
 	Tone, Label, Title, Detail, Action, Href string
 }
@@ -142,6 +144,9 @@ func (h *Dashboard) DashBoard(w http.ResponseWriter, r *http.Request) {
 					for _, crop := range got {
 						if crop.ListedForSale {
 							data.ListingsActive++
+							if strings.TrimSpace(crop.ImageURL) != "" {
+								data.ListingsWithPhotos++
+							}
 						}
 					}
 				}
@@ -190,6 +195,8 @@ func (h *Dashboard) DashBoard(w http.ResponseWriter, r *http.Request) {
 					for _, s := range sales {
 						data.Revenue += s.TotalPrice
 						if !s.CreatedAt.Before(cutoff) {
+							data.Revenue30 += s.TotalPrice
+							data.CompletedSales++
 							data.MarketOrders30++
 						}
 					}
@@ -225,7 +232,6 @@ func (h *Dashboard) DashBoard(w http.ResponseWriter, r *http.Request) {
 				data.Priorities = farmerPriorities(data, crops, diagnoses, negotiations)
 				data.HealthMetrics, data.HealthScore, data.HealthStatus = farmHealth(data, diagnoses)
 			}
-			data.Notifications = dashboardNotifications(data, farmer.IsBuyer())
 			if h.notification != nil {
 				if count, err := h.notification.GetUnreadCount(farmer.ID); err == nil {
 					data.UnreadNotifications = count
@@ -237,6 +243,10 @@ func (h *Dashboard) DashBoard(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := render.RenderTemplates(w, "dashboard.html", data); err != nil {
+			if clientDisconnected(err) {
+				log.Printf("dashboard client disconnected while rendering: %v", err)
+				return
+			}
 			log.Println("render error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
@@ -244,6 +254,15 @@ func (h *Dashboard) DashBoard(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		log.Println("user's Choices")
 	}
+}
+
+// A client may close the browser connection while a large dashboard is being
+// written. The response is no longer writable in that case, so attempting to
+// send a second HTTP error response causes a misleading superfluous-header log.
+func clientDisconnected(err error) bool {
+	return errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) ||
+		strings.Contains(strings.ToLower(err.Error()), "broken pipe") ||
+		strings.Contains(strings.ToLower(err.Error()), "connection reset")
 }
 
 func cartSummary(items []models.CartItem) (int, float64) {
@@ -396,21 +415,4 @@ func farmHealth(data DashboardData, diagnoses []models.Diagnosis) ([]HealthMetri
 		status = "Fair"
 	}
 	return []HealthMetric{{"Storage", storage}, {"Listings", listings}, {"Produce health", health}, {"Sales activity", sales}}, score, status
-}
-
-func dashboardNotifications(data DashboardData, buyer bool) []DashboardNotification {
-	if buyer {
-		if data.PurchasesMade == 0 {
-			return nil
-		}
-		return []DashboardNotification{{"success", "Purchase history is up to date", "Review your recent orders or browse available produce.", "/profile"}}
-	}
-	var n []DashboardNotification
-	if data.ProduceInStorage == 0 {
-		n = append(n, DashboardNotification{"warning", "Add produce to storage", "Create a crop record to start tracking stock.", "/storage"})
-	}
-	if data.AIDiagnosesThisMonth > 0 {
-		n = append(n, DashboardNotification{"success", "AI diagnosis completed", "Review your latest produce health analysis.", "/ai-diagnosis-history"})
-	}
-	return n
 }

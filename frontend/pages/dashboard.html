@@ -50,6 +50,9 @@
                 <a href="/ai-assistant">
                     AI Assistant
                 </a>
+                <a href="/sales">
+                    Sales
+                </a>
             {{end}}
 
             <a href="/profile">
@@ -84,7 +87,7 @@
 
                 <h1>
                     <span id="greeting">
-                        Welcome back
+                        Hi
                     </span>,
                     {{.FullName}}
                 </h1>
@@ -92,8 +95,7 @@
                 {{if .IsBuyer}}
 
                     <p class="header-copy">
-                        Find fresh produce from trusted local farmers
-                        and keep track of your purchases.
+                        Track purchases and discover fresh produce.
                     </p>
 
                 {{else}}
@@ -131,7 +133,7 @@
                         class="primary-action"
                         href="/storage"
                     >
-                        Add produce
+                        Open storage
                     </a>
 
                 {{end}}
@@ -172,8 +174,7 @@
                 {{else}}
 
                     <p class="header-copy">
-                        Here's what is happening with your farm,
-                        produce, sales, and produce health today.
+                        Manage produce, sales, and produce health.
                     </p>
 
                 {{end}}
@@ -237,7 +238,7 @@
 
                 <a
                     href="{{.PrimaryPriority.Href}}"
-                    class="secondary-action"
+                    class="primary-action priority-action"
                 >
                     {{.PrimaryPriority.Action}}
                 </a>
@@ -281,7 +282,7 @@
 
                 <!-- Spending -->
                 <a
-                    href="/profile"
+                    href="/sales"
                     class="metric-card"
                 >
                     <span class="metric-label">
@@ -304,7 +305,7 @@
                     class="metric-card"
                 >
                     <span class="metric-label">
-                        Available produce
+                        Available listings
                     </span>
 
                     <strong>
@@ -312,7 +313,7 @@
                     </strong>
 
                     <span class="metric-detail">
-                        Units currently available
+                        Listings currently open to buy
                     </span>
                 </a>
 
@@ -351,14 +352,14 @@
                     </strong>
 
                     <span class="metric-detail">
-                        Units available to manage
+                        Product items recorded
                     </span>
                 </a>
 
 
                 <!-- Listings -->
                 <a
-                    href="/marketplace"
+                    href="/storage"
                     class="metric-card"
                 >
                     <span class="metric-label">
@@ -373,7 +374,7 @@
                     </strong>
 
                     <span class="metric-detail">
-                        Visible to marketplace buyers
+                        Visible to buyers · your account
                     </span>
                 </a>
 
@@ -395,26 +396,26 @@
                     </strong>
 
                     <span class="metric-detail">
-                        Completed this month
+                        Completed this month · your account
                     </span>
                 </a>
 
 
                 <!-- Revenue -->
                 <a
-                    href="/marketplace"
+                    href="/profile"
                     class="metric-card"
                 >
                     <span class="metric-label">
-                        Sales revenue
+                        Sales revenue · 30 days
                     </span>
 
                     <strong>
-                        ₦{{printf "%.2f" .Revenue}}
+                        ₦{{printf "%.2f" .Revenue30}}
                     </strong>
 
                     <span class="metric-detail">
-                        Across completed sales
+                        {{.CompletedSales}} completed sales · platform records
                     </span>
                 </a>
 
@@ -442,7 +443,7 @@
                             </p>
 
                             <h2>
-                                Farm health
+                                Operational readiness
                             </h2>
                         </div>
 
@@ -462,12 +463,12 @@
 
                         <div class="health-score-copy">
                             <strong>
-                                Your farm is doing well
+                                Your farm readiness overview
                             </strong>
 
                             <p>
-                                Storage, produce health, listings,
-                                and sales are all being monitored.
+                                This is an operational indicator based on storage,
+                                listings, AI checks, and completed sales—not a crop diagnosis.
                             </p>
                         </div>
 
@@ -745,7 +746,7 @@
                     {{range .ProduceDemandPreview}}
                     <div class="produce-demand-summary">
                         <strong>{{.ProduceType}}</strong> · {{.Activity}}
-                        <span>{{.Views}} views · {{.CartAdds}} cart adds · {{.Negotiations}} negotiations · {{.Orders}} orders</span>
+                        <span>Last 30 days · {{.Views}} views · {{.CartAdds}} cart adds · {{.Negotiations}} negotiations · {{.Orders}} orders</span>
                         {{if .PriceAvailable}}<span>Local prices: ₦{{printf "%.0f" .LocalPriceMin}}–₦{{printf "%.0f" .LocalPriceMax}} · median ₦{{printf "%.0f" .LocalPriceMedian}}</span>{{end}}
                         {{if .PricePosition}}<span>Your average price: ₦{{printf "%.0f" .FarmerPrice}} · {{.PricePosition}} ({{printf "%+.0f%%" .PriceDifferencePercent}})</span>{{end}}
                         {{if .StateListings}}<span>State comparison: {{.StateListings}} listings · median ₦{{printf "%.0f" .StatePriceMedian}}</span>{{end}}
@@ -799,7 +800,7 @@
                             </h3>
 
                             <p>
-                                {{if .Demand.ProduceType}}Based on Agro-Shield activity across your produce listings.{{else}}Based on Agro-Shield orders and negotiations. This is a platform activity signal, not a market-wide demand forecast.{{end}}
+                            {{if .Demand.ProduceType}}Based on recorded activity across your listings in the last 30 days.{{else}}Based on recorded Agro-Shield orders and negotiations in the last 30 days; this is not a market-wide forecast.{{end}}
                             </p>
 
                         </div>
@@ -811,7 +812,7 @@
 
                         <div>
                                 <span>
-                                Active listings
+                                Your active listings
                             </span>
 
                                 <strong>
@@ -819,9 +820,11 @@
                             </strong>
                         </div>
 
+                        <div><span>Your listings with photos</span><strong>{{.ListingsWithPhotos}}/{{.ListingsActive}}</strong></div>
+
                         <div>
                                 <span>
-                                Comparable prices
+                                Platform price range
                             </span>
 
                                 <strong>
@@ -833,22 +836,22 @@
                             <strong>{{if .MarketHasPrices}}₦{{printf "%.0f" .MarketPriceMedian}}{{else}}—{{end}}</strong>
                         </div>
 
-                        <div><span>Orders · 30 days</span><strong>{{.MarketOrders30}}</strong></div>
-                        <div><span>Negotiations · 30 days</span><strong>{{.MarketNegotiations30}}</strong></div>
+                        <div><span>Your orders · last 30 days</span><strong>{{.MarketOrders30}}</strong></div>
+                        <div><span>Your negotiations · last 30 days</span><strong>{{.MarketNegotiations30}}</strong></div>
 
                         {{if .Demand.ProduceType}}<div><span>Views · 30 days</span><strong>{{.Demand.Views}}</strong></div>
                         <div><span>Cart adds · 30 days</span><strong>{{.Demand.CartAdds}}</strong></div>
                         <div><span>Units ordered · 30 days</span><strong>{{printf "%.0f" .Demand.UnitsOrdered}}</strong></div>
                         <div><span>Trend vs previous 30 days</span><strong>{{printf "%+.0f%%" .Demand.TrendPercent}}</strong></div>{{end}}
-                        {{if .Demand.ProduceType}}<div><span>Searches · {{.Demand.ComparisonLocation}}</span><strong>{{.Demand.Searches}}</strong></div>
+                        {{if .Demand.ProduceType}}<div><span>Platform searches · {{.Demand.ComparisonLocation}}</span><strong>{{.Demand.Searches}}</strong></div>
                         <div><span>Active negotiations</span><strong>{{.Demand.NegotiationsActive}}</strong></div>
                         <div><span>Accepted negotiations</span><strong>{{.Demand.NegotiationsAccepted}}</strong></div>
                         <div><span>Rejected negotiations</span><strong>{{.Demand.NegotiationsRejected}}</strong></div>
-                        <div><span>Negotiation conversion</span><strong>{{printf "%.0f%%" .Demand.NegotiationConversionRate}}</strong></div>
-                        <div><span>Demand score</span><strong>{{printf "%.0f/100" .Demand.DemandScore}}</strong></div>{{end}}
+                        <div><span>Negotiation conversion</span><strong>{{if or .Demand.NegotiationsActive .Demand.NegotiationsAccepted .Demand.NegotiationsRejected}}{{printf "%.0f%%" .Demand.NegotiationConversionRate}}{{else}}Awaiting activity{{end}}</strong></div>
+                        <div><span>Demand score</span><strong>{{if or .Demand.Views .Demand.CartAdds .Demand.Orders .Demand.Negotiations}}{{printf "%.0f/100" .Demand.DemandScore}}{{else}}Awaiting activity{{end}}</strong></div>{{end}}
                         {{if .Demand.ProduceType}}<div><span>Average offer price</span><strong>{{if .Demand.AverageOfferPrice}}₦{{printf "%.0f" .Demand.AverageOfferPrice}}{{else}}—{{end}}</strong></div>
                         <div><span>Negotiated units · 30 days</span><strong>{{printf "%.0f" .Demand.NegotiatedUnits}}</strong></div>
-                        <div><span>Sell-through · 30 days</span><strong>{{if .Demand.LifecycleDataAvailable}}{{printf "%.0f%%" .Demand.SellThroughRate}}{{else}}Not enough data{{end}}</strong></div>{{end}}
+                        <div><span>Sell-through · 30 days</span><strong>{{if .Demand.LifecycleDataAvailable}}{{printf "%.0f%%" .Demand.SellThroughRate}}{{else}}Awaiting sales data{{end}}</strong></div>{{end}}
                         {{if .Demand.TimeToFirstOrderHours}}<div><span>Average time to first order</span><strong>{{printf "%.0f hours" .Demand.TimeToFirstOrderHours}}</strong></div>{{end}}
                         {{if .Demand.TimeToSellOutHours}}<div><span>Average time to sell out</span><strong>{{printf "%.0f hours" .Demand.TimeToSellOutHours}}</strong></div>{{end}}
 
@@ -856,10 +859,10 @@
 
 
                     <a
-                        href="/marketplace"
+                        href="/storage"
                         class="panel-action"
                     >
-                        Manage your listings
+                        Manage listings in Storage
                     </a>
 
                 </section>
@@ -1051,7 +1054,7 @@
                     </h2>
                 </div>
 
-                <a href="{{if .IsBuyer}}/profile{{else}}/marketplace{{end}}">
+                <a href="{{if .IsBuyer}}/profile{{else}}/sales{{end}}">
                     View all
                 </a>
 
@@ -1124,7 +1127,7 @@
                         {{if .IsBuyer}}
                             Your completed purchases will appear here.
                         {{else}}
-                            Your completed sales will appear here.
+                            Add a product, publish a listing, and complete your first sale to see performance here.
                         {{end}}
 
                     </p>
