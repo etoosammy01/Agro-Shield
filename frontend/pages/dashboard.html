@@ -558,7 +558,7 @@
                             </h2>
 
                             {{if .Weather.Available}}
-                                <span class="weather-source">{{.Weather.Location}} · Source: {{.Weather.Source}}</span>
+                                <span class="weather-source"><span class="weather-location-icon" aria-hidden="true">&#128205;</span> {{.Weather.Location}} · Source: {{.Weather.Source}}</span>
                             {{else}}
                                 <span class="weather-source">Live weather unavailable</span>
                             {{end}}

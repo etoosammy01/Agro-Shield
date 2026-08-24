@@ -346,6 +346,11 @@
     font-weight: 500;
 }
 
+.weather-location-icon {
+    color: #1f7a4d;
+    font-size: 0.9rem;
+}
+
 
 /* =========================================================
    7. FARM HEALTH
