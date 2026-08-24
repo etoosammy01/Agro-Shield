@@ -624,9 +624,14 @@
                             Farm recommendation
                         </strong>
 
-                        <p>
-                            {{if .Weather.Available}}{{.Weather.Recommendation}}{{else}}Add a valid location to your profile to receive live weather conditions from Open-Meteo.{{end}}
-                        </p>
+                            <p>
+                            {{if .Weather.Available}}
+                                {{.Weather.Recommendation}}
+                            {{else}}
+                                Add your location to your profile to receive live weather conditions from Open-Meteo.
+                                <a href="/profile#edit-modal">Update location</a>
+                            {{end}}
+                            </p>
                     </div>
 
                 </section>

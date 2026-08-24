@@ -20,4 +20,8 @@ if (editModal) {
             editModal.style.display = "none";
         }
     });
+
+    if (window.location.hash === "#edit-modal") {
+        editModal.style.display = "flex";
+    }
 }
