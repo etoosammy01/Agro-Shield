@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 
 	"backend/internal/models"
+	"backend/internal/repository"
 	"backend/internal/services"
 	"backend/middleware"
 	"backend/render"
@@ -40,6 +42,7 @@ import (
 
 type Negotiation struct {
 	service *services.NegotiationService
+	events  *repository.MarketEventRepository
 }
 
 // ============================================================
@@ -48,10 +51,12 @@ type Negotiation struct {
 
 func NewNegotiationHandler(
 	service *services.NegotiationService,
+	events *repository.MarketEventRepository,
 ) *Negotiation {
 
 	return &Negotiation{
 		service: service,
+		events:  events,
 	}
 }
 
@@ -146,7 +151,6 @@ func (h *Negotiation) StartHandler(
 		)
 		return
 	}
-
 	if r.Method != http.MethodPost {
 		http.Error(
 			w,
@@ -241,6 +245,11 @@ func (h *Negotiation) StartHandler(
 		)
 
 		return
+	}
+	if h.events != nil {
+		uid := farmer.ID
+		cid := cropID
+		_ = h.events.Record(&models.MarketEvent{EventType: "negotiation_started", CropID: &cid, UserID: &uid, Metadata: fmt.Sprintf(`{"quantity":%g,"offer_price":%g}`, quantity, price)})
 	}
 
 	// --------------------------------------------------------

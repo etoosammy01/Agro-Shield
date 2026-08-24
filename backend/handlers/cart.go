@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"backend/internal/models"
+	"backend/internal/repository"
 	"backend/internal/services"
 	"backend/middleware"
 	"backend/render"
@@ -23,6 +24,7 @@ import (
 
 type Cart struct {
 	service *services.CartService
+	events  *repository.MarketEventRepository
 }
 
 // ============================================================
@@ -31,9 +33,10 @@ type Cart struct {
 // Connects the Cart Handler to the Cart Service.
 // ============================================================
 
-func NewCartHandler(service *services.CartService) *Cart {
+func NewCartHandler(service *services.CartService, events *repository.MarketEventRepository) *Cart {
 	return &Cart{
 		service: service,
+		events:  events,
 	}
 }
 
@@ -44,7 +47,7 @@ func NewCartHandler(service *services.CartService) *Cart {
 // ============================================================
 
 type CartPageData struct {
-	Items []models.CartItem
+	Items  []models.CartItem
 	UserID int
 	Error  string
 }
@@ -107,6 +110,11 @@ func (h *Cart) Handler(w http.ResponseWriter, r *http.Request) {
 		// ----------------------------------------------------
 
 		log.Println("User Visited Cart")
+		if h.events != nil {
+			uid := farmer.ID
+			_ = h.events.Record(&models.MarketEvent{EventType: "cart_view", UserID: &uid})
+			_ = h.events.Record(&models.MarketEvent{EventType: "checkout_started", UserID: &uid})
+		}
 
 		h.render(
 			w,
@@ -167,6 +175,10 @@ func (h *Cart) Handler(w http.ResponseWriter, r *http.Request) {
 				)
 
 				return
+			}
+			if h.events != nil {
+				uid := farmer.ID
+				_ = h.events.Record(&models.MarketEvent{EventType: "cart_item_removed", UserID: &uid})
 			}
 
 			// ------------------------------------------------

@@ -175,6 +175,7 @@ func main() {
 
 	notificationRepo :=
 		repository.NewNotificationRepository(db)
+	marketEventRepo := repository.NewMarketEventRepository(db)
 
 	// ============================================================
 	// CHAT REPOSITORIES
@@ -297,6 +298,7 @@ func main() {
 		negotiationRepo,
 		negotiationMsgRepo,
 		notificationRepo,
+		marketEventRepo,
 
 		// --------------------------------------------------------
 		// CHAT REPOSITORIES

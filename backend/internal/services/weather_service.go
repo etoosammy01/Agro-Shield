@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -21,12 +22,26 @@ type Weather struct {
 	RainChance     string
 	Conditions     string
 	Recommendation string
+	LastUpdated    time.Time
+	Cached         bool
 }
 
-type WeatherService struct{ client *http.Client }
+type cachedWeather struct {
+	weather   Weather
+	fetchedAt time.Time
+}
+
+type WeatherService struct {
+	client *http.Client
+	mu     sync.RWMutex
+	cache  map[string]cachedWeather
+}
 
 func NewWeatherService() *WeatherService {
-	return &WeatherService{client: &http.Client{Timeout: 5 * time.Second}}
+	return &WeatherService{
+		client: &http.Client{Timeout: 10 * time.Second},
+		cache:  make(map[string]cachedWeather),
+	}
 }
 
 func (s *WeatherService) Current(ctx context.Context, location string) (Weather, error) {
@@ -34,6 +49,37 @@ func (s *WeatherService) Current(ctx context.Context, location string) (Weather,
 	if location == "" {
 		return Weather{}, fmt.Errorf("farmer location is empty")
 	}
+	cacheKey := strings.ToLower(location)
+	if cached, ok := s.cached(cacheKey); ok && time.Since(cached.fetchedAt) < 15*time.Minute {
+		weather := cached.weather
+		weather.Cached = true
+		return weather, nil
+	}
+
+	weather, err := s.fetch(ctx, location)
+	if err != nil {
+		if cached, ok := s.cached(cacheKey); ok {
+			fallback := cached.weather
+			fallback.Cached = true
+			return fallback, err
+		}
+		return Weather{}, err
+	}
+
+	s.mu.Lock()
+	s.cache[cacheKey] = cachedWeather{weather: weather, fetchedAt: weather.LastUpdated}
+	s.mu.Unlock()
+	return weather, nil
+}
+
+func (s *WeatherService) cached(key string) (cachedWeather, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	weather, ok := s.cache[key]
+	return weather, ok
+}
+
+func (s *WeatherService) fetch(ctx context.Context, location string) (Weather, error) {
 	q := url.Values{"name": {location}, "count": {"1"}, "language": {"en"}, "format": {"json"}}
 	var geo struct {
 		Results []struct{ Latitude, Longitude float64 } `json:"results"`
@@ -64,7 +110,7 @@ func (s *WeatherService) Current(ctx context.Context, location string) (Weather,
 		rain = raw.Hourly.Rain[0]
 	}
 	summary := weatherSummary(raw.Current.Code)
-	return Weather{Available: true, Location: location, Source: "Open-Meteo", Temperature: fmt.Sprintf("%.0f°", raw.Current.Temperature), Summary: summary, Humidity: fmt.Sprintf("%.0f%%", raw.Current.Humidity), RainChance: fmt.Sprintf("%.0f%%", rain), Conditions: summary, Recommendation: weatherRecommendation(raw.Current.Code)}, nil
+	return Weather{Available: true, Location: location, Source: "Open-Meteo", Temperature: fmt.Sprintf("%.0f°", raw.Current.Temperature), Summary: summary, Humidity: fmt.Sprintf("%.0f%%", raw.Current.Humidity), RainChance: fmt.Sprintf("%.0f%%", rain), Conditions: summary, Recommendation: weatherRecommendation(raw.Current.Code), LastUpdated: time.Now()}, nil
 }
 
 func (s *WeatherService) getJSON(ctx context.Context, endpoint string, dst any) error {

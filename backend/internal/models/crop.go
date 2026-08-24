@@ -28,8 +28,10 @@ type Crop struct {
 	ImageURL string
 
 	// Timestamps for tracking the listing lifecycle.
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	CreatedAt                              time.Time
+	UpdatedAt                              time.Time
+	InitialListedQuantity                  float64
+	FirstListedAt, FirstOrderAt, SoldOutAt *time.Time
 
 	// SellerName is populated when retrieving marketplace
 	// results. It is not stored directly on the crops table.

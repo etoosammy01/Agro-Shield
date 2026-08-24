@@ -360,6 +360,14 @@
     flex: 0 0 auto;
 }
 
+.weather-updated {
+    display: block;
+    margin-top: 0.25rem;
+    color: #8a948d;
+    font-size: 0.68rem;
+    font-weight: 500;
+}
+
 
 /* =========================================================
    7. FARM HEALTH
@@ -612,39 +620,17 @@
     -webkit-line-clamp: 3;
 }
 
-.confidence {
-    max-width: 360px;
-}
-
-.ai-recommendation {
-    margin-top: 12px;
-    padding: 11px 14px;
-    border-left: 3px solid #1f7a4d;
-    border-radius: 0 12px 12px 0;
-    background: #f8fbf9;
-}
-
-.ai-recommendation span {
-    display: block;
-    margin-bottom: 4px;
+.diagnosis-full-link {
+    display: inline-block;
+    margin-top: 10px;
     color: #1f7a4d;
-    font-size: 0.7rem;
-    font-weight: 750;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    font-size: 0.75rem;
+    font-weight: 700;
 }
 
-.ai-recommendation p {
-    display: -webkit-box;
-    overflow: hidden;
-    margin: 0;
-    color: #667085;
-    font-size: 0.78rem;
-    line-height: 1.55;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
+.diagnosis-full-link:hover {
+    text-decoration: underline;
 }
-
 
 /* =========================================================
    10. MARKET OPPORTUNITY

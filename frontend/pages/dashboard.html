@@ -7,7 +7,7 @@
     <title>Dashboard | Agro-Shield</title>
 
     <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/dashboard.css">
+    <link rel="stylesheet" href="/static/css/dashboard.css?v=20260824-ai-summary">
 </head>
 
 <body>
@@ -559,6 +559,7 @@
 
                             {{if .Weather.Available}}
                                 <span class="weather-source"><img class="weather-location-icon" src="/static/assets/icon/location-image.avif" width="14" height="14" alt=""> <span>{{.Weather.Location}} · Source: {{.Weather.Source}}</span></span>
+                                <span class="weather-updated">{{if .Weather.Cached}}Cached conditions{{else}}Live conditions{{end}} · Updated {{.Weather.LastUpdated.Format "3:04 PM"}}</span>
                             {{else}}
                                 <span class="weather-source">Live weather unavailable</span>
                             {{end}}
@@ -686,7 +687,7 @@
                         <div class="diagnosis-content">
 
                             <span class="diagnosis-label">
-                                Latest diagnosis · {{.CreatedAt.Format "2 Jan 2006"}}
+                                Latest diagnosis summary · {{.CreatedAt.Format "2 Jan 2006"}}
                             </span>
 
                             <h3>
@@ -696,6 +697,10 @@
                             <p>
                                 {{.Result}}
                             </p>
+
+                            <a class="diagnosis-full-link" href="/ai-diagnosis-history">
+                                View full diagnosis →
+                            </a>
 
                         </div>
 
@@ -711,27 +716,21 @@
                     </div>
 
 
-                    {{with .LatestDiagnosis}}
-                    <div class="ai-recommendation">
-
-                        <span>
-                            Submitted description
-                        </span>
-
-                        <p>
-                            {{if .Description}}{{.Description}}{{else}}No additional description was provided.{{end}}
-                        </p>
-
-                    </div>
-                    {{end}}
-
-
                     <a
                         href="/ai-diagnosis-history"
                         class="panel-action"
                     >
                         {{if .LatestDiagnosis}}View diagnosis history{{else}}Start health check{{end}}
                     </a>
+
+                    {{range .ProduceDemands}}
+                    <div class="produce-demand-summary">
+                        <strong>{{.ProduceType}}</strong> · {{.Activity}}
+                        <span>{{.Views}} views · {{.CartAdds}} cart adds · {{.Negotiations}} negotiations · {{.Orders}} orders</span>
+                        {{if .PriceAvailable}}<span>Local prices: ₦{{printf "%.0f" .LocalPriceMin}}–₦{{printf "%.0f" .LocalPriceMax}} · median ₦{{printf "%.0f" .LocalPriceMedian}}</span>{{end}}
+                        <small>{{.Recommendation}}</small>
+                    </div>
+                    {{end}}
 
                 </section>
 
@@ -767,16 +766,15 @@
                         <div>
 
                             <span class="opportunity-label">
-                                High demand
+                                {{if .Demand.ProduceType}}Your produce demand signal{{else}}Platform activity{{end}}
                             </span>
 
                             <h3>
-                                Tomato demand is increasing
+                                {{if .Demand.ProduceType}}{{.Demand.Activity}}{{else if or .MarketOrders30 .MarketNegotiations30}}Buyer activity detected in the last 30 days{{else}}No buyer activity recorded in the last 30 days{{end}}
                             </h3>
 
                             <p>
-                                Buyers are currently looking for
-                                fresh tomatoes in your market.
+                                {{if .Demand.ProduceType}}Based on Agro-Shield activity across your produce listings.{{else}}Based on Agro-Shield orders and negotiations. This is a platform activity signal, not a market-wide demand forecast.{{end}}
                             </p>
 
                         </div>
@@ -787,24 +785,47 @@
                     <div class="opportunity-stats">
 
                         <div>
-                            <span>
-                                Buyer interest
+                                <span>
+                                Active listings
                             </span>
 
-                            <strong>
-                                High
+                                <strong>
+                                {{.MarketListings}}
                             </strong>
                         </div>
 
                         <div>
-                            <span>
-                                Suggested range
+                                <span>
+                                Comparable prices
                             </span>
 
-                            <strong>
-                                ₦85k–₦95k
+                                <strong>
+                                {{if .MarketHasPrices}}₦{{printf "%.0f" .MarketPriceMin}}–₦{{printf "%.0f" .MarketPriceMax}}{{else}}Unavailable{{end}}
                             </strong>
                         </div>
+                        <div>
+                            <span>Median price / unit</span>
+                            <strong>{{if .MarketHasPrices}}₦{{printf "%.0f" .MarketPriceMedian}}{{else}}—{{end}}</strong>
+                        </div>
+
+                        <div><span>Orders · 30 days</span><strong>{{.MarketOrders30}}</strong></div>
+                        <div><span>Negotiations · 30 days</span><strong>{{.MarketNegotiations30}}</strong></div>
+
+                        {{if .Demand.ProduceType}}<div><span>Views · 30 days</span><strong>{{.Demand.Views}}</strong></div>
+                        <div><span>Cart adds · 30 days</span><strong>{{.Demand.CartAdds}}</strong></div>
+                        <div><span>Units ordered · 30 days</span><strong>{{printf "%.0f" .Demand.UnitsOrdered}}</strong></div>
+                        <div><span>Trend vs previous 30 days</span><strong>{{printf "%+.0f%%" .Demand.TrendPercent}}</strong></div>{{end}}
+                        {{if .Demand.ProduceType}}<div><span>Searches · {{.Demand.ComparisonLocation}}</span><strong>{{.Demand.Searches}}</strong></div>
+                        <div><span>Active negotiations</span><strong>{{.Demand.NegotiationsActive}}</strong></div>
+                        <div><span>Accepted negotiations</span><strong>{{.Demand.NegotiationsAccepted}}</strong></div>
+                        <div><span>Rejected negotiations</span><strong>{{.Demand.NegotiationsRejected}}</strong></div>
+                        <div><span>Negotiation conversion</span><strong>{{printf "%.0f%%" .Demand.NegotiationConversionRate}}</strong></div>
+                        <div><span>Demand score</span><strong>{{printf "%.0f/100" .Demand.DemandScore}}</strong></div>{{end}}
+                        {{if .Demand.ProduceType}}<div><span>Average offer price</span><strong>{{if .Demand.AverageOfferPrice}}₦{{printf "%.0f" .Demand.AverageOfferPrice}}{{else}}—{{end}}</strong></div>
+                        <div><span>Negotiated units · 30 days</span><strong>{{printf "%.0f" .Demand.NegotiatedUnits}}</strong></div>
+                        <div><span>Sell-through · 30 days</span><strong>{{if .Demand.LifecycleDataAvailable}}{{printf "%.0f%%" .Demand.SellThroughRate}}{{else}}Not enough data{{end}}</strong></div>{{end}}
+                        {{if .Demand.TimeToFirstOrderHours}}<div><span>Average time to first order</span><strong>{{printf "%.0f hours" .Demand.TimeToFirstOrderHours}}</strong></div>{{end}}
+                        {{if .Demand.TimeToSellOutHours}}<div><span>Average time to sell out</span><strong>{{printf "%.0f hours" .Demand.TimeToSellOutHours}}</strong></div>{{end}}
 
                     </div>
 
@@ -813,7 +834,7 @@
                         href="/marketplace"
                         class="panel-action"
                     >
-                        List your tomatoes
+                        Manage your listings
                     </a>
 
                 </section>

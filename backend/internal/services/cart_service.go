@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"fmt"
 
 	"backend/internal/models"
 	"backend/internal/repository"
@@ -9,8 +10,9 @@ import (
 
 // CartService handles all business logic related to the buyer's cart.
 type CartService struct {
-	cartRepo *repository.CartRepository
-	cropRepo *repository.CropRepository
+	cartRepo  *repository.CartRepository
+	cropRepo  *repository.CropRepository
+	eventRepo *repository.MarketEventRepository
 }
 
 // NewCartService creates and returns a new CartService.
@@ -21,10 +23,12 @@ type CartService struct {
 func NewCartService(
 	cartRepo *repository.CartRepository,
 	cropRepo *repository.CropRepository,
+	eventRepo *repository.MarketEventRepository,
 ) *CartService {
 	return &CartService{
-		cartRepo: cartRepo,
-		cropRepo: cropRepo,
+		cartRepo:  cartRepo,
+		cropRepo:  cropRepo,
+		eventRepo: eventRepo,
 	}
 }
 
@@ -83,7 +87,15 @@ func (s *CartService) AddFromNegotiation(
 		TotalPrice:   negotiation.Quantity * agreedPrice,
 	}
 
-	return s.cartRepo.Create(item)
+	if err := s.cartRepo.Create(item); err != nil {
+		return err
+	}
+	if s.eventRepo != nil {
+		uid := item.BuyerID
+		cid := item.CropID
+		_ = s.eventRepo.Record(&models.MarketEvent{EventType: "cart_item_added", CropID: &cid, UserID: &uid, Metadata: fmt.Sprintf(`{"quantity":%g}`, item.Quantity)})
+	}
+	return nil
 }
 
 // MyCart returns all cart items belonging to a buyer.

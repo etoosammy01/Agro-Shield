@@ -33,9 +33,9 @@ func (r *CropRepository) Create(crop *models.Crop) error {
 			location,
 			price_per_unit,
 			listed_for_sale,
-			image_url
+			image_url, initial_listed_quantity, first_listed_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CASE WHEN $7 THEN $3 ELSE NULL END, CASE WHEN $7 THEN CURRENT_TIMESTAMP ELSE NULL END)
 		RETURNING id
 	`
 
@@ -317,6 +317,9 @@ func (r *CropRepository) Relist(cropID, farmerID int) error {
 		UPDATE crops
 		SET
 			listed_for_sale = TRUE,
+			first_listed_at = COALESCE(first_listed_at, CURRENT_TIMESTAMP),
+			initial_listed_quantity = CASE WHEN initial_listed_quantity IS NULL OR initial_listed_quantity < quantity THEN quantity ELSE initial_listed_quantity END,
+			sold_out_at = NULL,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = $1
 		  AND farmer_id = $2
@@ -385,6 +388,9 @@ func (r *CropRepository) ReduceQuantity(cropID int, amount float64) error {
 		UPDATE crops
 		SET
 			quantity = quantity - $1,
+			first_order_at = COALESCE(first_order_at, CURRENT_TIMESTAMP),
+			sold_out_at = CASE WHEN quantity - $1 <= 0 THEN CURRENT_TIMESTAMP ELSE sold_out_at END,
+			listed_for_sale = CASE WHEN quantity - $1 <= 0 THEN FALSE ELSE listed_for_sale END,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = $2
 		  AND quantity >= $1

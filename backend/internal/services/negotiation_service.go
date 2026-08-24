@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"backend/internal/models"
@@ -49,6 +50,7 @@ type NegotiationService struct {
 	cropRepo     *repository.CropRepository
 	cartService  *CartService
 	notification *NotificationService
+	eventRepo    *repository.MarketEventRepository
 }
 
 // ============================================================
@@ -61,6 +63,7 @@ func NewNegotiationService(
 	cropRepo *repository.CropRepository,
 	cartService *CartService,
 	notification *NotificationService,
+	eventRepo *repository.MarketEventRepository,
 ) *NegotiationService {
 
 	return &NegotiationService{
@@ -69,6 +72,7 @@ func NewNegotiationService(
 		cropRepo:     cropRepo,
 		cartService:  cartService,
 		notification: notification,
+		eventRepo:    eventRepo,
 	}
 }
 
@@ -583,6 +587,11 @@ func (s *NegotiationService) Accept(
 	); err != nil {
 		return err
 	}
+	if s.eventRepo != nil {
+		uid := negotiation.BuyerID
+		cid := negotiation.CropID
+		_ = s.eventRepo.Record(&models.MarketEvent{EventType: "negotiation_accepted", CropID: &cid, UserID: &uid, Metadata: fmt.Sprintf(`{"quantity":%g}`, negotiation.Quantity)})
+	}
 
 	// --------------------------------------------------------
 	// Move accepted deal into buyer's cart.
@@ -754,6 +763,11 @@ func (s *NegotiationService) Reject(
 		"rejected",
 	); err != nil {
 		return err
+	}
+	if s.eventRepo != nil {
+		uid := negotiation.BuyerID
+		cid := negotiation.CropID
+		_ = s.eventRepo.Record(&models.MarketEvent{EventType: "negotiation_rejected", CropID: &cid, UserID: &uid})
 	}
 
 	// ========================================================

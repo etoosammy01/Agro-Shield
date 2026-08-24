@@ -96,6 +96,7 @@ func RegisterRoutes(container *app.Container) {
 		container.AI,
 		container.Negotiation,
 		services.NewWeatherService(),
+		container.MarketEvents,
 	)
 
 	http.HandleFunc(
@@ -174,6 +175,7 @@ func RegisterRoutes(container *app.Container) {
 	marketplaceHandler := handlers.NewMarketplaceHandler(
 		container.Crop,
 		container.Order,
+		container.MarketEvents,
 	)
 
 	http.HandleFunc(
@@ -193,6 +195,7 @@ func RegisterRoutes(container *app.Container) {
 
 	productHandler := handlers.NewProductHandler(
 		container.Crop,
+		container.MarketEvents,
 	)
 
 	http.HandleFunc(
@@ -212,6 +215,7 @@ func RegisterRoutes(container *app.Container) {
 
 	cartHandler := handlers.NewCartHandler(
 		container.Cart,
+		container.MarketEvents,
 	)
 
 	http.HandleFunc(
@@ -303,6 +307,7 @@ func RegisterRoutes(container *app.Container) {
 
 	negotiationHandler := handlers.NewNegotiationHandler(
 		container.Negotiation,
+		container.MarketEvents,
 	)
 
 	// Negotiation list

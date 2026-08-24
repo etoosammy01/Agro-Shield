@@ -5,19 +5,24 @@ import (
 	"net/http"
 	"strconv"
 
+	"backend/internal/repository"
 	"backend/internal/services"
+	"backend/middleware"
 	"backend/render"
+	"time"
 )
 
 // ProductHandler handles requests related to viewing one product.
 type ProductHandler struct {
-	crop *services.CropService
+	crop   *services.CropService
+	events *repository.MarketEventRepository
 }
 
 // NewProductHandler creates a ProductHandler and gives it access to CropService.
-func NewProductHandler(crop *services.CropService) *ProductHandler {
+func NewProductHandler(crop *services.CropService, events *repository.MarketEventRepository) *ProductHandler {
 	return &ProductHandler{
-		crop: crop,
+		crop:   crop,
+		events: events,
 	}
 }
 
@@ -39,6 +44,14 @@ func (h *ProductHandler) ProductDetailsHandler(w http.ResponseWriter, r *http.Re
 	if crop == nil {
 		http.Error(w, "Product not found", http.StatusNotFound)
 		return
+	}
+	if h.events != nil {
+		var userID *int
+		if farmer, ok := middleware.FarmerFromContext(r); ok && farmer != nil {
+			id := farmer.ID
+			userID = &id
+		}
+		_ = h.events.RecordListingView(cropID, userID, r.URL.Query().Get("session_id"), time.Hour)
 	}
 
 	data := ProductPageData{

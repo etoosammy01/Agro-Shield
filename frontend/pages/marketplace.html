@@ -64,12 +64,11 @@
         </p>
     {{end}}
 
-    <input
-        type="search"
-        id="search"
-        placeholder="Search products..."
-        class="search-box"
-    >
+    <form method="post" action="/marketplace" class="marketplace-search-form">
+        <input type="hidden" name="action" value="search">
+        <input type="search" name="search_term" id="search" placeholder="Search products..." class="search-box">
+        <button type="submit">Search</button>
+    </form>
 
     <section class="product-grid" id="product-grid">
 

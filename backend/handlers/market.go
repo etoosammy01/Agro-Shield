@@ -1,23 +1,26 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 
 	"backend/internal/models"
+	"backend/internal/repository"
 	"backend/internal/services"
 	"backend/middleware"
 	"backend/render"
 )
 
 type Marketplace struct {
-	crop  *services.CropService
-	order *services.OrderService
+	crop   *services.CropService
+	order  *services.OrderService
+	events *repository.MarketEventRepository
 }
 
-func NewMarketplaceHandler(crop *services.CropService, order *services.OrderService) *Marketplace {
-	return &Marketplace{crop: crop, order: order}
+func NewMarketplaceHandler(crop *services.CropService, order *services.OrderService, events *repository.MarketEventRepository) *Marketplace {
+	return &Marketplace{crop: crop, order: order, events: events}
 }
 
 type MarketplacePageData struct {
@@ -38,8 +41,17 @@ func (h *Marketplace) MarketplaceHandler(w http.ResponseWriter, r *http.Request)
 	switch r.Method {
 	case http.MethodGet:
 		log.Println("User Visited Marketplace")
+		h.record("marketplace_view", nil, farmer.ID, r)
 		h.render(w, farmer.IsBuyer(), farmer.ID, "", "")
 	case http.MethodPost:
+		if r.FormValue("action") == "search" {
+			uid := farmer.ID
+			if h.events != nil {
+				_ = h.events.RecordSearch(r.FormValue("search_term"), r.FormValue("normalized_produce"), farmer.Location, &uid, r.FormValue("session_id"))
+			}
+			h.render(w, farmer.IsBuyer(), farmer.ID, "", "")
+			return
+		}
 		if !farmer.IsBuyer() {
 			h.render(w, farmer.IsBuyer(), farmer.ID, "", "Only buyer accounts can place orders")
 			return
@@ -50,10 +62,24 @@ func (h *Marketplace) MarketplaceHandler(w http.ResponseWriter, r *http.Request)
 			h.render(w, farmer.IsBuyer(), farmer.ID, "", err.Error())
 			return
 		}
+		h.record("checkout_completed", &cropID, farmer.ID, r, fmt.Sprintf(`{"quantity":%g}`, quantity))
 		h.render(w, farmer.IsBuyer(), farmer.ID, "Order placed successfully!", "")
 	default:
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func (h *Marketplace) record(eventType string, cropID *int, userID int, r *http.Request, metadata ...string) {
+	if h.events == nil {
+		return
+	}
+	uid := userID
+	sessionID, _ := r.Context().Value("session_id").(string)
+	meta := "{}"
+	if len(metadata) > 0 {
+		meta = metadata[0]
+	}
+	_ = h.events.Record(&models.MarketEvent{EventType: eventType, CropID: cropID, UserID: &uid, SessionID: sessionID, Metadata: meta})
 }
 
 func (h *Marketplace) render(w http.ResponseWriter, isBuyer bool, currentUserID int, message, errMsg string) {

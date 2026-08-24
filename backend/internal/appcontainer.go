@@ -32,6 +32,7 @@ type Container struct {
 	Negotiation  *services.NegotiationService
 	Notification *services.NotificationService
 	Chat         *services.ChatService
+	MarketEvents *repository.MarketEventRepository
 
 	// Used by authentication middleware.
 	FarmerRepo *repository.FarmerRepository
@@ -50,6 +51,7 @@ func NewContainer(
 	negotiationRepo *repository.NegotiationRepository,
 	negotiationMsgRepo *repository.NegotiationMessageRepository,
 	notificationRepo *repository.NotificationRepository,
+	marketEventRepo *repository.MarketEventRepository,
 
 	// ========================================================
 	// CHAT REPOSITORIES
@@ -69,6 +71,7 @@ func NewContainer(
 	cartService := services.NewCartService(
 		cartRepo,
 		cropRepo,
+		marketEventRepo,
 	)
 
 	// ========================================================
@@ -89,6 +92,7 @@ func NewContainer(
 		cropRepo,
 		cartService,
 		notificationService,
+		marketEventRepo,
 	)
 
 	// ========================================================
@@ -182,7 +186,8 @@ func NewContainer(
 		// CHAT
 		// ----------------------------------------------------
 
-		Chat: chatService,
+		Chat:         chatService,
+		MarketEvents: marketEventRepo,
 
 		// ----------------------------------------------------
 		// FARMER REPOSITORY
