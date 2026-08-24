@@ -348,12 +348,14 @@
     font-weight: 500;
 }
 
-.weather-location-icon {
+.weather-source > .weather-location-icon {
     display: block;
-    width: 14px;
-    height: 14px;
-    max-width: 14px;
-    max-height: 14px;
+    width: 14px !important;
+    height: 14px !important;
+    min-width: 14px;
+    max-width: 14px !important;
+    min-height: 14px;
+    max-height: 14px !important;
     object-fit: contain;
     flex: 0 0 auto;
 }
