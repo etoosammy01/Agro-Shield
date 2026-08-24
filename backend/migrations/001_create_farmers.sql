@@ -5,5 +5,6 @@ CREATE TABLE IF NOT EXISTS farmers (
     password_hash TEXT NOT NULL,
     location TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    photo_url TEXT NOT NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

@@ -27,6 +27,15 @@ func (h *Register) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case http.MethodPost:
+		if err := r.ParseMultipartForm(10 << 20); err != nil {
+			http.Error(w, "Invalid registration form", http.StatusBadRequest)
+			return
+		}
+		photoURL, err := saveUploadedFile(r, "profile_picture", "farmers")
+		if err != nil || photoURL == "" {
+			http.Error(w, "Profile picture is required", http.StatusBadRequest)
+			return
+		}
 		user := UserReg{
 			First_Name:       r.FormValue("first-name"),
 			Last_Name:        r.FormValue("last-name"),
@@ -50,7 +59,7 @@ func (h *Register) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		// Uses the service injected into this handler (h.service), not a
 		// package-level global — a prior version used an uninitialized
 		// global and would have panicked on every registration.
-		err := h.service.Register(
+		err = h.service.Register(
 			user.First_Name,
 			user.Last_Name,
 			user.Phone,
@@ -58,6 +67,7 @@ func (h *Register) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 			user.Password,
 			location,
 			user.Role,
+			photoURL,
 		)
 
 		if err != nil {

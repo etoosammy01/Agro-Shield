@@ -51,6 +51,10 @@ func (s *CropService) AddCrop(
 		return errors.New("crop name is required")
 	}
 
+	if strings.TrimSpace(imageURL) == "" {
+		return errors.New("crop picture is required")
+	}
+
 	if unit == "" {
 		return errors.New("unit is required")
 	}

@@ -18,8 +18,8 @@ func NewFarmerRepository(db *sql.DB) *FarmerRepository {
 func (r *FarmerRepository) Create(farmer *models.Farmer) error {
 	query := `
 	INSERT INTO farmers
-	(full_name, phone, email, password_hash, location, role)
-	VALUES ($1, $2, $3, $4, $5, $6)
+	(full_name, phone, email, password_hash, location, role, photo_url)
+	VALUES ($1, $2, $3, $4, $5, $6, $7)
 	RETURNING id
 	`
 	_, err := r.db.Exec(
@@ -30,6 +30,7 @@ func (r *FarmerRepository) Create(farmer *models.Farmer) error {
 		farmer.PasswordHash,
 		farmer.Location,
 		farmer.Role,
+		farmer.PhotoURL,
 	)
 	return err
 }
