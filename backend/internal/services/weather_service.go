@@ -13,6 +13,8 @@ import (
 
 type Weather struct {
 	Available      bool
+	Location       string
+	Source         string
 	Temperature    string
 	Summary        string
 	Humidity       string
@@ -62,7 +64,7 @@ func (s *WeatherService) Current(ctx context.Context, location string) (Weather,
 		rain = raw.Hourly.Rain[0]
 	}
 	summary := weatherSummary(raw.Current.Code)
-	return Weather{true, fmt.Sprintf("%.0f°", raw.Current.Temperature), summary, fmt.Sprintf("%.0f%%", raw.Current.Humidity), fmt.Sprintf("%.0f%%", rain), summary, weatherRecommendation(raw.Current.Code)}, nil
+	return Weather{Available: true, Location: location, Source: "Open-Meteo", Temperature: fmt.Sprintf("%.0f°", raw.Current.Temperature), Summary: summary, Humidity: fmt.Sprintf("%.0f%%", raw.Current.Humidity), RainChance: fmt.Sprintf("%.0f%%", rain), Conditions: summary, Recommendation: weatherRecommendation(raw.Current.Code)}, nil
 }
 
 func (s *WeatherService) getJSON(ctx context.Context, endpoint string, dst any) error {

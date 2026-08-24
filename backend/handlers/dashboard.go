@@ -79,7 +79,11 @@ func (h *Dashboard) DashBoard(w http.ResponseWriter, r *http.Request) {
 			data.IsBuyer = farmer.IsBuyer()
 			data.PhotoURL = farmer.PhotoURL
 			if h.weather != nil {
-				data.Weather, _ = h.weather.Current(r.Context(), farmer.Location)
+				var err error
+				data.Weather, err = h.weather.Current(r.Context(), farmer.Location)
+				if err != nil {
+					log.Printf("dashboard weather unavailable for %q: %v", farmer.Location, err)
+				}
 			}
 
 			if farmer.IsBuyer() {

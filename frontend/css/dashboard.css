@@ -338,6 +338,14 @@
     text-decoration: underline;
 }
 
+.weather-source {
+    display: block;
+    margin-top: 0.35rem;
+    color: #718096;
+    font-size: 0.78rem;
+    font-weight: 500;
+}
+
 
 /* =========================================================
    7. FARM HEALTH

@@ -556,6 +556,12 @@
                             <h2>
                                 Today's weather
                             </h2>
+
+                            {{if .Weather.Available}}
+                                <span class="weather-source">{{.Weather.Location}} · Source: {{.Weather.Source}}</span>
+                            {{else}}
+                                <span class="weather-source">Live weather unavailable</span>
+                            {{end}}
                         </div>
 
                     </div>
@@ -619,7 +625,7 @@
                         </strong>
 
                         <p>
-                            {{if .Weather.Available}}{{.Weather.Recommendation}}{{else}}Add a location to your profile to receive local weather conditions.{{end}}
+                            {{if .Weather.Available}}{{.Weather.Recommendation}}{{else}}Add a valid location to your profile to receive live weather conditions from Open-Meteo.{{end}}
                         </p>
                     </div>
 
