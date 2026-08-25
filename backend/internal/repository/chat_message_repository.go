@@ -183,11 +183,13 @@ func (r *ChatMessageRepository) ListByConversation(
 			id,
 			conversation_id,
 			sender_id,
-			message,
-			created_at
-		FROM chat_messages
-		WHERE conversation_id = $1
-		ORDER BY created_at ASC
+				m.message,
+				m.created_at,
+				f.full_name
+			FROM chat_messages m
+			JOIN farmers f ON f.id = m.sender_id
+			WHERE m.conversation_id = $1
+			ORDER BY m.created_at ASC, m.id ASC
 	`
 
 	rows, err := r.db.Query(
@@ -213,6 +215,7 @@ func (r *ChatMessageRepository) ListByConversation(
 			&message.SenderID,
 			&message.Message,
 			&message.CreatedAt,
+			&message.SenderName,
 		)
 
 		if err != nil {

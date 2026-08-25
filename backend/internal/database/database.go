@@ -827,6 +827,48 @@ func RunMigration(db *sql.DB) error {
 		return err
 	}
 
+	// Collapse duplicate private threads created by older chat flows. Messages
+	// and memberships are moved to the oldest conversation before duplicates
+	// are removed, so each pair of users has one continuous history.
+	if _, err = db.Exec(`
+		WITH private_pairs AS (
+			SELECT c.id, MIN(c.id) OVER (PARTITION BY
+				(SELECT ARRAY_AGG(cm.user_id ORDER BY cm.user_id)
+				 FROM conversation_members cm WHERE cm.conversation_id = c.id)
+			) AS canonical_id
+			FROM conversations c WHERE c.type = 'private'
+		), duplicates AS (
+			SELECT id, canonical_id FROM private_pairs WHERE id <> canonical_id
+		)
+		UPDATE chat_messages m SET conversation_id = d.canonical_id
+		FROM duplicates d WHERE m.conversation_id = d.id;
+
+		WITH private_pairs AS (
+			SELECT c.id, MIN(c.id) OVER (PARTITION BY
+				(SELECT ARRAY_AGG(cm.user_id ORDER BY cm.user_id)
+				 FROM conversation_members cm WHERE cm.conversation_id = c.id)
+			) AS canonical_id
+			FROM conversations c WHERE c.type = 'private'
+		)
+		INSERT INTO conversation_members (conversation_id, user_id)
+		SELECT p.canonical_id, cm.user_id
+		FROM private_pairs p JOIN conversation_members cm ON cm.conversation_id = p.id
+		WHERE p.id <> p.canonical_id
+		ON CONFLICT (conversation_id, user_id) DO NOTHING;
+
+		DELETE FROM conversations c
+		USING (
+			SELECT id, MIN(id) OVER (PARTITION BY
+				(SELECT ARRAY_AGG(cm.user_id ORDER BY cm.user_id)
+				 FROM conversation_members cm WHERE cm.conversation_id = c2.id)
+			) AS canonical_id
+			FROM conversations c2 WHERE c2.type = 'private'
+		) d
+		WHERE c.id = d.id AND d.id <> d.canonical_id;
+	`); err != nil {
+		return fmt.Errorf("duplicate private conversation migration failed: %w", err)
+	}
+
 	log.Println("✅ Chat messages table migrated successfully")
 
 	// ========================================================

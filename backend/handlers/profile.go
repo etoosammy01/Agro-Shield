@@ -3,20 +3,23 @@ package handlers
 import (
 	"log"
 	"net/http"
+	"strconv"
 
 	"backend/internal/models"
+	"backend/internal/repository"
 	"backend/internal/services"
 	"backend/middleware"
 	"backend/render"
 )
 
 type Profile struct {
-	crop  *services.CropService
-	order *services.OrderService
+	crop    *services.CropService
+	order   *services.OrderService
+	farmers *repository.FarmerRepository
 }
 
-func NewProfileHandler(crop *services.CropService, order *services.OrderService) *Profile {
-	return &Profile{crop: crop, order: order}
+func NewProfileHandler(crop *services.CropService, order *services.OrderService, farmers *repository.FarmerRepository) *Profile {
+	return &Profile{crop: crop, order: order, farmers: farmers}
 }
 
 // ProfilePageData embeds the farmer/buyer so the template can use .FullName,
@@ -35,6 +38,19 @@ func (h *Profile) ProfileHandler(w http.ResponseWriter, r *http.Request) {
 	if !ok || farmer == nil {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
+	}
+	if idValue := r.URL.Query().Get("id"); idValue != "" {
+		id, err := strconv.Atoi(idValue)
+		if err != nil || id <= 0 {
+			http.Error(w, "Invalid profile ID", http.StatusBadRequest)
+			return
+		}
+		profile, err := h.farmers.GetByID(id)
+		if err != nil || profile == nil {
+			http.NotFound(w, r)
+			return
+		}
+		farmer = profile
 	}
 
 	data := ProfilePageData{Farmer: farmer}

@@ -133,6 +133,7 @@ func RegisterRoutes(container *app.Container) {
 	profileHandler := handlers.NewProfileHandler(
 		container.Crop,
 		container.Order,
+		container.FarmerRepo,
 	)
 
 	http.HandleFunc(
