@@ -215,6 +215,9 @@ func RunMigration(db *sql.DB) error {
 		return err
 	}
 	log.Println("✅ Produce listing lifecycle columns migrated successfully")
+	if _, err = db.Exec(`ALTER TABLE crops ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION; ALTER TABLE crops ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION; ALTER TABLE crops ADD COLUMN IF NOT EXISTS location_accuracy DOUBLE PRECISION;`); err != nil {
+		return err
+	}
 
 	if _, err = db.Exec(marketEventsTable); err != nil {
 		return err
@@ -615,6 +618,34 @@ func RunMigration(db *sql.DB) error {
 		return err
 	}
 
+	// Older deployments may have created conversations without the
+	// current name column. Keep the migration additive and idempotent so
+	// those databases can be upgraded without dropping chat history.
+	if _, err = db.Exec(`ALTER TABLE conversations ADD COLUMN IF NOT EXISTS name TEXT;`); err != nil {
+		return err
+	}
+	// Older deployments may also have created conversations before the type
+	// column was introduced. Default legacy rows to private conversations so
+	// repository queries remain compatible without losing chat history.
+	if _, err = db.Exec(`ALTER TABLE conversations ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'private';`); err != nil {
+		return err
+	}
+	// created_by was added after the first chat schema shipped. Add it as
+	// nullable for now; once conversation_members is available below, legacy
+	// rows can be backfilled before the NOT NULL constraint is restored.
+	if _, err = db.Exec(`ALTER TABLE conversations ADD COLUMN IF NOT EXISTS created_by INTEGER;`); err != nil {
+		return err
+	}
+	// Older deployments may also lack timestamp columns that are selected and
+	// maintained by the conversation repository. Add them without replacing
+	// existing chat history.
+	if _, err = db.Exec(`ALTER TABLE conversations ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`); err != nil {
+		return err
+	}
+	if _, err = db.Exec(`ALTER TABLE conversations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`); err != nil {
+		return err
+	}
+
 	log.Println("✅ Conversations table migrated successfully")
 
 	// ========================================================
@@ -662,6 +693,48 @@ func RunMigration(db *sql.DB) error {
 	_, err = db.Exec(conversationMembersTable)
 	if err != nil {
 		return err
+	}
+
+	// Upgrade conversations created by older deployments. The earliest member
+	// is the best available representation of the original creator. Refuse to
+	// silently invent a creator for orphaned conversations, since doing so would
+	// assign ownership to an unrelated user.
+	if _, err = db.Exec(`
+		UPDATE conversations c
+		SET created_by = (
+			SELECT cm.user_id
+			FROM conversation_members cm
+			WHERE cm.conversation_id = c.id
+			ORDER BY cm.joined_at ASC, cm.id ASC
+			LIMIT 1
+		)
+		WHERE c.created_by IS NULL;
+	`); err != nil {
+		return fmt.Errorf("conversations.created_by backfill failed: %w", err)
+	}
+	var conversationsWithoutCreator int
+	if err = db.QueryRow(`SELECT COUNT(*) FROM conversations WHERE created_by IS NULL`).Scan(&conversationsWithoutCreator); err != nil {
+		return err
+	}
+	if conversationsWithoutCreator > 0 {
+		return fmt.Errorf("cannot migrate conversations.created_by: %d conversation(s) have no members", conversationsWithoutCreator)
+	}
+	if _, err = db.Exec(`
+		ALTER TABLE conversations ALTER COLUMN created_by SET NOT NULL;
+		DO $$
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_constraint
+				WHERE conrelid = 'conversations'::regclass
+				  AND conname = 'fk_conversations_creator'
+			) THEN
+				ALTER TABLE conversations
+					ADD CONSTRAINT fk_conversations_creator
+					FOREIGN KEY (created_by) REFERENCES farmers(id) ON DELETE CASCADE;
+			END IF;
+		END $$;
+	`); err != nil {
+		return fmt.Errorf("conversations.created_by constraint migration failed: %w", err)
 	}
 
 	log.Println("✅ Conversation members table migrated successfully")

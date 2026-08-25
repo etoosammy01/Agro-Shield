@@ -146,6 +146,27 @@ func (r *ConversationRepository) GetByID(
 	return &conversation, nil
 }
 
+// FindPrivateBetween returns the existing one-to-one chat for two users.
+func (r *ConversationRepository) FindPrivateBetween(firstUserID, secondUserID int) (*models.Conversation, error) {
+	query := `
+		SELECT c.id, c.name, c.type, c.created_by, c.created_at, c.updated_at
+		FROM conversations c
+		JOIN conversation_members first_member ON first_member.conversation_id = c.id AND first_member.user_id = $1
+		JOIN conversation_members second_member ON second_member.conversation_id = c.id AND second_member.user_id = $2
+		WHERE c.type = 'private'
+		  AND (SELECT COUNT(*) FROM conversation_members cm WHERE cm.conversation_id = c.id) = 2
+		ORDER BY c.id ASC LIMIT 1`
+	var conversation models.Conversation
+	err := r.db.QueryRow(query, firstUserID, secondUserID).Scan(&conversation.ID, &conversation.Name, &conversation.Type, &conversation.CreatedBy, &conversation.CreatedAt, &conversation.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &conversation, nil
+}
+
 // ============================================================
 // LIST USER CONVERSATIONS
 // ============================================================

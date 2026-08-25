@@ -151,6 +151,14 @@ func (s *ChatService) CreatePrivateChat(
 		)
 	}
 
+	existing, err := s.conversationRepo.FindPrivateBetween(userID, otherUserID)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		return existing, nil
+	}
+
 	conversation := &models.Conversation{
 		Name:      "",
 		Type:      "private",

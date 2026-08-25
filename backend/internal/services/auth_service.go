@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"strings"
 
 	"backend/internal/models"
 	"backend/internal/repository"
@@ -98,11 +99,18 @@ func (s *AuthService) GetFarmerByID(id int) (*models.Farmer, error) {
 
 // UpdateProfile edits a user's name, phone and location.
 func (s *AuthService) UpdateProfile(id int, fullName, phone, email, location string) error {
+	fullName = strings.TrimSpace(fullName)
+	phone = strings.TrimSpace(phone)
+	email = strings.TrimSpace(email)
+	location = strings.TrimSpace(location)
 	if fullName == "" {
 		return errors.New("full name is required")
 	}
 	if phone == "" {
 		return errors.New("phone is required")
+	}
+	if location == "" {
+		return errors.New("location is required")
 	}
 	return s.repo.UpdateProfile(id, fullName, phone, email, location)
 }

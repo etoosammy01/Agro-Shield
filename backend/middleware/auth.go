@@ -24,11 +24,15 @@ const sessionCookieName = "agroshield_session"
 type sessionStore struct {
 	mu       sync.RWMutex
 	sessions map[string]int
+	lastSeen map[int]time.Time
 }
 
 var store = &sessionStore{
 	sessions: make(map[string]int),
+	lastSeen: make(map[int]time.Time),
 }
+
+const onlineWindow = 60 * time.Second
 
 func newSessionID() string {
 	b := make([]byte, 32)
@@ -48,8 +52,36 @@ func CreateSession(farmerID int) string {
 // DeleteSession removes a session (used on logout).
 func DeleteSession(sessionID string) {
 	store.mu.Lock()
+	farmerID, exists := store.sessions[sessionID]
 	delete(store.sessions, sessionID)
+	if exists {
+		hasAnotherSession := false
+		for _, sessionFarmerID := range store.sessions {
+			if sessionFarmerID == farmerID {
+				hasAnotherSession = true
+				break
+			}
+		}
+		if !hasAnotherSession {
+			delete(store.lastSeen, farmerID)
+		}
+	}
 	store.mu.Unlock()
+}
+
+// MarkFarmerOnline records recent authenticated activity for presence checks.
+func MarkFarmerOnline(farmerID int) {
+	store.mu.Lock()
+	store.lastSeen[farmerID] = time.Now()
+	store.mu.Unlock()
+}
+
+// IsFarmerOnline reports whether a user has been active recently.
+func IsFarmerOnline(farmerID int) bool {
+	store.mu.RLock()
+	lastSeen, ok := store.lastSeen[farmerID]
+	store.mu.RUnlock()
+	return ok && time.Since(lastSeen) <= onlineWindow
 }
 
 func getFarmerIDForSession(sessionID string) (int, bool) {
@@ -123,6 +155,7 @@ func RequireAuth(repo *repository.FarmerRepository, next http.HandlerFunc) http.
 			return
 		}
 
+		MarkFarmerOnline(farmerID)
 		ctx := context.WithValue(r.Context(), farmerContextKey, farmer)
 		next(w, r.WithContext(ctx))
 	}

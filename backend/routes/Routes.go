@@ -420,6 +420,7 @@ func RegisterRoutes(container *app.Container) {
 
 	chatHandler := handlers.NewChatHandler(
 		container.Chat,
+		container.FarmerRepo,
 	)
 
 	// --------------------------------------------------------
@@ -463,6 +464,19 @@ func RegisterRoutes(container *app.Container) {
 				middleware.RequireAuth(
 					container.FarmerRepo,
 					chatHandler.ViewHandler,
+				),
+			),
+		),
+	)
+
+	http.HandleFunc(
+		"/chat/presence",
+		middleware.OnlyPath(
+			"/chat/presence",
+			middleware.OnlyGet(
+				middleware.RequireAuth(
+					container.FarmerRepo,
+					chatHandler.PresenceHandler,
 				),
 			),
 		),

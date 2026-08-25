@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"html/template"
 	"log"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"strings"
 
 	"backend/internal/models"
+	"backend/internal/repository"
 	"backend/internal/services"
 	"backend/middleware"
 )
@@ -43,6 +45,7 @@ import (
 
 type ChatHandler struct {
 	service *services.ChatService
+	farmers *repository.FarmerRepository
 }
 
 // ============================================================
@@ -51,10 +54,12 @@ type ChatHandler struct {
 
 func NewChatHandler(
 	service *services.ChatService,
+	farmers *repository.FarmerRepository,
 ) *ChatHandler {
 
 	return &ChatHandler{
 		service: service,
+		farmers: farmers,
 	}
 }
 
@@ -71,7 +76,42 @@ func NewChatHandler(
 type ChatListPageData struct {
 	Farmer        interface{}
 	Conversations []models.Conversation
+	Users         []models.Farmer
+	Query         string
 	Error         string
+}
+
+type chatPresenceResponse struct {
+	OnlineUserIDs []int `json:"online_user_ids"`
+}
+
+// PresenceHandler returns recently active chat users for client-side updates.
+func (h *ChatHandler) PresenceHandler(w http.ResponseWriter, r *http.Request) {
+	farmer, ok := middleware.FarmerFromContext(r)
+	if !ok || farmer == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	middleware.MarkFarmerOnline(farmer.ID)
+	users, err := h.farmers.ListForChat(farmer.ID, "")
+	if err != nil {
+		http.Error(w, "Could not load presence", http.StatusInternalServerError)
+		return
+	}
+
+	onlineIDs := make([]int, 0)
+	for _, user := range users {
+		if middleware.IsFarmerOnline(user.ID) {
+			onlineIDs = append(onlineIDs, user.ID)
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	if err := json.NewEncoder(w).Encode(chatPresenceResponse{OnlineUserIDs: onlineIDs}); err != nil {
+		log.Println("presence response error:", err)
+	}
 }
 
 // ============================================================
@@ -143,10 +183,17 @@ func (h *ChatHandler) ListHandler(
 		)
 		return
 	}
+	users, usersErr := h.farmers.ListForChat(farmer.ID, r.URL.Query().Get("q"))
+	if usersErr != nil {
+		h.renderList(w, farmer, conversations, usersErr.Error())
+		return
+	}
 
 	data := ChatListPageData{
 		Farmer:        farmer,
 		Conversations: conversations,
+		Users:         users,
+		Query:         r.URL.Query().Get("q"),
 	}
 
 	if err := h.renderTemplate(
@@ -974,7 +1021,7 @@ func (h *ChatHandler) renderTemplate(
 ) error {
 
 	tmpl, err := template.ParseFiles(
-		"../frontend/pages/"+templateName,
+		"../frontend/pages/" + templateName,
 	)
 
 	if err != nil {

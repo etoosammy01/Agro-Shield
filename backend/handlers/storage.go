@@ -150,6 +150,9 @@ func (h *Storage) createCrop(
 	name := strings.TrimSpace(r.FormValue("produce"))
 	unit := strings.TrimSpace(r.FormValue("unit"))
 	location := strings.TrimSpace(r.FormValue("location"))
+	latitude, _ := strconv.ParseFloat(r.FormValue("latitude"), 64)
+	longitude, _ := strconv.ParseFloat(r.FormValue("longitude"), 64)
+	accuracy, _ := strconv.ParseFloat(r.FormValue("location_accuracy"), 64)
 
 	quantity, err := strconv.ParseFloat(
 		strings.TrimSpace(r.FormValue("quantity")),
@@ -203,6 +206,7 @@ func (h *Storage) createCrop(
 		price,
 		listForSale,
 		imageURL,
+		latitude, longitude, accuracy,
 	); err != nil {
 		h.render(
 			w,

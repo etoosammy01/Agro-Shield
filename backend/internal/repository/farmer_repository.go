@@ -3,6 +3,7 @@ package repository
 import (
 	"backend/internal/models"
 	"database/sql"
+	"strings"
 )
 
 type FarmerRepository struct {
@@ -113,6 +114,30 @@ func (r *FarmerRepository) GetByID(id int) (*models.Farmer, error) {
 		return nil, err
 	}
 	return &farmer, nil
+}
+
+// ListForChat returns registered users that can be contacted in general chat.
+func (r *FarmerRepository) ListForChat(excludeID int, search string) ([]models.Farmer, error) {
+	rows, err := r.db.Query(`
+		SELECT id, full_name, phone, COALESCE(email, ''), password_hash,
+			location, COALESCE(lga, location), COALESCE(state, ''), COALESCE(country, 'Nigeria'),
+			role, COALESCE(photo_url, ''), created_at, updated_at
+		FROM farmers
+		WHERE id <> $1 AND ($2 = '' OR full_name ILIKE '%' || $2 || '%' OR role ILIKE '%' || $2 || '%' OR location ILIKE '%' || $2 || '%')
+		ORDER BY full_name ASC`, excludeID, strings.TrimSpace(search))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var users []models.Farmer
+	for rows.Next() {
+		var user models.Farmer
+		if err := rows.Scan(&user.ID, &user.FullName, &user.Phone, &user.Email, &user.PasswordHash, &user.Location, &user.LGA, &user.State, &user.Country, &user.Role, &user.PhotoURL, &user.CreatedAt, &user.UpdatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+	return users, rows.Err()
 }
 
 // UpdateProfile updates the editable personal details.

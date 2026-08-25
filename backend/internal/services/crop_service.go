@@ -37,6 +37,7 @@ func (s *CropService) AddCrop(
 	price float64,
 	listForSale bool,
 	imageURL string,
+	latitude, longitude, accuracy float64,
 ) error {
 
 	name = strings.TrimSpace(name)
@@ -62,6 +63,9 @@ func (s *CropService) AddCrop(
 	if location == "" {
 		return errors.New("location is required")
 	}
+	if latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 {
+		return errors.New("valid farm GPS location is required")
+	}
 
 	if quantity <= 0 {
 		return errors.New("quantity must be greater than zero")
@@ -80,6 +84,7 @@ func (s *CropService) AddCrop(
 		PricePerUnit:  price,
 		ListedForSale: listForSale,
 		ImageURL:      imageURL,
+		Latitude: latitude, Longitude: longitude, LocationAccuracy: accuracy,
 	}
 
 	return s.repo.Create(crop)

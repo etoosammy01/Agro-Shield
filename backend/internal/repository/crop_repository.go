@@ -40,9 +40,9 @@ func (r *CropRepository) Create(crop *models.Crop) error {
 			location,
 			price_per_unit,
 			listed_for_sale,
-			image_url, lga, state, country, initial_listed_quantity, first_listed_at
+			image_url, lga, state, country, latitude, longitude, location_accuracy, initial_listed_quantity, first_listed_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $5, COALESCE((SELECT state FROM farmers WHERE id=$1),'Benue'), COALESCE((SELECT country FROM farmers WHERE id=$1),'Nigeria'), CASE WHEN $7 THEN $3 ELSE NULL END, CASE WHEN $7 THEN CURRENT_TIMESTAMP ELSE NULL END)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $5, COALESCE((SELECT state FROM farmers WHERE id=$1),'Benue'), COALESCE((SELECT country FROM farmers WHERE id=$1),'Nigeria'), $9, $10, $11, CASE WHEN $7 THEN $3 ELSE NULL END, CASE WHEN $7 THEN CURRENT_TIMESTAMP ELSE NULL END)
 		RETURNING id
 	`
 
@@ -56,6 +56,7 @@ func (r *CropRepository) Create(crop *models.Crop) error {
 		crop.PricePerUnit,
 		crop.ListedForSale,
 		crop.ImageURL,
+		crop.Latitude, crop.Longitude, crop.LocationAccuracy,
 	).Scan(&crop.ID)
 	if err != nil {
 		return err
