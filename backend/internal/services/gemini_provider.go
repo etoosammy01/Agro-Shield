@@ -3,6 +3,9 @@ package services
 import (
 	"context"
 	"errors"
+	"log"
+	"strings"
+	"time"
 
 	"google.golang.org/genai"
 )
@@ -168,26 +171,26 @@ Keep the complete answer below 250 words.`
 	// ========================================================
 
 	// ============================================================
-// PROCESS IMAGE BEFORE SENDING TO GEMINI
-//
-// Large phone images can make AI analysis slow.
-// We resize and compress the image first.
-// ============================================================
+	// PROCESS IMAGE BEFORE SENDING TO GEMINI
+	//
+	// Large phone images can make AI analysis slow.
+	// We resize and compress the image first.
+	// ============================================================
 
-if len(request.Image) > 0 {
+	if len(request.Image) > 0 {
 
-	processedImage, err := prepareImage(request.Image)
-	if err != nil {
-		return nil, errors.New("could not process image")
+		processedImage, err := prepareImage(request.Image)
+		if err != nil {
+			return nil, errors.New("could not process image")
+		}
+
+		parts = append(parts, &genai.Part{
+			InlineData: &genai.Blob{
+				Data:     processedImage,
+				MIMEType: "image/jpeg",
+			},
+		})
 	}
-
-	parts = append(parts, &genai.Part{
-		InlineData: &genai.Blob{
-			Data:     processedImage,
-			MIMEType: "image/jpeg",
-		},
-	})
-}
 
 	// ========================================================
 	// 8. ADD AUDIO
@@ -237,22 +240,48 @@ if len(request.Image) > 0 {
 	// - Turning thinking off for this test
 	// ========================================================
 
-	result, err := p.client.Models.GenerateContent(
-		context.Background(),
-		p.model,
-		contents,
-		&genai.GenerateContentConfig{
-			MaxOutputTokens: 300,
+	thinkingBudget := int32(0)
+	if request.Thinking {
+		thinkingBudget = 1024
+	}
+	config := &genai.GenerateContentConfig{
+		MaxOutputTokens: 300,
+		ThinkingConfig:  &genai.ThinkingConfig{ThinkingBudget: genai.Ptr(thinkingBudget)},
+	}
 
-			ThinkingConfig: &genai.ThinkingConfig{
-				ThinkingBudget: genai.Ptr[int32](0),
-			},
-		},
-	)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	var result *genai.GenerateContentResponse
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		result, err = p.client.Models.GenerateContent(ctx, p.model, contents, config)
+		if err == nil || !isTemporaryGeminiError(err) {
+			break
+		}
+
+		log.Printf("temporary Gemini error on attempt %d: %v", attempt+1, err)
+		if attempt < 2 {
+			delay := time.Duration(attempt+1) * time.Second
+			select {
+			case <-time.After(delay):
+			case <-ctx.Done():
+				err = ctx.Err()
+				attempt = 2
+			}
+		}
+	}
 
 	// If Gemini gives an error, return it.
 	if err != nil {
-		return nil, err
+		log.Printf("Gemini analysis failed: %v", err)
+		if isTemporaryGeminiError(err) {
+			return nil, errors.New("the AI service is busy right now. Please wait a moment and try again")
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			return nil, errors.New("the AI service took too long to respond. Please try again")
+		}
+		return nil, errors.New("the AI service could not complete the analysis. Please try again")
 	}
 
 	// ========================================================
@@ -294,4 +323,16 @@ if len(request.Image) > 0 {
 	// ========================================================
 
 	return nil, errors.New("gemini returned no diagnosis text")
+}
+
+func isTemporaryGeminiError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "503") ||
+		strings.Contains(message, "unavailable") ||
+		strings.Contains(message, "high demand") ||
+		strings.Contains(message, "resource exhausted") ||
+		strings.Contains(message, "429")
 }

@@ -15,13 +15,15 @@
 <header class="navbar">
     <div class="logo">🌾 Agro-Shield</div>
 
-    <nav>
+    <nav aria-label="Main navigation">
         <a href="/dashboard">Dashboard</a>
         <a href="/storage">Storage</a>
         <a href="/marketplace">Marketplace</a>
         <a href="/negotiations">Negotiations</a>
-        <a href="/ai-assistant">AI Assistant</a>
+        <a href="/cart">Cart</a>
+        <a href="/ai-assistant" aria-current="page">AI Assistant</a>
         <a href="/profile">Profile</a>
+        <a href="/notifications">Notifications</a>
         <a href="/logout">Logout</a>
     </nav>
 </header>
@@ -48,7 +50,7 @@
         method="POST"
         action="/ai-assistant"
         enctype="multipart/form-data"
-        class="ai-form"
+        class="ai-form" id="ai-form"
     >
 
         <!-- CATEGORY -->
@@ -115,18 +117,23 @@
 
             <input type="file" id="image" name="image" accept="image/*" hidden>
             <input type="file" id="audio" name="audio" accept="audio/*" hidden>
+            <input type="hidden" id="thinking" name="thinking" value="false">
 
             <div class="composer-controls">
                 <button type="button" id="add-image" class="composer-icon plus-button" aria-label="Upload image" title="Upload image">+</button>
-                <button type="button" class="think-toggle" aria-label="Toggle thinking mode"><span aria-hidden="true">◉</span><span>Think</span></button>
+                <button type="button" id="think-toggle" class="think-toggle" aria-label="Use deeper AI analysis" aria-pressed="false"><span aria-hidden="true">◉</span><span>Think</span></button>
                 <button type="button" id="start-audio" class="composer-icon microphone-button" aria-label="Start voice recording" title="Record voice"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a4 4 0 0 0 4-4V6a4 4 0 1 0-8 0v5a4 4 0 0 0 4 4Zm-7-4a7 7 0 0 0 14 0M12 18v3m-3 0h6"/></svg></button>
                 <button type="button" id="stop-audio" hidden disabled>Stop recording</button>
-                <button type="submit" class="send-button" aria-label="Send to AI" title="Send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9v6m3-9v12m4-9v6m3-4v2"/></svg></button>
+                <button type="submit" class="send-button" aria-label="Send to AI" title="Send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 12 16-8-6 16-3-7-7-1Z"/><path d="m11 13 4-4"/></svg></button>
             </div>
         </div>
 
         <div class="composer-feedback">
-            <span id="image-status" aria-live="polite"></span>
+            <div id="image-preview-wrap" class="attachment-preview" hidden>
+                <img id="image-preview" alt="Selected crop or farm image preview">
+                <span id="image-status" aria-live="polite"></span>
+                <button type="button" id="remove-image" class="remove-attachment">Remove image</button>
+            </div>
 
             <p
                 id="audio-status"
@@ -139,6 +146,7 @@
                 controls
                 hidden
             ></audio>
+            <button type="button" id="remove-audio" class="remove-attachment" hidden>Remove voice recording</button>
         </div>
 
         <!-- VIDEO -->
@@ -188,12 +196,15 @@
                 width="320"
                 hidden
             ></video>
+            <button type="button" id="remove-video" class="remove-attachment" hidden>Remove video</button>
         </section>
 
         <p class="media-help">
             You can describe the issue or provide audio/video context.
             Media uploads are optional.
         </p>
+
+        <div id="submit-status" class="submit-status" role="status" aria-live="polite"></div>
 
     </form>
 
@@ -212,67 +223,14 @@
         </section>
     {{end}}
 
-    <!-- HISTORY -->
-
-    <section class="ai-history">
-
-        <h2>Past AI Consultations</h2>
-
-        {{if .History}}
-
-            <table>
-                <thead>
-                    <tr>
-                        <th>Category</th>
-                        <th>Description</th>
-                        <th>Result</th>
-                        <th>Date</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    {{range .History}}
-                        <tr>
-                            <td>
-                                {{.Category}}
-                            </td>
-
-                            <td>
-                                {{if .Description}}
-                                    {{.Description}}
-                                {{else}}
-                                    —
-                                {{end}}
-                            </td>
-
-                            <td>
-                                <div class="history-result">
-                                    {{.Result}}
-                                </div>
-                            </td>
-
-                            <td>
-                                {{.CreatedAt.Format "02 Jan 2006"}}
-                            </td>
-                        </tr>
-                    {{end}}
-                </tbody>
-            </table>
-
-        {{else}}
-
-            <p>
-                No AI consultations yet.
-                Ask Agro-Shield AI a farming question to get started.
-            </p>
-
-        {{end}}
-
-    </section>
+    <p class="history-link-wrap">
+        <a class="history-link" href="/ai-diagnosis-history">View AI diagnosis history</a>
+    </p>
 
 </main>
 
-<script src="/static/js/ai-assistant.js?v=20260824-chat-composer"></script>
+<script src="/static/js/ai_assistant.js?v=20260824-chat-composer"></script>
 
+<script src="/static/js/navigation.js"></script>
 </body>
 </html>

@@ -10,13 +10,18 @@
 
     <title>Agro-Shield Chat</title>
 
-    <link
-        rel="stylesheet"
-        href="/static/css/chat.css"
-    >
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/chat.css">
 </head>
 
 <body>
+
+<header class="navbar">
+    <a class="logo" href="/dashboard">🌾 Agro-Shield</a>
+    <nav aria-label="Main navigation">
+        <a href="/dashboard">Dashboard</a><a href="/storage">Storage</a><a href="/marketplace">Marketplace</a><a href="/negotiations">Negotiations</a><a href="/ai-assistant">AI Assistant</a><a href="/chat" aria-current="page">Chat</a><a href="/profile">Profile</a><a href="/notifications">Notifications</a><a href="/logout">Logout</a>
+    </nav>
+</header>
 
     <!-- =====================================================
          CHAT PAGE
@@ -208,5 +213,6 @@
 
     </div>
 
+<script src="/static/js/navigation.js"></script>
 </body>
 </html>

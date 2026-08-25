@@ -16,242 +16,19 @@
         {{end}}
         - Agro-Shield
     </title>
+    <link rel="stylesheet" href="/static/css/style.css">
 
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: Arial, sans-serif;
-            background: #f4f7f5;
-            color: #222;
-        }
-
-        /* =====================================================
-           PAGE CONTAINER
-           ===================================================== */
-
-        .chat-container {
-            width: 100%;
-            max-width: 1000px;
-            height: 90vh;
-            margin: 30px auto;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        /* =====================================================
-           CHAT HEADER
-           ===================================================== */
-
-        .chat-header {
-            background: #1b5e20;
-            color: white;
-            padding: 18px 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .chat-header-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .back-button {
-            color: white;
-            text-decoration: none;
-            font-size: 22px;
-            font-weight: bold;
-        }
-
-        .chat-title {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .chat-title h2 {
-            font-size: 20px;
-            margin-bottom: 3px;
-        }
-
-        .chat-type {
-            font-size: 12px;
-            opacity: 0.8;
-        }
-
-        /* =====================================================
-           MESSAGES AREA
-           ===================================================== */
-
-        .messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            background: #eef3ef;
-        }
-
-        .empty-chat {
-            text-align: center;
-            color: #777;
-            margin-top: 100px;
-        }
-
-        .message {
-            margin-bottom: 15px;
-            display: flex;
-            flex-direction: column;
-            max-width: 75%;
-        }
-
-        .message.mine {
-            margin-left: auto;
-            align-items: flex-end;
-        }
-
-        .message.theirs {
-            margin-right: auto;
-            align-items: flex-start;
-        }
-
-        .sender {
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 4px;
-        }
-
-        .message-bubble {
-            padding: 11px 15px;
-            border-radius: 15px;
-            word-wrap: break-word;
-            line-height: 1.5;
-        }
-
-        .mine .message-bubble {
-            background: #2e7d32;
-            color: white;
-            border-bottom-right-radius: 4px;
-        }
-
-        .theirs .message-bubble {
-            background: white;
-            color: #222;
-            border-bottom-left-radius: 4px;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-        }
-
-        .message-time {
-            font-size: 10px;
-            color: #888;
-            margin-top: 4px;
-        }
-
-        /* =====================================================
-           MESSAGE INPUT
-           ===================================================== */
-
-        .message-form {
-            display: flex;
-            gap: 10px;
-            padding: 15px;
-            background: white;
-            border-top: 1px solid #ddd;
-        }
-
-        .message-input {
-            flex: 1;
-            border: 1px solid #ccc;
-            border-radius: 25px;
-            padding: 12px 18px;
-            font-size: 15px;
-            outline: none;
-        }
-
-        .message-input:focus {
-            border-color: #2e7d32;
-        }
-
-        .send-button {
-            border: none;
-            background: #2e7d32;
-            color: white;
-            padding: 0 22px;
-            border-radius: 25px;
-            cursor: pointer;
-            font-size: 15px;
-        }
-
-        .send-button:hover {
-            background: #1b5e20;
-        }
-
-        /* =====================================================
-           GROUP MEMBERS
-           ===================================================== */
-
-        .members-section {
-            background: white;
-            padding: 12px 20px;
-            border-top: 1px solid #ddd;
-        }
-
-        .members-title {
-            font-size: 13px;
-            font-weight: bold;
-            margin-bottom: 8px;
-            color: #555;
-        }
-
-        .members {
-            display: flex;
-            gap: 8px;
-            overflow-x: auto;
-        }
-
-        .member {
-            background: #eef5ef;
-            padding: 6px 10px;
-            border-radius: 15px;
-            font-size: 12px;
-            white-space: nowrap;
-        }
-
-        /* =====================================================
-           RESPONSIVE DESIGN
-           ===================================================== */
-
-        @media (max-width: 700px) {
-
-            .chat-container {
-                height: 100vh;
-                margin: 0;
-                border-radius: 0;
-            }
-
-            .message {
-                max-width: 85%;
-            }
-
-            .chat-header {
-                padding: 15px;
-            }
-
-            .messages {
-                padding: 15px;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="/static/css/chat-thread.css">
 </head>
 
 <body>
+
+<header class="navbar">
+    <a class="logo" href="/dashboard">🌾 Agro-Shield</a>
+    <nav aria-label="Main navigation">
+        <a href="/dashboard">Dashboard</a><a href="/storage">Storage</a><a href="/marketplace">Marketplace</a><a href="/negotiations">Negotiations</a><a href="/cart">Cart</a><a href="/ai-assistant">AI Assistant</a><a href="/profile">Profile</a><a href="/notifications">Notifications</a><a href="/logout">Logout</a>
+    </nav>
+</header>
 
 <div class="chat-container">
 
@@ -439,6 +216,6 @@
 
 </script>
 
+<script src="/static/js/navigation.js"></script>
 </body>
 </html>
-```

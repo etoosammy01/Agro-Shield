@@ -14,123 +14,17 @@
         rel="stylesheet"
         href="/static/css/style.css"
     >
-
-    <style>
-        /* =====================================================
-           NOTIFICATIONS PAGE
-           ===================================================== */
-
-        .notifications-container {
-            max-width: 900px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-
-        .notifications-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 20px;
-            margin-bottom: 25px;
-        }
-
-        .notifications-title {
-            margin: 0;
-        }
-
-        .unread-count {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 28px;
-            height: 28px;
-            padding: 0 8px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: 700;
-        }
-
-        .mark-all-button {
-            border: none;
-            padding: 10px 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-        }
-
-        .notification-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .notification-card {
-            padding: 18px;
-            border-radius: 10px;
-            border: 1px solid #ddd;
-        }
-
-        .notification-card.unread {
-            border-left: 5px solid;
-        }
-
-        .notification-card.read {
-            opacity: 0.75;
-        }
-
-        .notification-top {
-            display: flex;
-            justify-content: space-between;
-            gap: 15px;
-        }
-
-        .notification-title {
-            margin: 0;
-            font-size: 18px;
-        }
-
-        .notification-message {
-            margin: 10px 0;
-            line-height: 1.5;
-        }
-
-        .notification-date {
-            font-size: 13px;
-            opacity: 0.7;
-        }
-
-        .notification-type {
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .notification-actions {
-            margin-top: 12px;
-        }
-
-        .mark-read-button {
-            border: none;
-            padding: 8px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-
-        .empty-notifications {
-            text-align: center;
-            padding: 60px 20px;
-            border-radius: 10px;
-            border: 1px dashed #ccc;
-        }
-
-        .empty-notifications-icon {
-            font-size: 45px;
-            margin-bottom: 10px;
-        }
-    </style>
+    <link rel="stylesheet" href="/static/css/notifications.css">
 </head>
 
 <body>
+
+<header class="navbar">
+    <a class="logo" href="/dashboard">🌾 Agro-Shield</a>
+    <nav aria-label="Main navigation">
+        <a href="/dashboard">Dashboard</a><a href="/storage">Storage</a><a href="/marketplace">Marketplace</a><a href="/negotiations">Negotiations</a><a href="/cart">Cart</a><a href="/ai-assistant">AI Assistant</a><a href="/profile">Profile</a><a href="/notifications" aria-current="page">Notifications</a><a href="/logout">Logout</a>
+    </nav>
+</header>
 
     <!-- =====================================================
          NOTIFICATIONS CONTAINER
@@ -271,5 +165,6 @@
 
     </main>
 
+<script src="/static/js/navigation.js"></script>
 </body>
 </html>

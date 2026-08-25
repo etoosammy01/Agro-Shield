@@ -39,7 +39,7 @@
     </div>
 
 
-    <nav>
+    <nav aria-label="Main navigation">
 
         <a href="/dashboard">
             Dashboard
@@ -57,9 +57,11 @@
             Negotiations
         </a>
 
-        <a href="/ai-assistant">
+        <a href="/ai-assistant" aria-current="page">
             AI Assistant
         </a>
+
+        <a href="/notifications">Notifications</a>
 
         <a href="/profile">
             Profile
@@ -363,6 +365,11 @@
                         View Full Result
                     </button>
 
+                    <form method="POST" action="/ai-diagnosis-history" class="delete-diagnosis-form">
+                        <input type="hidden" name="id" value="{{.ID}}">
+                        <button type="submit" class="delete-diagnosis-button">Delete</button>
+                    </form>
+
                 </div>
 
 
@@ -538,6 +545,7 @@
 
 <script src="/static/js/ai-diagnosis-history.js"></script>
 
+<script src="/static/js/navigation.js"></script>
 </body>
 
 </html>

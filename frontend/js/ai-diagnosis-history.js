@@ -22,6 +22,14 @@ const resultCount =
 const noSearchResults =
     document.getElementById("no-search-results");
 
+document.querySelectorAll(".delete-diagnosis-form").forEach(form => {
+    form.addEventListener("submit", event => {
+        if (!window.confirm("Delete this AI diagnosis permanently?")) {
+            event.preventDefault();
+        }
+    });
+});
+
 
 // -----------------------------------------
 // FILTER HISTORY

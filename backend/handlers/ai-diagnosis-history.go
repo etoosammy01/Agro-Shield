@@ -1,13 +1,16 @@
 package handlers
 
 import (
+	"database/sql"
+	"errors"
 	"log"
 	"net/http"
+	"strconv"
 
-	"backend/middleware"
-	"backend/render"
 	"backend/internal/models"
 	"backend/internal/services"
+	"backend/middleware"
+	"backend/render"
 )
 
 type AIDiagnosisHistory struct {
@@ -46,6 +49,32 @@ func (h *AIDiagnosisHistory) Handler(
 		return
 	}
 
+	if r.Method == http.MethodPost {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+		id, err := strconv.Atoi(r.FormValue("id"))
+		if err != nil || id <= 0 {
+			http.Error(w, "Invalid diagnosis", http.StatusBadRequest)
+			return
+		}
+		if err := h.ai.DeleteDiagnosis(farmer.ID, id); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				http.Error(w, "Diagnosis not found", http.StatusNotFound)
+				return
+			}
+			log.Println("failed to delete diagnosis:", err)
+			http.Error(w, "Unable to delete diagnosis", http.StatusInternalServerError)
+			return
+		}
+		redirectTo := "/ai-diagnosis-history"
+		if r.FormValue("return_to") == "/ai-assistant" {
+			redirectTo = "/ai-assistant"
+		}
+		http.Redirect(w, r, redirectTo, http.StatusSeeOther)
+		return
+	}
 
 	if r.Method != http.MethodGet {
 
@@ -58,9 +87,7 @@ func (h *AIDiagnosisHistory) Handler(
 		return
 	}
 
-
 	log.Println("User visited AI diagnosis history")
-
 
 	history, err := h.ai.History(farmer.ID)
 
@@ -80,11 +107,9 @@ func (h *AIDiagnosisHistory) Handler(
 		return
 	}
 
-
 	data := AIDiagnosisHistoryPageData{
 		History: history,
 	}
-
 
 	if err := render.RenderTemplates(
 		w,

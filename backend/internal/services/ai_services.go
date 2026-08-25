@@ -8,9 +8,14 @@ import (
 	"backend/internal/models"
 	"backend/internal/repository"
 )
+
 type AIService struct {
 	repo     *repository.DiagnosisRepository
 	provider AIProvider
+}
+
+func (s *AIService) DeleteDiagnosis(farmerID, diagnosisID int) error {
+	return s.repo.DeleteForFarmer(diagnosisID, farmerID)
 }
 
 func NewAIService(
@@ -37,15 +42,15 @@ func (s *AIService) Diagnose(
 	}
 
 	aiStart := time.Now()
-log.Println("⏱️ AI analysis started")
+	log.Println("⏱️ AI analysis started")
 
-aiResult, err := s.provider.Analyze(request)
+	aiResult, err := s.provider.Analyze(request)
 
-log.Printf("⏱️ AI analysis took: %v", time.Since(aiStart))
+	log.Printf("⏱️ AI analysis took: %v", time.Since(aiStart))
 
-if err != nil {
-	return nil, err
-}
+	if err != nil {
+		return nil, err
+	}
 
 	diagnosis := &models.Diagnosis{
 		FarmerID:    farmerID,
@@ -55,13 +60,13 @@ if err != nil {
 	}
 
 	dbStart := time.Now()
-log.Println("⏱️ Saving diagnosis to database")
+	log.Println("⏱️ Saving diagnosis to database")
 
-if err := s.repo.Create(diagnosis); err != nil {
-	return nil, err
-}
+	if err := s.repo.Create(diagnosis); err != nil {
+		return nil, err
+	}
 
-log.Printf("⏱️ Database save took: %v", time.Since(dbStart))
+	log.Printf("⏱️ Database save took: %v", time.Since(dbStart))
 
 	return diagnosis, nil
 }

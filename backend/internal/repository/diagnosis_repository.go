@@ -101,3 +101,18 @@ func (r *DiagnosisRepository) CountThisMonth(
 
 	return count, err
 }
+
+func (r *DiagnosisRepository) DeleteForFarmer(diagnosisID, farmerID int) error {
+	result, err := r.db.Exec(`DELETE FROM diagnoses WHERE id = $1 AND farmer_id = $2`, diagnosisID, farmerID)
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}

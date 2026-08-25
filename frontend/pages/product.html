@@ -4,12 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+    <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="/static/css/product.css">
 
     <title>{{.Crop.Name}} - Agro-Shield</title>
 </head>
 
 <body>
+
+    <header class="navbar">
+        <a class="logo" href="/dashboard">🌾 Agro-Shield</a>
+        <nav aria-label="Main navigation">
+            <a href="/dashboard">Dashboard</a><a href="/storage">Storage</a><a href="/marketplace" aria-current="page">Marketplace</a><a href="/negotiations">Negotiations</a><a href="/cart">Cart</a><a href="/ai-assistant">AI Assistant</a><a href="/profile">Profile</a><a href="/notifications">Notifications</a><a href="/logout">Logout</a>
+        </nav>
+    </header>
 
     <!-- Product Details Page: displays information about one product. -->
     <main class="product-page">
@@ -64,5 +72,6 @@
 
     <script src="/static/js/product.js"></script>
 
+<script src="/static/js/navigation.js"></script>
 </body>
 </html>

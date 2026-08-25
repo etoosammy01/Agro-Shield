@@ -15,7 +15,7 @@
 
     <div class="logo">🌾 Agro-Shield</div>
 
-    <nav>
+    <nav aria-label="Main navigation">
         <a href="/dashboard">Dashboard</a>
         {{if not .IsBuyer}}
         <a href="/storage">Storage</a>
@@ -25,7 +25,9 @@
         {{if not .IsBuyer}}
         <a href="/ai-assistant">AI Assistant</a>
         {{end}}
-        <a href="/profile">Profile</a>
+        <a href="/cart">Cart</a>
+        <a href="/notifications">Notifications</a>
+        <a href="/profile" aria-current="page">Profile</a>
         <a href="/logout">Logout</a>
     </nav>
 
@@ -212,5 +214,6 @@
 
 <script src="/static/js/profile.js"></script>
 
+<script src="/static/js/navigation.js"></script>
 </body>
 </html>

@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/static/css/dashboard.css">
 </head>
 <body>
-<header class="navbar"><a class="logo" href="/dashboard">Agro-Shield</a><nav><a href="/dashboard">Dashboard</a><a href="/storage">Storage</a><a href="/marketplace">Marketplace</a><a href="/profile">Profile</a></nav></header>
+<header class="navbar"><a class="logo" href="/dashboard">🌾 Agro-Shield</a><nav aria-label="Main navigation"><a href="/dashboard">Dashboard</a><a href="/storage">Storage</a><a href="/marketplace">Marketplace</a><a href="/negotiations">Negotiations</a><a href="/ai-assistant">AI Assistant</a><a href="/profile">Profile</a><a href="/notifications">Notifications</a><a href="/logout">Logout</a></nav></header>
 <main class="dashboard">
     <section class="dashboard-header"><div class="dashboard-intro"><p class="eyebrow">Market intelligence</p><h1>All product insights</h1><p>Buyer activity and independent price comparisons for {{.FullName}}.</p></div></section>
     <section class="panel">
@@ -25,5 +25,6 @@
         {{else}}<div class="empty-state"><p>Add produce to storage to begin receiving market insights.</p></div>{{end}}
     </section>
 </main>
+<script src="/static/js/navigation.js"></script>
 </body>
 </html>

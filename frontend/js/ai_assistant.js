@@ -2,12 +2,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const imageButton = document.getElementById("add-image");
     const imageInput = document.getElementById("image");
     const imageStatus = document.getElementById("image-status");
+    const imagePreview = document.getElementById("image-preview");
+    const imageWrap = document.getElementById("image-preview-wrap");
+    const removeImage = document.getElementById("remove-image");
     if (imageButton && imageInput) {
         imageButton.addEventListener("click", () => imageInput.click());
         imageInput.addEventListener("change", () => {
-            if (imageStatus) imageStatus.textContent = imageInput.files.length ? `${imageInput.files[0].name} attached` : "";
+            if (imageInput.files.length) { imageStatus.textContent = `${imageInput.files[0].name} attached`; imagePreview.src = URL.createObjectURL(imageInput.files[0]); imageWrap.hidden = false; }
         });
+        removeImage.addEventListener("click", () => { imageInput.value = ""; imageWrap.hidden = true; imagePreview.removeAttribute("src"); imageStatus.textContent = ""; });
     }
+    const thinkToggle = document.getElementById("think-toggle"), thinking = document.getElementById("thinking");
+    thinkToggle?.addEventListener("click", () => { const on = thinkToggle.getAttribute("aria-pressed") !== "true"; thinkToggle.setAttribute("aria-pressed", String(on)); thinking.value = String(on); });
+    const form = document.getElementById("ai-form"), submitStatus = document.getElementById("submit-status");
+    form?.addEventListener("submit", () => { form.querySelector(".send-button").disabled = true; submitStatus.textContent = "Analysing your farming issue… Please wait."; });
     setupAudioRecorder();
     setupVideoRecorder();
 });
@@ -62,6 +70,7 @@ function setupAudioRecorder() {
     const stopButton = document.getElementById("stop-audio");
     const status = document.getElementById("audio-status");
     const preview = document.getElementById("audio-preview");
+    const removeButton = document.getElementById("remove-audio");
 
     if (!startButton || !stopButton || !status || !preview) {
         return;
@@ -70,6 +79,18 @@ function setupAudioRecorder() {
     let recorder = null;
     let stream = null;
     let chunks = [];
+    let previewURL = "";
+
+    const clearPreview = () => {
+        if (previewURL) {
+            URL.revokeObjectURL(previewURL);
+            previewURL = "";
+        }
+        preview.pause();
+        preview.removeAttribute("src");
+        preview.load();
+        preview.hidden = true;
+    };
 
     startButton.addEventListener("click", async () => {
         if (recorder && recorder.state === "recording") {
@@ -84,8 +105,14 @@ function setupAudioRecorder() {
         }
 
         try {
+            clearPreview();
+            removeButton.hidden = true;
             stream = await navigator.mediaDevices.getUserMedia({
-                audio: true
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                }
             });
 
             chunks = [];
@@ -122,15 +149,25 @@ function setupAudioRecorder() {
                     "voice-recording"
                 );
 
-                preview.src = URL.createObjectURL(blob);
+                if (blob.size === 0) {
+                    status.textContent = "No voice audio was captured. Please try again.";
+                    releaseStream(stream);
+                    stream = null;
+                    return;
+                }
+
+                previewURL = URL.createObjectURL(blob);
+                preview.src = previewURL;
                 preview.hidden = false;
 
                 status.textContent =
                     "Voice recording is ready to submit.";
+                removeButton.hidden = false;
 
                 releaseStream(stream);
                 stream = null;
                 chunks = [];
+                recorder = null;
             });
 
             recorder.addEventListener("error", (event) => {
@@ -141,9 +178,12 @@ function setupAudioRecorder() {
 
                 releaseStream(stream);
                 stream = null;
+                recorder = null;
+                startButton.classList.remove("recording");
+                startButton.setAttribute("aria-label", "Start voice recording");
             });
 
-            recorder.start();
+            recorder.start(1000);
 
             startButton.disabled = false;
             startButton.classList.add("recording");
@@ -175,6 +215,7 @@ function setupAudioRecorder() {
     };
 
     stopButton.addEventListener("click", stopRecording);
+    removeButton?.addEventListener("click", () => { document.getElementById("audio").value = ""; clearPreview(); removeButton.hidden = true; status.textContent = "Voice recording removed."; });
 }
 
 function setupVideoRecorder() {
@@ -182,6 +223,7 @@ function setupVideoRecorder() {
     const stopButton = document.getElementById("stop-video");
     const status = document.getElementById("video-status");
     const preview = document.getElementById("video-preview");
+    const removeButton = document.getElementById("remove-video");
 
     if (!startButton || !stopButton || !status || !preview) {
         return;
@@ -248,6 +290,7 @@ function setupVideoRecorder() {
 
                 status.textContent =
                     "Video recording is ready to submit.";
+                removeButton.hidden = false;
 
                 releaseStream(stream);
                 stream = null;
@@ -291,6 +334,7 @@ function setupVideoRecorder() {
         stopButton.disabled = true;
         status.textContent = "Preparing video recording...";
     });
+    removeButton?.addEventListener("click", () => { document.getElementById("video").value = ""; preview.hidden = true; preview.removeAttribute("src"); removeButton.hidden = true; status.textContent = ""; });
 }
 
 function releaseStream(stream) {

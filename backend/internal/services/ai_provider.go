@@ -3,6 +3,7 @@ package services
 type AIRequest struct {
 	Category    string
 	Description string
+	Thinking    bool
 
 	Image     []byte
 	ImageType string
