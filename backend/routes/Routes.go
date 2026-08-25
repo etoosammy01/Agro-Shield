@@ -321,11 +321,9 @@ func RegisterRoutes(container *app.Container) {
 		"/ai-diagnosis-history",
 		middleware.OnlyPath(
 			"/ai-diagnosis-history",
-			middleware.OnlyGet(
-				middleware.RequireAuth(
-					container.FarmerRepo,
-					diagnosisHistoryHandler.Handler,
-				),
+			middleware.RequireAuth(
+				container.FarmerRepo,
+				diagnosisHistoryHandler.Handler,
 			),
 		),
 	)
