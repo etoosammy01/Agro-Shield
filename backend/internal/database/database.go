@@ -2,10 +2,12 @@ package database
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/joho/godotenv"
 )
@@ -645,6 +647,23 @@ func RunMigration(db *sql.DB) error {
 	if _, err = db.Exec(`ALTER TABLE conversations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`); err != nil {
 		return err
 	}
+	// The first chat implementation stored private participants directly on the
+	// conversations row. The current model stores every participant in
+	// conversation_members so that the same table supports private and group
+	// chats. Keep the legacy columns, but make them optional: current inserts do
+	// not populate them and group conversations do not have a fixed pair.
+	if _, err = db.Exec(`
+		ALTER TABLE conversations ALTER COLUMN user_one_id DROP NOT NULL;
+		ALTER TABLE conversations ALTER COLUMN user_two_id DROP NOT NULL;
+	`); err != nil {
+		// Fresh databases do not have the legacy columns. Only ignore PostgreSQL's
+		// undefined-column error; every other migration failure must still stop
+		// startup.
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) || pgErr.Code != "42703" {
+			return fmt.Errorf("legacy conversation columns migration failed: %w", err)
+		}
+	}
 
 	log.Println("✅ Conversations table migrated successfully")
 
@@ -693,6 +712,38 @@ func RunMigration(db *sql.DB) error {
 	_, err = db.Exec(conversationMembersTable)
 	if err != nil {
 		return err
+	}
+
+	// Preserve participants from the legacy two-column private-chat schema.
+	// Dynamic SQL keeps this migration valid for fresh databases where those
+	// columns never existed.
+	if _, err = db.Exec(`
+		DO $$
+		BEGIN
+			IF EXISTS (
+				SELECT 1 FROM information_schema.columns
+				WHERE table_schema = current_schema()
+				  AND table_name = 'conversations'
+				  AND column_name = 'user_one_id'
+			) THEN
+				INSERT INTO conversation_members (conversation_id, user_id)
+				SELECT id, user_one_id FROM conversations WHERE user_one_id IS NOT NULL
+				ON CONFLICT (conversation_id, user_id) DO NOTHING;
+			END IF;
+
+			IF EXISTS (
+				SELECT 1 FROM information_schema.columns
+				WHERE table_schema = current_schema()
+				  AND table_name = 'conversations'
+				  AND column_name = 'user_two_id'
+			) THEN
+				INSERT INTO conversation_members (conversation_id, user_id)
+				SELECT id, user_two_id FROM conversations WHERE user_two_id IS NOT NULL
+				ON CONFLICT (conversation_id, user_id) DO NOTHING;
+			END IF;
+		END $$;
+	`); err != nil {
+		return fmt.Errorf("legacy conversation members migration failed: %w", err)
 	}
 
 	// Upgrade conversations created by older deployments. The earliest member

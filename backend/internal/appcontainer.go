@@ -122,6 +122,7 @@ func NewContainer(
 		conversationRepo,
 		memberRepo,
 		chatMessageRepo,
+		notificationService,
 	)
 
 	// ========================================================

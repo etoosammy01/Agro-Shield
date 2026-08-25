@@ -220,8 +220,11 @@ func (r *ConversationMemberRepository) ListMembers(
 			cm.id,
 			cm.conversation_id,
 			cm.user_id,
+			f.full_name,
+			COALESCE(f.photo_url, ''),
 			cm.joined_at
 		FROM conversation_members cm
+		JOIN farmers f ON f.id = cm.user_id
 		WHERE cm.conversation_id = $1
 		ORDER BY cm.joined_at ASC
 	`
@@ -247,6 +250,8 @@ func (r *ConversationMemberRepository) ListMembers(
 			&member.ID,
 			&member.ConversationID,
 			&member.UserID,
+			&member.FullName,
+			&member.PhotoURL,
 			&member.JoinedAt,
 		)
 

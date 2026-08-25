@@ -166,7 +166,11 @@
 
                                 <h3>
 
-                                    {{if .Name}}
+                                    {{if eq .Type "private"}}
+
+                                        {{if .OtherName}}{{.OtherName}}{{else}}Private Chat{{end}}
+
+                                    {{else if .Name}}
 
                                         {{.Name}}
 

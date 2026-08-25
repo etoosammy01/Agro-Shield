@@ -92,7 +92,7 @@
             {{range .Members}}
 
                 <div class="member">
-                    User #{{.UserID}}
+                    {{.FullName}}
                 </div>
 
             {{end}}
@@ -126,7 +126,7 @@
                     {{if ne .SenderID $.Farmer.ID}}
 
                         <div class="sender">
-                            User #{{.SenderID}}
+                            {{range $.Members}}{{if eq .UserID $.SenderID}}{{.FullName}}{{end}}{{end}}
                         </div>
 
                     {{end}}

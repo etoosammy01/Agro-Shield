@@ -38,6 +38,7 @@ type ChatService struct {
 	conversationRepo *repository.ConversationRepository
 	memberRepo       *repository.ConversationMemberRepository
 	messageRepo      *repository.ChatMessageRepository
+	notification     *NotificationService
 }
 
 // ============================================================
@@ -48,12 +49,14 @@ func NewChatService(
 	conversationRepo *repository.ConversationRepository,
 	memberRepo *repository.ConversationMemberRepository,
 	messageRepo *repository.ChatMessageRepository,
+	notification *NotificationService,
 ) *ChatService {
 
 	return &ChatService{
 		conversationRepo: conversationRepo,
 		memberRepo:       memberRepo,
 		messageRepo:      messageRepo,
+		notification:     notification,
 	}
 }
 
@@ -483,6 +486,15 @@ func (s *ChatService) SendMessage(
 		conversationID,
 	); err != nil {
 		return nil, err
+	}
+	if s.notification != nil {
+		if members, memberErr := s.memberRepo.ListMembers(conversationID); memberErr == nil {
+			for _, member := range members {
+				if member.UserID != senderID {
+					_ = s.notification.CreateNotification(member.UserID, "New chat message", "You received a new message in chat.", "chat_message")
+				}
+			}
+		}
 	}
 
 	return chatMessage, nil
