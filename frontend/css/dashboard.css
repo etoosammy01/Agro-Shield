@@ -1,4 +1,10 @@
 
+/* Primary dashboard brand */
+.dashboard-logo{width:280px;height:88px;overflow:visible;}
+.dashboard-logo img{transform:scale(1.35);transform-origin:left center;}
+@media (max-width:900px){.dashboard-logo{width:230px;height:72px;}.dashboard-logo img{transform:scale(1.2);}}
+@media (max-width:600px){.dashboard-logo{width:190px;height:60px;}.dashboard-logo img{transform:scale(1.1);}}
+
 /* =========================================================
    AGRO-SHIELD DASHBOARD
    Complete dashboard styling
