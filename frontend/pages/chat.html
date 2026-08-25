@@ -101,6 +101,27 @@
 
         </section>
 
+        <section class="people">
+            <div class="section-title">
+                <h2>People</h2>
+                <span>{{len .Users}}</span>
+            </div>
+            <form action="/chat" method="GET" class="people-search">
+                <input type="search" name="q" value="{{.Query}}" placeholder="Find a farmer or buyer">
+                <button type="submit">Search</button>
+            </form>
+            {{if .Users}}
+                <div class="people-list">
+                    {{range .Users}}
+                        <div class="person-row" data-user-id="{{.ID}}">
+                            <div><strong>{{.FullName}}</strong><small>{{.Role}} · {{.Location}}</small><span class="presence-status" aria-live="polite"><i></i><span>Offline</span></span></div>
+                            <form action="/chat/private" method="POST"><input type="hidden" name="user_id" value="{{.ID}}"><button type="submit">Chat</button></form>
+                        </div>
+                    {{end}}
+                </div>
+            {{else}}<p>No other registered users found.</p>{{end}}
+        </section>
+
 
         <!-- =================================================
              MY CONVERSATIONS
@@ -214,5 +235,6 @@
     </div>
 
 <script src="/static/js/navigation.js"></script>
+<script src="/static/js/chat.js" defer></script>
 </body>
 </html>

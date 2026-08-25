@@ -5,10 +5,14 @@ import (
 	app "backend/internal"
 	"backend/internal/services"
 	"backend/middleware"
+	"backend/ussd"
 	"net/http"
 )
 
 func RegisterRoutes(container *app.Container) {
+	// USSD gateways post menu selections to this provider-neutral endpoint.
+	ussdHandler := ussd.NewHandler(container.FarmerRepo, container.Crop, services.NewWeatherService(), container.Order, container.Notification)
+	http.Handle("/ussd", ussdHandler)
 
 	// ========================================================
 	// STATIC FILES

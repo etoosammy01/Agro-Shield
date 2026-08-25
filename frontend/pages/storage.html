@@ -15,7 +15,7 @@
         <a href="/dashboard">Dashboard</a>
         <a href="/storage" aria-current="page">Storage</a>
         <a href="/marketplace">Marketplace</a>
-        <a href="/negotiations">Negotiations</a>
+        <a href="/chat">Chat</a>
         <a href="/ai-assistant">AI Assistant</a>
         <a href="/cart">Cart</a>
         <a href="/notifications">Notifications</a>
@@ -105,6 +105,12 @@
 
             <label>Storage Location</label>
             <input type="text" name="location" id="location" value="{{if .EditCrop}}{{.EditCrop.Location}}{{end}}" placeholder="Warehouse A" required>
+
+            <input type="hidden" name="latitude" id="latitude">
+            <input type="hidden" name="longitude" id="longitude">
+            <input type="hidden" name="location_accuracy" id="location-accuracy">
+            <button type="button" id="capture-location">Capture farm location</button>
+            <small id="location-status">GPS location is required before saving.</small>
 
             <label>Price per Unit (₦)</label>
             <input type="number" step="0.01" min="0" name="price" id="price" value="{{if .EditCrop}}{{.EditCrop.PricePerUnit}}{{end}}" placeholder="Required if listing for sale" required>

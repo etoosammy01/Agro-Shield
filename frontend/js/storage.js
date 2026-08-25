@@ -9,6 +9,20 @@ const cropId = document.getElementById("crop-id");
 const imageURL = document.getElementById("image-url");
 const imageInput = document.getElementById("produce-image");
 const imageHelp = document.getElementById("image-help");
+const captureLocation = document.getElementById("capture-location");
+const locationStatus = document.getElementById("location-status");
+function captureGPS() {
+    if (!navigator.geolocation) { locationStatus.textContent = "This device does not support GPS."; return; }
+    locationStatus.textContent = "Getting your farm location...";
+    navigator.geolocation.getCurrentPosition(position => {
+        document.getElementById("latitude").value = position.coords.latitude;
+        document.getElementById("longitude").value = position.coords.longitude;
+        document.getElementById("location-accuracy").value = position.coords.accuracy || "";
+        locationStatus.textContent = `Location captured (accuracy ${Math.round(position.coords.accuracy)} m)`;
+    }, () => { locationStatus.textContent = "Location permission is required to register a crop."; }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
+}
+if (captureLocation) captureLocation.addEventListener("click", captureGPS);
+if (form) form.addEventListener("submit", event => { if (!document.getElementById("latitude").value || !document.getElementById("longitude").value) { event.preventDefault(); captureGPS(); } });
 
 function openModal(editProduct = null) {
     form.reset();
