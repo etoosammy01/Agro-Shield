@@ -53,6 +53,7 @@ body {
     margin-bottom: 10px;
     font-size: 17px;
 }
+.map-location-link{color:#176b42;font-weight:700;text-decoration:none}.map-location-link:hover{text-decoration:underline}.map-location-link span{font-size:.85em;margin-left:6px}
 
 .product-status {
     display: inline-block;

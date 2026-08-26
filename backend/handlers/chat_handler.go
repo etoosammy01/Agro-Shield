@@ -76,6 +76,7 @@ func NewChatHandler(
 type ChatListPageData struct {
 	Farmer        interface{}
 	Conversations []models.Conversation
+	UnreadCount   int
 	Users         []models.Farmer
 	Query         string
 	Error         string
@@ -194,6 +195,9 @@ func (h *ChatHandler) ListHandler(
 		Conversations: conversations,
 		Users:         users,
 		Query:         r.URL.Query().Get("q"),
+	}
+	for _, conversation := range conversations {
+		data.UnreadCount += conversation.UnreadCount
 	}
 
 	if err := h.renderTemplate(
@@ -984,6 +988,9 @@ func (h *ChatHandler) renderList(
 		Farmer:        farmer,
 		Conversations: conversations,
 		Error:         errorMessage,
+	}
+	for _, conversation := range conversations {
+		data.UnreadCount += conversation.UnreadCount
 	}
 
 	if err := h.renderTemplate(

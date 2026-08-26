@@ -26,7 +26,7 @@
 <header class="navbar">
     <a class="logo" href="/dashboard"><img src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield"></a>
     <nav aria-label="Main navigation">
-        <a href="/dashboard">Dashboard</a><a href="/storage">Storage</a><a href="/marketplace">Marketplace</a><a href="/negotiations">Negotiations</a><a href="/cart">Cart</a><a href="/ai-assistant">AI Assistant</a><a href="/profile">Profile</a><a href="/notifications">Notifications</a><a href="/logout">Logout</a>
+        <a href="/dashboard">Dashboard</a><a href="/chat" aria-current="page">Chat</a><a href="/storage">Storage</a><a href="/marketplace">Marketplace</a><a href="/negotiations">Negotiations</a><a href="/cart">Cart</a><a href="/ai-assistant">AI Assistant</a><a href="/profile">Profile</a><a href="/notifications">Notifications</a><a href="/logout">Logout</a>
     </nav>
 </header>
 
@@ -50,11 +50,11 @@
 
             <div class="chat-title">
 
-                <h2>
+                <h2 class="chat-heading">
                     {{if eq .Conversation.Type "group"}}
                         {{.Conversation.Name}}
                     {{else}}
-                        Private Chat
+                        {{range .Members}}{{if ne .UserID $.Farmer.ID}}<a class="chat-profile-link" href="/profile?id={{.UserID}}">{{if .PhotoURL}}<img class="thread-avatar" src="{{.PhotoURL}}" alt="{{.FullName}} profile picture">{{else}}<span class="thread-avatar">👤</span>{{end}}{{.FullName}}</a>{{end}}{{end}}
                     {{end}}
                 </h2>
 
@@ -65,6 +65,7 @@
                     {{else}}
                         Private conversation
                     {{end}}
+                    <span class="chat-status"><i></i> Active conversation</span>
 
                 </span>
 
@@ -91,9 +92,10 @@
 
             {{range .Members}}
 
-                <div class="member">
-                    {{.FullName}}
-                </div>
+                <a class="member" href="/profile?id={{.UserID}}">
+                    {{if .PhotoURL}}<img src="{{.PhotoURL}}" alt="">{{else}}<span class="member-avatar">👤</span>{{end}}
+                    <span>{{.FullName}}</span>
+                </a>
 
             {{end}}
 
@@ -113,6 +115,7 @@
         {{if .Messages}}
 
             {{range .Messages}}
+                {{$message := .}}
 
                 <div
                     class="message
@@ -125,9 +128,12 @@
 
                     {{if ne .SenderID $.Farmer.ID}}
 
-                        <div class="sender">
-                            {{range $.Members}}{{if eq .UserID $.SenderID}}{{.FullName}}{{end}}{{end}}
-                        </div>
+                        {{range $.Members}}{{if eq .UserID $message.SenderID}}
+                        <a class="sender" href="/profile?id={{.UserID}}">
+                            {{if .PhotoURL}}<img src="{{.PhotoURL}}" alt="">{{else}}<span>👤</span>{{end}}
+                            {{.FullName}}
+                        </a>
+                        {{end}}{{end}}
 
                     {{end}}
 
@@ -139,7 +145,8 @@
 
                     <div class="message-time">
 
-                        {{.CreatedAt}}
+                        <time class="local-time" datetime="{{.CreatedAt.UTC.Format "2006-01-02T15:04:05Z07:00"}}">{{.CreatedAt.Format "02 Jan 2006 15:04"}}</time>
+						{{if eq .SenderID $.Farmer.ID}}<span class="message-receipt">{{if .Seen}}✓✓ Seen{{else}}✓ Sent{{end}}</span>{{end}}
 
                     </div>
 
@@ -174,7 +181,7 @@
         action="/chat/send"
     >
 
-        <input
+            <input
             type="hidden"
             name="conversation_id"
             value="{{.Conversation.ID}}"
@@ -188,16 +195,18 @@
             maxlength="5000"
             required
             autocomplete="off"
+            aria-label="Message"
         >
 
         <button
             type="submit"
             class="send-button"
         >
-            Send
+            <span>Send</span>
         </button>
 
     </form>
+	<div id="typing-status" class="typing-status" aria-live="polite"></div>
 
 </div>
 
@@ -214,6 +223,14 @@
         messages.scrollTop = messages.scrollHeight;
     }
 
+</script>
+
+<script src="/static/js/chat-thread.js" defer></script>
+<script>
+document.querySelectorAll('.local-time').forEach((el) => {
+    const date = new Date(el.dateTime);
+    if (!Number.isNaN(date.getTime())) el.textContent = date.toLocaleString([], {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'});
+});
 </script>
 
 <script src="/static/js/navigation.js"></script>

@@ -15,9 +15,11 @@ type Negotiation struct {
 	ExpiresAt  time.Time
 
 	// Populated for display only
-	CropName   string
-	BuyerName  string
-	SellerName string
+	CropName       string
+	BuyerName      string
+	SellerName     string
+	BuyerPhotoURL  string
+	SellerPhotoURL string
 }
 
 func (n *Negotiation) TimeLeft() time.Duration {

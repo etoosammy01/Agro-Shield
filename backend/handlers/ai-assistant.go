@@ -176,10 +176,17 @@ func (h *AIAssistant) Handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		greeting := "Good evening"
+		hour := time.Now().Hour()
+		if hour < 12 {
+			greeting = "Good morning"
+		} else if hour < 17 {
+			greeting = "Good afternoon"
+		}
 		h.render(
 			w,
 			farmer.ID,
-			diagnosis.Result,
+			greeting+", "+farmer.FullName+". I’m Agro-Shield AI, and I’m ready to help you.\n\n"+diagnosis.Result,
 			"",
 		)
 
@@ -212,7 +219,7 @@ func (h *AIAssistant) render(
 	}
 
 	log.Printf("⏱️ History loading took: %v", time.Since(historyStart))
-	log.Printf("⏱️ History loading took: %v", time.Since(historyStart))
+	// The greeting is added in the template using the authenticated farmer.
 	data := AIAssistantPageData{
 		History: history,
 		Result:  result,

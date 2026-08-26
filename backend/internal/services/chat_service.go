@@ -608,9 +608,16 @@ func (s *ChatService) GetMessages(
 		)
 	}
 
-	return s.messageRepo.ListByConversation(
+	messages, err := s.messageRepo.ListByConversation(
 		conversationID,
 	)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.memberRepo.MarkRead(conversationID, userID); err != nil {
+		return nil, err
+	}
+	return messages, nil
 }
 
 // ============================================================

@@ -1,7 +1,8 @@
 (() => {
     const userRows = [...document.querySelectorAll(".person-row[data-user-id]")];
+    const conversationCards = [...document.querySelectorAll(".conversation-card[data-user-id]")];
 
-    if (userRows.length === 0) {
+    if (userRows.length === 0 && conversationCards.length === 0) {
         return;
     }
 
@@ -27,6 +28,18 @@
                     label.textContent = isOnline ? "Online" : "Offline";
                 }
             });
+            conversationCards.forEach((card) => {
+                const isOnline = onlineIDs.has(card.dataset.userId);
+                const label = card.querySelector(".conversation-presence span");
+                card.classList.toggle("is-online", isOnline);
+                if (label) label.textContent = isOnline ? "Online" : "Offline";
+            });
+            const conversations = document.querySelector(".conversation-list");
+            if (conversations) [...conversations.children].sort((a,b) => Number(b.classList.contains("is-online")) - Number(a.classList.contains("is-online"))).forEach((card) => conversations.appendChild(card));
+            const list = document.querySelector('.people-list');
+            if (list) {
+                [...list.children].sort((a, b) => Number(b.classList.contains('is-online')) - Number(a.classList.contains('is-online'))).forEach((row) => list.appendChild(row));
+            }
         } catch {
             // Keep the last known state when the network is temporarily unavailable.
         }

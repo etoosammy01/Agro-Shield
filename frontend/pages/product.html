@@ -47,7 +47,11 @@
 
             <p class="product-info">
                 <strong>Location:</strong>
-                {{.Crop.Location}}
+                {{if and (ne .Crop.Latitude 0) (ne .Crop.Longitude 0)}}
+                    <a class="map-location-link" href="https://www.google.com/maps/search/?api=1&query={{.Crop.Latitude}},{{.Crop.Longitude}}" target="_blank" rel="noopener">{{.Crop.Location}} <span>↗ View on map</span></a>
+                {{else}}
+                    {{.Crop.Location}}
+                {{end}}
             </p>
 
             {{if .Crop.ListedForSale}}

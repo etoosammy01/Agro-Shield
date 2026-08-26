@@ -38,4 +38,5 @@ type ChatMessage struct {
 	Message string `json:"message"`
 
 	CreatedAt time.Time `json:"created_at"`
+	Seen      bool      `json:"seen"`
 }

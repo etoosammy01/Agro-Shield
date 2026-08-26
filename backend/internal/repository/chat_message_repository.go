@@ -180,14 +180,15 @@ func (r *ChatMessageRepository) ListByConversation(
 
 	query := `
 		SELECT
-			id,
-			conversation_id,
-			sender_id,
-				m.message,
-				m.created_at,
-				f.full_name
+			m.id,
+			m.conversation_id,
+			m.sender_id,
+			m.message,
+			m.created_at,
+			f.full_name,
+			EXISTS (SELECT 1 FROM conversation_members receipt WHERE receipt.conversation_id = m.conversation_id AND receipt.user_id <> m.sender_id AND receipt.last_read_at >= m.created_at) AS seen
 			FROM chat_messages m
-			JOIN farmers f ON f.id = m.sender_id
+		JOIN farmers f ON f.id = m.sender_id
 			WHERE m.conversation_id = $1
 			ORDER BY m.created_at ASC, m.id ASC
 	`
@@ -216,6 +217,7 @@ func (r *ChatMessageRepository) ListByConversation(
 			&message.Message,
 			&message.CreatedAt,
 			&message.SenderName,
+			&message.Seen,
 		)
 
 		if err != nil {

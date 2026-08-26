@@ -38,5 +38,6 @@ type Crop struct {
 
 	// SellerName is populated when retrieving marketplace
 	// results. It is not stored directly on the crops table.
-	SellerName string
+	SellerName     string
+	SellerPhotoURL string
 }

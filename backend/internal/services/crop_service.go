@@ -63,7 +63,7 @@ func (s *CropService) AddCrop(
 	if location == "" {
 		return errors.New("location is required")
 	}
-	if latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 {
+	if latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || (latitude == 0 && longitude == 0) || accuracy <= 0 {
 		return errors.New("valid farm GPS location is required")
 	}
 
@@ -84,7 +84,7 @@ func (s *CropService) AddCrop(
 		PricePerUnit:  price,
 		ListedForSale: listForSale,
 		ImageURL:      imageURL,
-		Latitude: latitude, Longitude: longitude, LocationAccuracy: accuracy,
+		Latitude:      latitude, Longitude: longitude, LocationAccuracy: accuracy,
 	}
 
 	return s.repo.Create(crop)
@@ -139,6 +139,7 @@ func (s *CropService) UpdateCrop(
 	price float64,
 	listForSale bool,
 	imageURL string,
+	latitude, longitude, accuracy float64,
 ) error {
 
 	if farmerID <= 0 {
@@ -163,6 +164,9 @@ func (s *CropService) UpdateCrop(
 
 	if location == "" {
 		return errors.New("location is required")
+	}
+	if latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || (latitude == 0 && longitude == 0) || accuracy <= 0 {
+		return errors.New("valid farm GPS location is required")
 	}
 
 	if quantity <= 0 {
@@ -193,6 +197,7 @@ func (s *CropService) UpdateCrop(
 	crop.Quantity = quantity
 	crop.PricePerUnit = price
 	crop.ListedForSale = listForSale
+	crop.Latitude, crop.Longitude, crop.LocationAccuracy = latitude, longitude, accuracy
 
 	// Only replace the image when a new image was provided.
 	if strings.TrimSpace(imageURL) != "" {
@@ -287,9 +292,9 @@ func (s *CropService) RelistCrop(
 // DeleteCrop permanently deletes a farmer's product.
 //
 // Responsibility:
-// - Verify ownership.
-// - Prevent deletion of products that already have
-//   business history.
+//   - Verify ownership.
+//   - Prevent deletion of products that already have
+//     business history.
 //
 // NOTE:
 // The transaction-history protection will be expanded when

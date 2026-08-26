@@ -19,7 +19,7 @@
 <header class="navbar">
     <a class="logo" href="/dashboard"><img src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield"></a>
     <nav aria-label="Main navigation">
-        <a href="/dashboard">Dashboard</a><a href="/storage">Storage</a><a href="/marketplace">Marketplace</a><a href="/negotiations">Negotiations</a><a href="/ai-assistant">AI Assistant</a><a href="/chat" aria-current="page">Chat</a><a href="/profile">Profile</a><a href="/notifications">Notifications</a><a href="/logout">Logout</a>
+        <a href="/dashboard">Dashboard</a><a href="/storage">Storage</a><a href="/marketplace">Marketplace</a><a href="/negotiations">Negotiations</a><a href="/ai-assistant">AI Assistant</a><a href="/chat" aria-current="page">Chat{{if gt .UnreadCount 0}} <span class="chat-nav-unread">{{.UnreadCount}}</span>{{end}}</a><a href="/profile">Profile</a><a href="/notifications">Notifications</a><a href="/logout">Logout</a>
     </nav>
 </header>
 
@@ -101,11 +101,9 @@
 
         </section>
 
-        <section class="people">
-            <div class="section-title">
-                <h2>People</h2>
-                <span>{{len .Users}}</span>
-            </div>
+        <details class="people">
+            <summary class="people-toggle"><span><strong>People</strong><small>Find someone to start a conversation</small></span><b>{{len .Users}} <i>⌄</i></b></summary>
+            <div class="people-content">
             <form action="/chat" method="GET" class="people-search">
                 <input type="search" name="q" value="{{.Query}}" placeholder="Find a farmer or buyer">
                 <button type="submit">Search</button>
@@ -114,13 +112,14 @@
                 <div class="people-list">
                     {{range .Users}}
                         <div class="person-row" data-user-id="{{.ID}}">
-                            <div><strong>{{.FullName}}</strong><small>{{.Role}} · {{.Location}}</small><span class="presence-status" aria-live="polite"><i></i><span>Offline</span></span></div>
+                            <a class="person-identity" href="/profile?id={{.ID}}">{{if .PhotoURL}}<img class="person-avatar" src="{{.PhotoURL}}" alt="{{.FullName}} profile picture">{{else}}<span class="person-avatar">👤</span>{{end}}<span><strong>{{.FullName}}</strong><small>{{.Role}} · {{.Location}}</small><span class="presence-status"><i></i><span>Offline</span></span></span></a>
                             <form action="/chat/private" method="POST"><input type="hidden" name="user_id" value="{{.ID}}"><button type="submit">Chat</button></form>
                         </div>
                     {{end}}
                 </div>
             {{else}}<p>No other registered users found.</p>{{end}}
-        </section>
+            </div>
+        </details>
 
 
         <!-- =================================================
@@ -132,6 +131,7 @@
             <div class="section-title">
 
                 <h2>My Chats</h2>
+				{{if gt .UnreadCount 0}}<strong class="unread-summary">{{.UnreadCount}} unread</strong>{{end}}
 
                 <span>
                     {{len .Conversations}}
@@ -148,15 +148,19 @@
 
                         <a
                             href="/chat/view?id={{.ID}}"
-                            class="conversation-card"
+                            class="conversation-card" {{if and (eq .Type "private") (gt .OtherUserID 0)}}data-user-id="{{.OtherUserID}}"{{end}}
                         >
 
                             <div class="conversation-icon">
 
                                 {{if eq .Type "group"}}
-                                    👥
+                                    <span class="group-avatar">👥</span>
                                 {{else}}
-                                    👤
+                                    {{if .OtherPhotoURL}}
+                                        <img src="{{.OtherPhotoURL}}" alt="{{.OtherName}} profile picture">
+                                    {{else}}
+                                        <span class="group-avatar">👤</span>
+                                    {{end}}
                                 {{end}}
 
                             </div>
@@ -190,7 +194,7 @@
 
                                     {{else}}
 
-                                        Private conversation
+                                        <span class="conversation-presence"><i></i><span>Offline</span></span>
 
                                     {{end}}
 
@@ -200,6 +204,7 @@
 
 
                             <div class="conversation-arrow">
+                                {{if gt .UnreadCount 0}}<span class="chat-unread" aria-label="{{.UnreadCount}} unread messages">{{.UnreadCount}}</span>{{end}}
                                 →
                             </div>
 

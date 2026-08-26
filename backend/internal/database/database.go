@@ -713,6 +713,9 @@ func RunMigration(db *sql.DB) error {
 	if err != nil {
 		return err
 	}
+	if _, err = db.Exec(`ALTER TABLE conversation_members ADD COLUMN IF NOT EXISTS last_read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`); err != nil {
+		return err
+	}
 
 	// Preserve participants from the legacy two-column private-chat schema.
 	// Dynamic SQL keeps this migration valid for fresh databases where those

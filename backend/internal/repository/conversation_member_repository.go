@@ -308,3 +308,8 @@ func (r *ConversationMemberRepository) CountMembers(
 
 	return count, nil
 }
+
+func (r *ConversationMemberRepository) MarkRead(conversationID, userID int) error {
+	_, err := r.db.Exec(`UPDATE conversation_members SET last_read_at = CURRENT_TIMESTAMP WHERE conversation_id = $1 AND user_id = $2`, conversationID, userID)
+	return err
+}

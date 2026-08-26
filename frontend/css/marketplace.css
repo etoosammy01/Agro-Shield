@@ -127,3 +127,4 @@
 .view-product:hover {
     background: #1b5e20;
 }
+.seller-identity,.negotiation-person{display:inline-flex;align-items:center;gap:8px}.seller-identity img,.negotiation-person img{width:28px;height:28px;border-radius:50%;object-fit:cover}

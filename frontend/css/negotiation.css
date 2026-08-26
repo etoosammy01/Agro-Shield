@@ -236,3 +236,4 @@
     .offer-form,.chat-form{flex-wrap:wrap;}
     .offer-form input[name="message"],.chat-form input{min-width:100%;}
 }
+.negotiation-person{display:inline-flex;align-items:center;gap:8px}.negotiation-person img{width:28px;height:28px;border-radius:50%;object-fit:cover}

@@ -44,7 +44,7 @@
             {{range .Negotiations}}
             <tr>
                 <td>{{.CropName}}</td>
-                <td>{{if eq .BuyerID $.UserID}}{{.SellerName}}{{else}}{{.BuyerName}}{{end}}</td>
+                <td class="negotiation-person">{{if eq .BuyerID $.UserID}}{{if .SellerPhotoURL}}<img src="{{.SellerPhotoURL}}" alt="">{{else}}👤{{end}}{{.SellerName}}{{else}}{{if .BuyerPhotoURL}}<img src="{{.BuyerPhotoURL}}" alt="">{{else}}👤{{end}}{{.BuyerName}}{{end}}</td>
                 <td><span class="status status-{{.Status}}">{{.Status}}</span></td>
                 <td>{{.RoundCount}}/{{.MaxRounds}}</td>
                 <td><a class="open-chat-btn" href="/negotiation?id={{.ID}}">Open chat</a></td>

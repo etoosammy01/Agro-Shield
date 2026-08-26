@@ -153,6 +153,23 @@ tbody tr:hover{
 
 .modal form input[type="file"]{width:100%;line-height:1.4;}
 
+#capture-location{
+    align-self:flex-start;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:11px 15px;
+    border:1px solid #1f7a4d;
+    border-radius:8px;
+    background:#eef8f0;
+    color:#166534;
+    font-weight:700;
+    cursor:pointer;
+}
+#capture-location::before{content:'⌖';font-size:1.1rem}
+#capture-location:hover{background:#dff1e3}
+#location-status{color:#6b776f;font-size:.82rem;line-height:1.35}
+
 .checkbox-row{
     display:flex;
     align-items:center;

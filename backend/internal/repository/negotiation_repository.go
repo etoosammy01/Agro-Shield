@@ -48,7 +48,7 @@ func (r *NegotiationRepository) GetByID(id int) (*models.Negotiation, error) {
 	SELECT negotiations.id, negotiations.crop_id, negotiations.buyer_id, negotiations.farmer_id,
 	       negotiations.quantity, negotiations.status, negotiations.round_count, negotiations.max_rounds,
 	       negotiations.created_at, negotiations.expires_at,
-	       crops.name, buyer.full_name, seller.full_name
+	       crops.name, buyer.full_name, seller.full_name, buyer.photo_url, seller.photo_url
 	FROM negotiations
 	JOIN crops ON crops.id = negotiations.crop_id
 	JOIN farmers buyer ON buyer.id = negotiations.buyer_id
@@ -58,7 +58,7 @@ func (r *NegotiationRepository) GetByID(id int) (*models.Negotiation, error) {
 	var n models.Negotiation
 	err := r.db.QueryRow(query, id).Scan(
 		&n.ID, &n.CropID, &n.BuyerID, &n.FarmerID, &n.Quantity, &n.Status, &n.RoundCount, &n.MaxRounds,
-		&n.CreatedAt, &n.ExpiresAt, &n.CropName, &n.BuyerName, &n.SellerName,
+		&n.CreatedAt, &n.ExpiresAt, &n.CropName, &n.BuyerName, &n.SellerName, &n.BuyerPhotoURL, &n.SellerPhotoURL,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -75,7 +75,7 @@ func (r *NegotiationRepository) ListForUser(userID int) ([]models.Negotiation, e
 	SELECT negotiations.id, negotiations.crop_id, negotiations.buyer_id, negotiations.farmer_id,
 	       negotiations.quantity, negotiations.status, negotiations.round_count, negotiations.max_rounds,
 	       negotiations.created_at, negotiations.expires_at,
-	       crops.name, buyer.full_name, seller.full_name
+	       crops.name, buyer.full_name, seller.full_name, buyer.photo_url, seller.photo_url
 	FROM negotiations
 	JOIN crops ON crops.id = negotiations.crop_id
 	JOIN farmers buyer ON buyer.id = negotiations.buyer_id
@@ -94,7 +94,7 @@ func (r *NegotiationRepository) ListForUser(userID int) ([]models.Negotiation, e
 		var n models.Negotiation
 		if err := rows.Scan(
 			&n.ID, &n.CropID, &n.BuyerID, &n.FarmerID, &n.Quantity, &n.Status, &n.RoundCount, &n.MaxRounds,
-			&n.CreatedAt, &n.ExpiresAt, &n.CropName, &n.BuyerName, &n.SellerName,
+			&n.CreatedAt, &n.ExpiresAt, &n.CropName, &n.BuyerName, &n.SellerName, &n.BuyerPhotoURL, &n.SellerPhotoURL,
 		); err != nil {
 			return nil, err
 		}

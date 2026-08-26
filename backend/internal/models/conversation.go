@@ -29,8 +29,11 @@ type Conversation struct {
 	// "Maize Farmers Association"
 	//
 	// Private conversations may not need a name.
-	Name      string `json:"name"`
-	OtherName string `json:"other_name"`
+	Name          string `json:"name"`
+	OtherName     string `json:"other_name"`
+	OtherUserID   int    `json:"other_user_id"`
+	OtherPhotoURL string `json:"other_photo_url"`
+	UnreadCount   int    `json:"unread_count"`
 
 	// Type determines what kind of conversation this is.
 	//

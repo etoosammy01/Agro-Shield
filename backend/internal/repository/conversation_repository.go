@@ -196,10 +196,13 @@ func (r *ConversationRepository) ListForUser(
 			c.id,
 			c.name,
 			COALESCE((SELECT f.full_name FROM conversation_members cm JOIN farmers f ON f.id = cm.user_id WHERE cm.conversation_id = c.id AND cm.user_id <> $1 LIMIT 1), '') AS other_name,
+			COALESCE((SELECT cm.user_id FROM conversation_members cm WHERE cm.conversation_id = c.id AND cm.user_id <> $1 LIMIT 1), 0) AS other_user_id,
+			COALESCE((SELECT f.photo_url FROM conversation_members cm JOIN farmers f ON f.id = cm.user_id WHERE cm.conversation_id = c.id AND cm.user_id <> $1 LIMIT 1), '') AS other_photo_url,
 			c.type,
 			c.created_by,
 			c.created_at,
 			c.updated_at
+			, (SELECT COUNT(*) FROM chat_messages msg WHERE msg.conversation_id = c.id AND msg.sender_id <> $1 AND msg.created_at > COALESCE(cm.last_read_at, cm.joined_at)) AS unread_count
 		FROM conversations c
 		INNER JOIN conversation_members cm
 			ON cm.conversation_id = c.id
@@ -228,10 +231,13 @@ func (r *ConversationRepository) ListForUser(
 			&conversation.ID,
 			&conversation.Name,
 			&conversation.OtherName,
+			&conversation.OtherUserID,
+			&conversation.OtherPhotoURL,
 			&conversation.Type,
 			&conversation.CreatedBy,
 			&conversation.CreatedAt,
 			&conversation.UpdatedAt,
+			&conversation.UnreadCount,
 		)
 
 		if err != nil {

@@ -42,7 +42,7 @@ func (r *CropRepository) Create(crop *models.Crop) error {
 			listed_for_sale,
 			image_url, lga, state, country, latitude, longitude, location_accuracy, initial_listed_quantity, first_listed_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $5, COALESCE((SELECT state FROM farmers WHERE id=$1),'Benue'), COALESCE((SELECT country FROM farmers WHERE id=$1),'Nigeria'), $9, $10, $11, CASE WHEN $7 THEN $3 ELSE NULL END, CASE WHEN $7 THEN CURRENT_TIMESTAMP ELSE NULL END)
+		VALUES ($1::integer, $2::text, $3::numeric, $4::text, $5::text, $6::numeric, $7::boolean, $8::text, $5::text, COALESCE((SELECT state FROM farmers WHERE id=$1::integer),'Benue'), COALESCE((SELECT country FROM farmers WHERE id=$1::integer),'Nigeria'), $9::double precision, $10::double precision, $11::double precision, CASE WHEN $7::boolean THEN $3::numeric ELSE NULL::numeric END, CASE WHEN $7::boolean THEN CURRENT_TIMESTAMP ELSE NULL::timestamp END)
 		RETURNING id
 	`
 
@@ -143,16 +143,19 @@ func (r *CropRepository) ListAvailable() ([]models.Crop, error) {
 			crops.quantity,
 			crops.unit,
 			crops.location,
+			crops.latitude, crops.longitude, crops.location_accuracy,
 			crops.price_per_unit,
 			crops.listed_for_sale,
 			crops.image_url,
 			crops.created_at,
 			crops.updated_at,
-			farmers.full_name
+			farmers.full_name, farmers.photo_url
 		FROM crops
 		JOIN farmers ON farmers.id = crops.farmer_id
 		WHERE crops.listed_for_sale = TRUE
 		  AND crops.quantity > 0
+		  AND crops.latitude IS NOT NULL AND crops.longitude IS NOT NULL
+		  AND NOT (crops.latitude = 0 AND crops.longitude = 0)
 		ORDER BY crops.created_at DESC
 	`
 
@@ -175,12 +178,13 @@ func (r *CropRepository) ListAvailable() ([]models.Crop, error) {
 			&crop.Quantity,
 			&crop.Unit,
 			&crop.Location,
+			&crop.Latitude, &crop.Longitude, &crop.LocationAccuracy,
 			&crop.PricePerUnit,
 			&crop.ListedForSale,
 			&crop.ImageURL,
 			&crop.CreatedAt,
 			&crop.UpdatedAt,
-			&crop.SellerName,
+			&crop.SellerName, &crop.SellerPhotoURL,
 		); err != nil {
 			return nil, err
 		}
@@ -205,6 +209,7 @@ func (r *CropRepository) GetByID(id int) (*models.Crop, error) {
 			quantity,
 			unit,
 			location,
+			latitude, longitude, location_accuracy,
 			price_per_unit,
 			listed_for_sale,
 			image_url,
@@ -224,6 +229,7 @@ func (r *CropRepository) GetByID(id int) (*models.Crop, error) {
 		&crop.Quantity,
 		&crop.Unit,
 		&crop.Location,
+		&crop.Latitude, &crop.Longitude, &crop.LocationAccuracy,
 		&crop.PricePerUnit,
 		&crop.ListedForSale,
 		&crop.ImageURL,
@@ -269,6 +275,7 @@ func (r *CropRepository) Update(crop *models.Crop) error {
 			lga = $4,
 			state = COALESCE((SELECT state FROM farmers WHERE id=$9), state, 'Benue'),
 			country = COALESCE((SELECT country FROM farmers WHERE id=$9), country, 'Nigeria'),
+			latitude = $10, longitude = $11, location_accuracy = $12,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = $8
 		  AND farmer_id = $9
@@ -285,6 +292,7 @@ func (r *CropRepository) Update(crop *models.Crop) error {
 		crop.ImageURL,
 		crop.ID,
 		crop.FarmerID,
+		crop.Latitude, crop.Longitude, crop.LocationAccuracy,
 	)
 
 	if err != nil {

@@ -6,7 +6,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const imageWrap = document.getElementById("image-preview-wrap");
     const removeImage = document.getElementById("remove-image");
     if (imageButton && imageInput) {
-        imageButton.addEventListener("click", () => imageInput.click());
+        const menu = document.getElementById("attachment-menu");
+        imageButton.addEventListener("click", () => { if (menu) menu.hidden = !menu.hidden; });
+        document.getElementById("upload-photo")?.addEventListener("click", () => imageInput.click());
+        document.getElementById("take-photo")?.addEventListener("click", () => { imageInput.setAttribute("capture", "environment"); imageInput.click(); });
+        document.getElementById("upload-video")?.addEventListener("click", () => document.getElementById("video")?.click());
+        document.getElementById("record-video")?.addEventListener("click", () => document.getElementById("start-video")?.click());
         imageInput.addEventListener("change", () => {
             if (imageInput.files.length) { imageStatus.textContent = `${imageInput.files[0].name} attached`; imagePreview.src = URL.createObjectURL(imageInput.files[0]); imageWrap.hidden = false; }
         });
@@ -71,6 +76,7 @@ function setupAudioRecorder() {
     const status = document.getElementById("audio-status");
     const preview = document.getElementById("audio-preview");
     const removeButton = document.getElementById("remove-audio");
+    const playButton = document.getElementById("play-audio");
 
     if (!startButton || !stopButton || !status || !preview) {
         return;
@@ -117,10 +123,11 @@ function setupAudioRecorder() {
 
             chunks = [];
 
+            // Opus is compact and well suited to voice/AI uploads.
             const mimeType = getSupportedMimeType([
                 "audio/webm;codecs=opus",
-                "audio/webm",
                 "audio/ogg;codecs=opus",
+                "audio/webm",
                 "audio/mp4"
             ]);
 
@@ -129,7 +136,7 @@ function setupAudioRecorder() {
                 : undefined;
 
             recorder = options
-                ? new MediaRecorder(stream, options)
+                ? new MediaRecorder(stream, {...options, videoBitsPerSecond: 900000, audioBitsPerSecond: 64000})
                 : new MediaRecorder(stream);
 
             recorder.addEventListener("dataavailable", (event) => {
@@ -158,16 +165,24 @@ function setupAudioRecorder() {
 
                 previewURL = URL.createObjectURL(blob);
                 preview.src = previewURL;
+                preview.controls = true;
+                preview.volume = 1;
+                preview.load();
                 preview.hidden = false;
+                if (playButton) playButton.hidden = false;
+                preview.onloadedmetadata = () => { preview.currentTime = 0; };
+                preview.onerror = () => { status.textContent = "This browser cannot play the recorded format. Try Chrome or Firefox."; };
 
                 status.textContent =
-                    "Voice recording is ready to submit.";
+                    "Voice recording is ready. Play it before sending.";
                 removeButton.hidden = false;
 
                 releaseStream(stream);
                 stream = null;
                 chunks = [];
                 recorder = null;
+                stopButton.hidden = true;
+                stopButton.disabled = true;
             });
 
             recorder.addEventListener("error", (event) => {
@@ -181,6 +196,8 @@ function setupAudioRecorder() {
                 recorder = null;
                 startButton.classList.remove("recording");
                 startButton.setAttribute("aria-label", "Start voice recording");
+                stopButton.hidden = true;
+                stopButton.disabled = true;
             });
 
             recorder.start(1000);
@@ -189,6 +206,7 @@ function setupAudioRecorder() {
             startButton.classList.add("recording");
             startButton.setAttribute("aria-label", "Stop voice recording");
             stopButton.disabled = false;
+            stopButton.hidden = false;
             status.textContent = "Recording voice...";
         } catch (error) {
             console.error("Microphone error:", error);
@@ -211,11 +229,13 @@ function setupAudioRecorder() {
         startButton.classList.remove("recording");
         startButton.setAttribute("aria-label", "Start voice recording");
         stopButton.disabled = true;
+        stopButton.hidden = true;
         status.textContent = "Preparing voice recording...";
     };
 
     stopButton.addEventListener("click", stopRecording);
-    removeButton?.addEventListener("click", () => { document.getElementById("audio").value = ""; clearPreview(); removeButton.hidden = true; status.textContent = "Voice recording removed."; });
+    playButton?.addEventListener("click", async () => { try { await preview.play(); status.textContent = "Playing your voice recording."; } catch { status.textContent = "The recording cannot be played in this browser. Try Chrome or Firefox."; } });
+    removeButton?.addEventListener("click", () => { document.getElementById("audio").value = ""; clearPreview(); removeButton.hidden = true; if (playButton) playButton.hidden = true; status.textContent = "Voice recording removed."; });
 }
 
 function setupVideoRecorder() {
@@ -286,6 +306,7 @@ function setupVideoRecorder() {
                 );
 
                 preview.src = URL.createObjectURL(blob);
+                preview.load();
                 preview.hidden = false;
 
                 status.textContent =
@@ -330,8 +351,9 @@ function setupVideoRecorder() {
 
         recorder.stop();
 
-        startButton.disabled = false;
-        stopButton.disabled = true;
+                startButton.disabled = false;
+                stopButton.disabled = true;
+                recorder = null;
         status.textContent = "Preparing video recording...";
     });
     removeButton?.addEventListener("click", () => { document.getElementById("video").value = ""; preview.hidden = true; preview.removeAttribute("src"); removeButton.hidden = true; status.textContent = ""; });

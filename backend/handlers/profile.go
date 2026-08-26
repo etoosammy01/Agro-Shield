@@ -26,6 +26,7 @@ func NewProfileHandler(crop *services.CropService, order *services.OrderService,
 // .Phone, .Location, .Role, .CreatedAt directly, plus role-specific data.
 type ProfilePageData struct {
 	*models.Farmer
+	IsOwner   bool
 	Crops     []models.Crop
 	Purchases []models.Order
 	Sales     []models.Order
@@ -53,9 +54,11 @@ func (h *Profile) ProfileHandler(w http.ResponseWriter, r *http.Request) {
 		farmer = profile
 	}
 
-	data := ProfilePageData{Farmer: farmer}
+	data := ProfilePageData{Farmer: farmer, IsOwner: r.URL.Query().Get("id") == ""}
 
-	if farmer.IsBuyer() {
+	if !data.IsOwner {
+		// Public profile: contact details only.
+	} else if farmer.IsBuyer() {
 		if purchases, err := h.order.MyPurchases(farmer.ID); err == nil {
 			data.Purchases = purchases
 		} else {

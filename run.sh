@@ -3,28 +3,40 @@
 set -e
 
 # ============================================================
-# AgentRouter + Claude Code / Codex Setup Script
-# macOS / Linux
+# AI CODING SETUP
+# ============================================================
+#
+# Providers through AgentRouter:
+#
+#   Anthropic
+#     - claude-opus-4-8
+#     - claude-opus-5
+#
+#   DeepSeek
+#     - deepseek-v4-flash
+#
+#   Zhipu AI
+#     - glm-5.3
+#
+#   OpenAI
+#     - gpt-5.6-sol
+#
+# Everything is optional.
+#
 # ============================================================
 
 clear
 
 echo "============================================================"
-echo "        AgentRouter CLI Setup"
+echo "              AI CODING + AGENTROUTER SETUP"
 echo "============================================================"
 echo
-echo "This script will:"
-echo "  1. Install NVM"
-echo "  2. Install Node.js 22"
-echo "  3. Install Claude Code or Codex"
-echo "  4. Configure AgentRouter"
-echo
-echo "============================================================"
+echo "All components are optional."
 echo
 
-# ------------------------------------------------------------
-# Helper functions
-# ------------------------------------------------------------
+# ============================================================
+# HELPERS
+# ============================================================
 
 error_exit() {
     echo
@@ -35,14 +47,37 @@ error_exit() {
     exit 1
 }
 
-pause() {
-    echo
-    read -r -p "Press Enter to continue..."
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
 }
 
-# ------------------------------------------------------------
-# Check operating system
-# ------------------------------------------------------------
+remove_whitespace() {
+    printf '%s' "$1" | tr -d '[:space:]'
+}
+
+ask_yes_no() {
+    local QUESTION="$1"
+
+    while true; do
+        read -r -p "$QUESTION [y/n]: " ANSWER
+
+        case "$ANSWER" in
+            y|Y|yes|YES)
+                return 0
+                ;;
+            n|N|no|NO)
+                return 1
+                ;;
+            *)
+                echo "Please enter y or n."
+                ;;
+        esac
+    done
+}
+
+# ============================================================
+# OPERATING SYSTEM
+# ============================================================
 
 OS="$(uname -s)"
 
@@ -50,359 +85,505 @@ case "$OS" in
     Darwin)
         SHELL_CONFIG="$HOME/.zshrc"
         ;;
+
     Linux)
-        if [ -f "$HOME/.bashrc" ]; then
-            SHELL_CONFIG="$HOME/.bashrc"
-        elif [ -f "$HOME/.zshrc" ]; then
+        if [ -f "$HOME/.zshrc" ]; then
             SHELL_CONFIG="$HOME/.zshrc"
+        elif [ -f "$HOME/.bashrc" ]; then
+            SHELL_CONFIG="$HOME/.bashrc"
         else
             SHELL_CONFIG="$HOME/.bashrc"
         fi
         ;;
+
     *)
-        error_exit "This script supports macOS and Linux only."
+        error_exit "Unsupported operating system: $OS"
         ;;
 esac
 
-# ------------------------------------------------------------
-# Check curl
-# ------------------------------------------------------------
+echo "Operating system: $OS"
+echo "Shell config:     $SHELL_CONFIG"
+echo
 
-if ! command -v curl >/dev/null 2>&1; then
-    error_exit "curl is not installed. Please install curl and run this script again."
+# ============================================================
+# CURL
+# ============================================================
+
+if ! command_exists curl; then
+    echo "curl is not installed."
+
+    if ! ask_yes_no "Continue anyway?"; then
+        error_exit "Please install curl and run the script again."
+    fi
 fi
 
-# ------------------------------------------------------------
-# Install NVM
-# ------------------------------------------------------------
+# ============================================================
+# NVM
+# ============================================================
 
 echo
 echo "============================================================"
-echo "Step 1: Installing NVM"
+echo "NVM"
 echo "============================================================"
 echo
 
 if [ -s "$HOME/.nvm/nvm.sh" ]; then
-    echo "NVM appears to already be installed."
+
+    echo "NVM is already installed."
+
 else
-    echo "Installing NVM..."
-    echo
 
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.6/install.sh | bash \
-        || error_exit "NVM installation failed."
+    if ask_yes_no "Install NVM?"; then
 
-    echo
-    echo "NVM installation completed."
+        if ! command_exists curl; then
+            error_exit "curl is required to install NVM."
+        fi
+
+        echo
+        echo "Installing NVM..."
+
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.6/install.sh | bash \
+            || error_exit "NVM installation failed."
+
+        echo
+        echo "NVM installation completed."
+
+    else
+
+        echo "Skipping NVM."
+
+    fi
+
 fi
 
-# ------------------------------------------------------------
-# Load NVM into the current shell
-# ------------------------------------------------------------
+# ============================================================
+# LOAD NVM
+# ============================================================
 
 export NVM_DIR="$HOME/.nvm"
 
 if [ -s "$NVM_DIR/nvm.sh" ]; then
     # shellcheck disable=SC1090
     source "$NVM_DIR/nvm.sh"
+fi
+
+# ============================================================
+# NODE.JS
+# ============================================================
+
+echo
+echo "============================================================"
+echo "Node.js"
+echo "============================================================"
+echo
+
+if command_exists node; then
+
+    echo "Node.js is already installed:"
+    node -v
+
 else
-    error_exit "NVM was installed, but nvm.sh could not be found."
+
+    if command_exists nvm; then
+
+        if ask_yes_no "Install Node.js 22?"; then
+
+            nvm install 22 \
+                || error_exit "Node.js 22 installation failed."
+
+            nvm use 22 \
+                || error_exit "Could not switch to Node.js 22."
+
+            nvm alias default 22 >/dev/null 2>&1 || true
+
+        else
+
+            echo "Skipping Node.js."
+
+        fi
+
+    else
+
+        echo "NVM is not available."
+        echo "Skipping Node.js."
+
+    fi
+
 fi
 
-if ! command -v nvm >/dev/null 2>&1; then
-    error_exit "NVM could not be loaded into the current shell."
+# ============================================================
+# RELOAD NVM
+# ============================================================
+
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+    # shellcheck disable=SC1090
+    source "$NVM_DIR/nvm.sh"
 fi
 
 echo
-echo "NVM version:"
-nvm --version
 
-# ------------------------------------------------------------
-# Install Node.js 22
-# ------------------------------------------------------------
+if command_exists node; then
+    echo "Node.js: $(node -v)"
+fi
 
-echo
-echo "============================================================"
-echo "Step 2: Installing Node.js 22"
-echo "============================================================"
-echo
+if command_exists npm; then
+    echo "npm:     $(npm -v)"
+fi
 
-nvm install 22 || error_exit "Node.js 22 installation failed."
-
-echo
-echo "Switching to Node.js 22..."
-
-nvm use 22 || error_exit "Could not switch to Node.js 22."
-
-# Set Node 22 as the default for future shells.
-nvm alias default 22 >/dev/null 2>&1 || true
-
-# ------------------------------------------------------------
-# Confirm Node/npm installation
-# ------------------------------------------------------------
+# ============================================================
+# AI MODEL SELECTION
+# ============================================================
 
 echo
 echo "============================================================"
-echo "Step 3: Confirming Node.js and npm"
+echo "                    AI MODEL SELECTION"
 echo "============================================================"
 echo
-
-NODE_VERSION="$(node -v)" || error_exit "Node.js is not available."
-NPM_VERSION="$(npm -v)" || error_exit "npm is not available."
-
-echo "Node.js: $NODE_VERSION"
-echo "npm:     $NPM_VERSION"
-
+echo "Select the AI model you want to use."
 echo
-
-# ------------------------------------------------------------
-# Select CLI
-# ------------------------------------------------------------
-
-echo "============================================================"
-echo "Step 4: Choose your AI coding CLI"
-echo "============================================================"
+echo "Anthropic:"
+echo "  1) claude-opus-4-8"
+echo "  2) claude-opus-5"
 echo
-echo "1) Claude Code"
-echo "2) Codex"
+echo "DeepSeek:"
+echo "  3) deepseek-v4-flash"
+echo
+echo "Zhipu AI:"
+echo "  4) glm-5.3"
+echo
+echo "OpenAI:"
+echo "  5) gpt-5.6-sol"
+echo
+echo "  6) Skip AI configuration"
 echo
 
 while true; do
-    read -r -p "Enter your choice [1-2]: " CLI_CHOICE
 
-    case "$CLI_CHOICE" in
+    read -r -p "Choose [1-6]: " MODEL_CHOICE
+
+    case "$MODEL_CHOICE" in
+
         1)
-            CLI="claude"
+            PROVIDER="Anthropic"
+            MODEL="claude-opus-4-8"
             break
             ;;
+
         2)
-            CLI="codex"
+            PROVIDER="Anthropic"
+            MODEL="claude-opus-5"
             break
             ;;
-        *)
-            echo "Invalid choice. Please enter 1 or 2."
+
+        3)
+            PROVIDER="DeepSeek"
+            MODEL="deepseek-v4-flash"
+            break
             ;;
+
+        4)
+            PROVIDER="Zhipu AI"
+            MODEL="glm-5.3"
+            break
+            ;;
+
+        5)
+            PROVIDER="OpenAI"
+            MODEL="gpt-5.6-sol"
+            break
+            ;;
+
+        6)
+            PROVIDER=""
+            MODEL=""
+            break
+            ;;
+
+        *)
+            echo
+            echo "Invalid choice. Please choose 1-6."
+            echo
+            ;;
+
     esac
+
 done
 
-# ------------------------------------------------------------
-# Claude Code
-# ------------------------------------------------------------
+# ============================================================
+# SKIP AI
+# ============================================================
 
-if [ "$CLI" = "claude" ]; then
-
-    echo
-    echo "============================================================"
-    echo "Installing Claude Code"
-    echo "============================================================"
-    echo
-
-    npm install -g @anthropic-ai/claude-code@latest \
-        || error_exit "Claude Code installation failed."
-
-    echo
-    echo "Claude Code version:"
-    claude --version || error_exit "Claude Code was installed but could not be executed."
-
-    # --------------------------------------------------------
-    # AgentRouter API key
-    # --------------------------------------------------------
+if [ -z "$MODEL" ]; then
 
     echo
     echo "============================================================"
-    echo "AgentRouter Configuration"
+    echo "AI CONFIGURATION SKIPPED"
     echo "============================================================"
     echo
-    echo "Paste your AgentRouter API key."
-    echo "Spaces will automatically be removed."
+    echo "No AI model was selected."
     echo
-
-    while true; do
-        read -r -s -p "AgentRouter API key: " AGENTROUTER_KEY
-        echo
-
-        # Remove all whitespace.
-        AGENTROUTER_KEY="$(printf '%s' "$AGENTROUTER_KEY" | tr -d '[:space:]')"
-
-        if [ -n "$AGENTROUTER_KEY" ]; then
-            break
-        fi
-
-        echo "The API key cannot be empty."
-        echo
-    done
-
-    # --------------------------------------------------------
-    # Select Claude model
-    # --------------------------------------------------------
-
+    echo "You can run this script again whenever you want."
     echo
-    echo "============================================================"
-    echo "Select your Claude model"
-    echo "============================================================"
-    echo
-    echo "1) claude-opus-4-6"
-    echo "2) claude-opus-4-7"
-    echo "3) claude-opus-4-8"
-    echo "4) claude-opus-4-9"
-    echo "5) claude-opus-5"
-    echo
+    exit 0
 
-    while true; do
-        read -r -p "Enter your choice [1-5]: " MODEL_CHOICE
-
-        case "$MODEL_CHOICE" in
-            1)
-                ANTHROPIC_MODEL="claude-opus-4-6"
-                break
-                ;;
-            2)
-                ANTHROPIC_MODEL="claude-opus-4-7"
-                break
-                ;;
-            3)
-                ANTHROPIC_MODEL="claude-opus-4-8"
-                break
-                ;;
-            4)
-                ANTHROPIC_MODEL="claude-opus-4-9"
-                break
-                ;;
-            5)
-                ANTHROPIC_MODEL="claude-opus-5"
-                break
-                ;;
-            *)
-                echo "Invalid choice. Please enter a number from 1 to 5."
-                ;;
-        esac
-    done
-
-    # --------------------------------------------------------
-    # Configure Claude Code environment variables
-    # --------------------------------------------------------
-
-    echo
-    echo "Configuring Claude Code..."
-    echo
-
-    # Remove previously generated AgentRouter configuration
-    # so running this script again does not create duplicates.
-    if [ -f "$SHELL_CONFIG" ]; then
-        TMP_CONFIG="$(mktemp)"
-
-        awk '
-        BEGIN { skip=0 }
-
-        /^# >>> AgentRouter Claude Code Configuration >>>$/ {
-            skip=1
-            next
-        }
-
-        /^# <<< AgentRouter Claude Code Configuration <<<$ / {
-            skip=0
-            next
-        }
-
-        skip == 0 {
-            print
-        }
-        ' "$SHELL_CONFIG" > "$TMP_CONFIG" 2>/dev/null || cp "$SHELL_CONFIG" "$TMP_CONFIG"
-
-        mv "$TMP_CONFIG" "$SHELL_CONFIG"
-    fi
-
-    cat >> "$SHELL_CONFIG" <<EOF
-
-# >>> AgentRouter Claude Code Configuration >>>
-export ANTHROPIC_AUTH_TOKEN="$AGENTROUTER_KEY"
-export ANTHROPIC_BASE_URL="https://agentrouter.org"
-export ANTHROPIC_MODEL="$ANTHROPIC_MODEL"
-# <<< AgentRouter Claude Code Configuration <<<
-EOF
-
-    # Apply the settings immediately to this shell.
-    export ANTHROPIC_AUTH_TOKEN="$AGENTROUTER_KEY"
-    export ANTHROPIC_BASE_URL="https://agentrouter.org"
-    export ANTHROPIC_MODEL="$ANTHROPIC_MODEL"
-
-    echo "Claude Code configuration completed."
-    echo
-    echo "ANTHROPIC_BASE_URL = $ANTHROPIC_BASE_URL"
-    echo "ANTHROPIC_MODEL    = $ANTHROPIC_MODEL"
-    echo "ANTHROPIC_AUTH_TOKEN has been configured."
 fi
 
-# ------------------------------------------------------------
-# Codex
-# ------------------------------------------------------------
+# ============================================================
+# SELECTED MODEL
+# ============================================================
 
-if [ "$CLI" = "codex" ]; then
+echo
+echo "============================================================"
+echo "                    SELECTED AI"
+echo "============================================================"
+echo
+echo "Provider: $PROVIDER"
+echo "Model:    $MODEL"
+echo
 
-    echo
-    echo "============================================================"
-    echo "Installing Codex"
-    echo "============================================================"
-    echo
+# ============================================================
+# AGENTROUTER
+# ============================================================
 
-    npm install -g @openai/codex@latest \
-        || error_exit "Codex installation failed."
-
-    echo
-    echo "Codex version:"
-    codex --version || error_exit "Codex was installed but could not be executed."
-
-    # --------------------------------------------------------
-    # AgentRouter API key
-    # --------------------------------------------------------
+if ! ask_yes_no "Configure $MODEL through AgentRouter?"; then
 
     echo
-    echo "============================================================"
-    echo "AgentRouter Configuration"
-    echo "============================================================"
+    echo "AgentRouter configuration skipped."
     echo
-    echo "Paste your AgentRouter API key."
-    echo "Spaces will automatically be removed."
+    exit 0
+
+fi
+
+# ============================================================
+# API KEY
+# ============================================================
+
+echo
+echo "============================================================"
+echo "                AGENTROUTER API KEY"
+echo "============================================================"
+echo
+echo "Paste your AgentRouter API key."
+echo "Your key will not be displayed."
+echo "Whitespace will automatically be removed."
+echo
+
+while true; do
+
+    read -r -s -p "AgentRouter API key: " AGENTROUTER_KEY
     echo
 
-    while true; do
-        read -r -s -p "AgentRouter API key: " AGENTROUTER_KEY
-        echo
+    AGENTROUTER_KEY="$(remove_whitespace "$AGENTROUTER_KEY")"
 
-        # Remove all whitespace.
-        AGENTROUTER_KEY="$(printf '%s' "$AGENTROUTER_KEY" | tr -d '[:space:]')"
-
-        if [ -n "$AGENTROUTER_KEY" ]; then
-            break
-        fi
-
-        echo "The API key cannot be empty."
-        echo
-    done
-
-    # --------------------------------------------------------
-    # Create ~/.codex/config.toml
-    # --------------------------------------------------------
-
-    CODEX_DIR="$HOME/.codex"
-    CODEX_CONFIG="$CODEX_DIR/config.toml"
-
-    mkdir -p "$CODEX_DIR" \
-        || error_exit "Could not create $CODEX_DIR."
-
-    # If an existing config exists, make a backup before replacing it.
-    if [ -f "$CODEX_CONFIG" ]; then
-        BACKUP_FILE="$CODEX_CONFIG.backup.$(date +%Y%m%d_%H%M%S)"
-
-        cp "$CODEX_CONFIG" "$BACKUP_FILE" \
-            || error_exit "Could not back up the existing Codex configuration."
-
-        echo
-        echo "Existing Codex configuration backed up to:"
-        echo "$BACKUP_FILE"
+    if [ -n "$AGENTROUTER_KEY" ]; then
+        break
     fi
 
-    cat > "$CODEX_CONFIG" <<EOF
-model = "gpt-5.6-sol"
+    echo
+    echo "API key cannot be empty."
+    echo
+
+done
+
+# ============================================================
+# SAVE GENERIC AGENTROUTER ENVIRONMENT
+# ============================================================
+
+echo
+echo "============================================================"
+echo "Saving AgentRouter configuration..."
+echo "============================================================"
+echo
+
+TMP_CONFIG="$(mktemp)"
+
+if [ -f "$SHELL_CONFIG" ]; then
+
+    awk '
+    BEGIN { skip=0 }
+
+    /^# >>> AGENTROUTER AI CONFIGURATION >>>$/ {
+        skip=1
+        next
+    }
+
+    /^# <<< AGENTROUTER AI CONFIGURATION <<<$ / {
+        skip=0
+        next
+    }
+
+    skip == 0 {
+        print
+    }
+    ' "$SHELL_CONFIG" > "$TMP_CONFIG"
+
+else
+
+    touch "$TMP_CONFIG"
+
+fi
+
+mv "$TMP_CONFIG" "$SHELL_CONFIG"
+
+cat >> "$SHELL_CONFIG" <<EOF
+
+# >>> AGENTROUTER AI CONFIGURATION >>>
+export AGENTROUTER_API_KEY="$AGENTROUTER_KEY"
+export AGENTROUTER_MODEL="$MODEL"
+export AGENTROUTER_BASE_URL="https://agentrouter.org/v1"
+# <<< AGENTROUTER AI CONFIGURATION <<<
+EOF
+
+export AGENTROUTER_API_KEY="$AGENTROUTER_KEY"
+export AGENTROUTER_MODEL="$MODEL"
+export AGENTROUTER_BASE_URL="https://agentrouter.org/v1"
+
+# ============================================================
+# OPTIONAL CLAUDE CODE
+# ============================================================
+
+if [ "$PROVIDER" = "Anthropic" ]; then
+
+    echo
+    echo "============================================================"
+    echo "Claude Code"
+    echo "============================================================"
+    echo
+
+    if ask_yes_no "Install/configure Claude Code?"; then
+
+        if ! command_exists npm; then
+            echo
+            echo "npm is not available."
+            echo "Claude Code installation skipped."
+        else
+
+            if command_exists claude; then
+
+                echo "Claude Code is already installed."
+                claude --version || true
+
+            else
+
+                echo "Installing Claude Code..."
+
+                npm install -g @anthropic-ai/claude-code@latest \
+                    || error_exit "Claude Code installation failed."
+
+            fi
+
+            # ------------------------------------------------
+            # Claude environment
+            # ------------------------------------------------
+
+            TMP_CONFIG="$(mktemp)"
+
+            awk '
+            BEGIN { skip=0 }
+
+            /^# >>> CLAUDE AGENTROUTER CONFIGURATION >>>$/ {
+                skip=1
+                next
+            }
+
+            /^# <<< CLAUDE AGENTROUTER CONFIGURATION <<<$ / {
+                skip=0
+                next
+            }
+
+            skip == 0 {
+                print
+            }
+            ' "$SHELL_CONFIG" > "$TMP_CONFIG"
+
+            mv "$TMP_CONFIG" "$SHELL_CONFIG"
+
+            cat >> "$SHELL_CONFIG" <<EOF
+
+# >>> CLAUDE AGENTROUTER CONFIGURATION >>>
+export ANTHROPIC_AUTH_TOKEN="$AGENTROUTER_KEY"
+export ANTHROPIC_BASE_URL="https://agentrouter.org"
+export ANTHROPIC_MODEL="$MODEL"
+# <<< CLAUDE AGENTROUTER CONFIGURATION <<<
+EOF
+
+            export ANTHROPIC_AUTH_TOKEN="$AGENTROUTER_KEY"
+            export ANTHROPIC_BASE_URL="https://agentrouter.org"
+            export ANTHROPIC_MODEL="$MODEL"
+
+            echo
+            echo "Claude Code configured."
+            echo "Model: $MODEL"
+
+        fi
+
+    else
+
+        echo "Claude Code skipped."
+
+    fi
+
+fi
+
+# ============================================================
+# OPTIONAL CODEX
+# ============================================================
+
+if [ "$PROVIDER" = "OpenAI" ]; then
+
+    echo
+    echo "============================================================"
+    echo "Codex"
+    echo "============================================================"
+    echo
+
+    if ask_yes_no "Install/configure Codex?"; then
+
+        if ! command_exists npm; then
+
+            echo
+            echo "npm is not available."
+            echo "Codex installation skipped."
+
+        else
+
+            if command_exists codex; then
+
+                echo "Codex is already installed."
+                codex --version || true
+
+            else
+
+                echo "Installing Codex..."
+
+                npm install -g @openai/codex@latest \
+                    || error_exit "Codex installation failed."
+
+            fi
+
+            # ------------------------------------------------
+            # Codex configuration
+            # ------------------------------------------------
+
+            CODEX_DIR="$HOME/.codex"
+            CODEX_CONFIG="$CODEX_DIR/config.toml"
+
+            mkdir -p "$CODEX_DIR"
+
+            if [ -f "$CODEX_CONFIG" ]; then
+
+                BACKUP_FILE="$CODEX_CONFIG.backup.$(date +%Y%m%d_%H%M%S)"
+
+                cp "$CODEX_CONFIG" "$BACKUP_FILE"
+
+                echo
+                echo "Existing Codex configuration backed up:"
+                echo "$BACKUP_FILE"
+
+            fi
+
+            cat > "$CODEX_CONFIG" <<EOF
+model = "$MODEL"
 model_provider = "agentrouter"
 
 [model_providers.agentrouter]
@@ -413,59 +594,87 @@ requires_openai_auth = false
 experimental_bearer_token = "$AGENTROUTER_KEY"
 EOF
 
-    echo
-    echo "Codex configuration created:"
-    echo "$CODEX_CONFIG"
+            chmod 600 "$CODEX_CONFIG"
+
+            echo
+            echo "Codex configured."
+            echo "Model: $MODEL"
+            echo "Config: $CODEX_CONFIG"
+
+        fi
+
+    else
+
+        echo "Codex skipped."
+
+    fi
+
 fi
 
-# ------------------------------------------------------------
-# Final verification
-# ------------------------------------------------------------
+# ============================================================
+# DEEPSEEK / ZHIPU
+# ============================================================
+
+if [ "$PROVIDER" = "DeepSeek" ] || [ "$PROVIDER" = "Zhipu AI" ]; then
+
+    echo
+    echo "============================================================"
+    echo "$PROVIDER"
+    echo "============================================================"
+    echo
+    echo "Selected model:"
+    echo "$MODEL"
+    echo
+    echo "AgentRouter environment configuration has been saved."
+    echo
+    echo "You can use this model through AgentRouter-compatible"
+    echo "applications/tools."
+    echo
+
+fi
+
+# ============================================================
+# FINAL
+# ============================================================
 
 echo
 echo "============================================================"
-echo "                 SETUP COMPLETE"
+echo "                    SETUP COMPLETE"
 echo "============================================================"
 echo
 
-echo "Node.js:"
-node -v
-
-echo
-echo "npm:"
-npm -v
+echo "Provider:"
+echo "$PROVIDER"
 
 echo
 
-if [ "$CLI" = "claude" ]; then
-    echo "Claude Code:"
-    claude --version
+echo "Model:"
+echo "$MODEL"
 
-    echo
-    echo "AgentRouter model:"
-    echo "$ANTHROPIC_MODEL"
+echo
 
-    echo
-    echo "Claude Code is configured to use:"
-    echo "$ANTHROPIC_BASE_URL"
+echo "AgentRouter:"
+echo "https://agentrouter.org/v1"
 
-    echo
-    echo "Configuration saved to:"
-    echo "$SHELL_CONFIG"
+echo
 
-elif [ "$CLI" = "codex" ]; then
-    echo "Codex:"
-    codex --version
+echo "Configuration saved to:"
+echo "$SHELL_CONFIG"
 
+if [ -f "$HOME/.codex/config.toml" ] && [ "$PROVIDER" = "OpenAI" ]; then
     echo
     echo "Codex configuration:"
-    echo "$CODEX_CONFIG"
+    echo "$HOME/.codex/config.toml"
 fi
 
 echo
 echo "============================================================"
-echo "Everything completed successfully."
-echo "============================================================"
 echo
-echo "You may now use your selected CLI."
+echo "Reload your shell with:"
+echo
+echo "source \"$SHELL_CONFIG\""
+echo
+echo "============================================================"
+echo "Done."
+echo "============================================================"
 echo
