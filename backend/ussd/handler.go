@@ -97,7 +97,7 @@ func (h *Handler) respond(ctx context.Context, phone, text string) string {
 		}
 		lines := []string{"END Marketplace:"}
 		for _, c := range items {
-			lines = append(lines, fmt.Sprintf("%d. %s %.2f/%s", c.ID, c.Name, c.PricePerUnit, c.Unit))
+			lines = append(lines, fmt.Sprintf("%d. %s ₦%s/%s", c.ID, c.Name, formatMoney(c.PricePerUnit), c.Unit))
 		}
 		return strings.Join(lines[:min(len(lines), 5)], "\n")
 	case "3":
@@ -107,7 +107,7 @@ func (h *Handler) respond(ctx context.Context, phone, text string) string {
 		}
 		lines := []string{"END Sales:"}
 		for _, o := range items {
-			lines = append(lines, fmt.Sprintf("%s: %.2f (%s)", o.CropName, o.TotalPrice, o.Status))
+			lines = append(lines, fmt.Sprintf("%s: ₦%s (%s)", o.CropName, formatMoney(o.TotalPrice), o.Status))
 		}
 		return strings.Join(lines[:min(len(lines), 5)], "\n")
 	case "4":
@@ -128,6 +128,20 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func formatMoney(value float64) string {
+	s := strconv.FormatFloat(value, 'f', 2, 64)
+	parts := strings.SplitN(s, ".", 2)
+	whole := parts[0]
+	sign := ""
+	if strings.HasPrefix(whole, "-") {
+		sign, whole = "-", whole[1:]
+	}
+	for i := len(whole) - 3; i > 0; i -= 3 {
+		whole = whole[:i] + "," + whole[i:]
+	}
+	return sign + whole + "." + parts[1]
 }
 
 // ParseInt is kept small and exported for integrations that need to parse a

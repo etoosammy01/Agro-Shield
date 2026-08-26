@@ -36,7 +36,7 @@ func (r *CropRepository) Create(crop *models.Crop) error {
 			farmer_id,
 			name,
 			quantity,
-			unit,
+			COALESCE(unit, ''),
 			location,
 			price_per_unit,
 			listed_for_sale,
@@ -81,14 +81,14 @@ func (r *CropRepository) ListByFarmer(farmerID int) ([]models.Crop, error) {
 			farmer_id,
 			name,
 			quantity,
-			unit,
+			COALESCE(unit, ''),
 			location,
 			price_per_unit,
 			listed_for_sale,
-			image_url,
-			initial_listed_quantity, first_listed_at, first_order_at, sold_out_at,
-			created_at,
-			updated_at
+			COALESCE(image_url, ''),
+			COALESCE(initial_listed_quantity, 0), first_listed_at, first_order_at, sold_out_at,
+			COALESCE(created_at, CURRENT_TIMESTAMP),
+			COALESCE(updated_at, CURRENT_TIMESTAMP)
 		FROM crops
 		WHERE farmer_id = $1
 		ORDER BY created_at DESC
@@ -140,22 +140,20 @@ func (r *CropRepository) ListAvailable() ([]models.Crop, error) {
 			crops.id,
 			crops.farmer_id,
 			crops.name,
-			crops.quantity,
-			crops.unit,
-			crops.location,
-			crops.latitude, crops.longitude, crops.location_accuracy,
-			crops.price_per_unit,
-			crops.listed_for_sale,
-			crops.image_url,
-			crops.created_at,
-			crops.updated_at,
-			farmers.full_name, farmers.photo_url
+			COALESCE(crops.quantity, 0),
+			COALESCE(crops.unit, ''),
+			COALESCE(crops.location, ''),
+			COALESCE(crops.latitude, 0), COALESCE(crops.longitude, 0), COALESCE(crops.location_accuracy, 0),
+			COALESCE(crops.price_per_unit, 0),
+			COALESCE(crops.listed_for_sale, FALSE),
+			COALESCE(crops.image_url, ''),
+			COALESCE(crops.created_at, CURRENT_TIMESTAMP),
+			COALESCE(crops.updated_at, CURRENT_TIMESTAMP),
+			COALESCE(farmers.full_name, ''), COALESCE(farmers.photo_url, '')
 		FROM crops
 		JOIN farmers ON farmers.id = crops.farmer_id
 		WHERE crops.listed_for_sale = TRUE
 		  AND crops.quantity > 0
-		  AND crops.latitude IS NOT NULL AND crops.longitude IS NOT NULL
-		  AND NOT (crops.latitude = 0 AND crops.longitude = 0)
 		ORDER BY crops.created_at DESC
 	`
 
@@ -206,16 +204,16 @@ func (r *CropRepository) GetByID(id int) (*models.Crop, error) {
 			id,
 			farmer_id,
 			name,
-			quantity,
-			unit,
-			location,
-			latitude, longitude, location_accuracy,
-			price_per_unit,
-			listed_for_sale,
-			image_url,
-			initial_listed_quantity, first_listed_at, first_order_at, sold_out_at,
-			created_at,
-			updated_at
+			COALESCE(quantity, 0),
+			COALESCE(unit, ''),
+			COALESCE(location, ''),
+			COALESCE(latitude, 0), COALESCE(longitude, 0), COALESCE(location_accuracy, 0),
+			COALESCE(price_per_unit, 0),
+			COALESCE(listed_for_sale, FALSE),
+			COALESCE(image_url, ''),
+			COALESCE(initial_listed_quantity, 0), first_listed_at, first_order_at, sold_out_at,
+			COALESCE(created_at, CURRENT_TIMESTAMP),
+			COALESCE(updated_at, CURRENT_TIMESTAMP)
 		FROM crops
 		WHERE id = $1
 	`

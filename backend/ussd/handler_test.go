@@ -44,7 +44,7 @@ func TestStorageEndsSession(t *testing.T) {
 
 func TestMarketPricesEndSession(t *testing.T) {
 	got := testHandler().respond(context.Background(), "+2341", "2")
-	if got != "END Marketplace:\n0. Maize 500.00/kg" {
+	if got != "END Marketplace:\n0. Maize ₦500.00/kg" {
 		t.Fatalf("got %q", got)
 	}
 }
