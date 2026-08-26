@@ -117,7 +117,7 @@
                     <a href="/cart" class="action-card">
                         <span>Cart</span>
                         <h3>Review cart{{if .CartItemCount}} ({{.CartItemCount}}){{end}}</h3>
-                        <p>{{if .CartItemCount}}Negotiated total: ₦{{printf "%.2f" .CartTotal}}{{else}}Accepted negotiated offers will appear here.{{end}}</p>
+                        <p>{{if .CartItemCount}}Negotiated total: ₦{{money .CartTotal}}{{else}}Accepted negotiated offers will appear here.{{end}}</p>
                     </a>
 
                     <a
@@ -290,7 +290,7 @@
                     </span>
 
                     <strong>
-                        ₦{{printf "%.2f" .TotalSpent}}
+                        ₦{{money .TotalSpent}}
                     </strong>
 
                     <span class="metric-detail">
@@ -411,7 +411,7 @@
                     </span>
 
                     <strong>
-                        ₦{{printf "%.2f" .Revenue30}}
+                        ₦{{money .Revenue30}}
                     </strong>
 
                     <span class="metric-detail">
@@ -747,12 +747,12 @@
                     <div class="produce-demand-summary">
                         <strong>{{.ProduceType}}</strong> · {{.Activity}}
                         <span>Last 30 days · {{.Views}} views · {{.CartAdds}} cart adds · {{.Negotiations}} negotiations · {{.Orders}} orders</span>
-                        {{if .PriceAvailable}}<span>Local prices: ₦{{printf "%.0f" .LocalPriceMin}}–₦{{printf "%.0f" .LocalPriceMax}} · median ₦{{printf "%.0f" .LocalPriceMedian}}</span>{{end}}
-                        {{if .PricePosition}}<span>Your average price: ₦{{printf "%.0f" .FarmerPrice}} · {{.PricePosition}} ({{printf "%+.0f%%" .PriceDifferencePercent}})</span>{{end}}
-                        {{if .StateListings}}<span>State comparison: {{.StateListings}} listings · median ₦{{printf "%.0f" .StatePriceMedian}}</span>{{end}}
-                        {{if .NearbyListings}}<span>Nearby LGA comparison: {{.NearbyListings}} listings · median ₦{{printf "%.0f" .NearbyPriceMedian}}</span>{{end}}
-                        {{if .NationalListings}}<span>National comparison: {{.NationalListings}} listings · median ₦{{printf "%.0f" .NationalPriceMedian}}</span>{{end}}
-                        {{if .ExternalPriceAvailable}}<span>Verified external observations: {{.ExternalListings}} · median ₦{{printf "%.0f" .ExternalPriceMedian}}</span>{{end}}
+                        {{if .PriceAvailable}}<span>Local prices: ₦{{money0 .LocalPriceMin}}–₦{{money0 .LocalPriceMax}} · median ₦{{money0 .LocalPriceMedian}}</span>{{end}}
+                        {{if .PricePosition}}<span>Your average price: ₦{{money0 .FarmerPrice}} · {{.PricePosition}} ({{printf "%+.0f%%" .PriceDifferencePercent}})</span>{{end}}
+                        {{if .StateListings}}<span>State comparison: {{.StateListings}} listings · median ₦{{money0 .StatePriceMedian}}</span>{{end}}
+                        {{if .NearbyListings}}<span>Nearby LGA comparison: {{.NearbyListings}} listings · median ₦{{money0 .NearbyPriceMedian}}</span>{{end}}
+                        {{if .NationalListings}}<span>National comparison: {{.NationalListings}} listings · median ₦{{money0 .NationalPriceMedian}}</span>{{end}}
+                        {{if .ExternalPriceAvailable}}<span>Verified external observations: {{.ExternalListings}} · median ₦{{money0 .ExternalPriceMedian}}</span>{{end}}
                         <small>{{.Recommendation}}</small>
                     </div>
                     {{end}}
@@ -828,12 +828,12 @@
                             </span>
 
                                 <strong>
-                                {{if .MarketHasPrices}}₦{{printf "%.0f" .MarketPriceMin}}–₦{{printf "%.0f" .MarketPriceMax}}{{else}}Unavailable{{end}}
+                                {{if .MarketHasPrices}}₦{{money0 .MarketPriceMin}}–₦{{money0 .MarketPriceMax}}{{else}}Unavailable{{end}}
                             </strong>
                         </div>
                         <div>
                             <span>Median price / unit</span>
-                            <strong>{{if .MarketHasPrices}}₦{{printf "%.0f" .MarketPriceMedian}}{{else}}—{{end}}</strong>
+                            <strong>{{if .MarketHasPrices}}₦{{money0 .MarketPriceMedian}}{{else}}—{{end}}</strong>
                         </div>
 
                         <div><span>Your orders · last 30 days</span><strong>{{.MarketOrders30}}</strong></div>
@@ -849,7 +849,7 @@
                         <div><span>Rejected negotiations</span><strong>{{.Demand.NegotiationsRejected}}</strong></div>
                         <div><span>Negotiation conversion</span><strong>{{if or .Demand.NegotiationsActive .Demand.NegotiationsAccepted .Demand.NegotiationsRejected}}{{printf "%.0f%%" .Demand.NegotiationConversionRate}}{{else}}Awaiting activity{{end}}</strong></div>
                         <div><span>Demand score</span><strong>{{if or .Demand.Views .Demand.CartAdds .Demand.Orders .Demand.Negotiations}}{{printf "%.0f/100" .Demand.DemandScore}}{{else}}Awaiting activity{{end}}</strong></div>{{end}}
-                        {{if .Demand.ProduceType}}<div><span>Average offer price</span><strong>{{if .Demand.AverageOfferPrice}}₦{{printf "%.0f" .Demand.AverageOfferPrice}}{{else}}—{{end}}</strong></div>
+                        {{if .Demand.ProduceType}}<div><span>Average offer price</span><strong>{{if .Demand.AverageOfferPrice}}₦{{money0 .Demand.AverageOfferPrice}}{{else}}—{{end}}</strong></div>
                         <div><span>Negotiated units · 30 days</span><strong>{{printf "%.0f" .Demand.NegotiatedUnits}}</strong></div>
                         <div><span>Sell-through · 30 days</span><strong>{{if .Demand.LifecycleDataAvailable}}{{printf "%.0f%%" .Demand.SellThroughRate}}{{else}}Awaiting sales data{{end}}</strong></div>{{end}}
                         {{if .Demand.TimeToFirstOrderHours}}<div><span>Average time to first order</span><strong>{{printf "%.0f hours" .Demand.TimeToFirstOrderHours}}</strong></div>{{end}}
@@ -1099,7 +1099,7 @@
                             <div class="activity-value">
 
                                 <strong>
-                                    ₦{{printf "%.2f" .TotalPrice}}
+                                    ₦{{money .TotalPrice}}
                                 </strong>
 
                                 <span>

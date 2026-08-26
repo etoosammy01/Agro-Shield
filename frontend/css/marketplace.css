@@ -128,3 +128,5 @@
     background: #1b5e20;
 }
 .seller-identity,.negotiation-person{display:inline-flex;align-items:center;gap:8px}.seller-identity img,.negotiation-person img{width:28px;height:28px;border-radius:50%;object-fit:cover}
+.view-product{display:flex;align-items:center;justify-content:center;width:100%;min-height:44px;margin:14px 0 8px;padding:0 16px;border-radius:8px;background:#1f7a4d;color:#fff;text-decoration:none;font-weight:700;cursor:pointer;position:relative;z-index:2}.view-product:hover,.view-product:focus-visible{background:#14532d;color:#fff}
+.product-location{color:#53635a;font-size:.92rem}.product-location a{color:#176b42;font-weight:700;text-decoration:none}.product-location a:hover{text-decoration:underline}.product-location a span{font-size:1rem}

@@ -123,14 +123,14 @@
                             <p>
                                 Price per unit:
                                 <strong>
-                                    ₦{{printf "%.2f" .PricePerUnit}}
+                                    ₦{{money .PricePerUnit}}
                                 </strong>
                             </p>
 
                             <p class="total-price">
                                 Total:
                                 <strong>
-                                    ₦{{printf "%.2f" .TotalPrice}}
+                                    ₦{{money .TotalPrice}}
                                 </strong>
                             </p>
 
@@ -241,7 +241,7 @@
                             <p>
                                 Agreed Price:
                                 <strong>
-                                    ₦{{printf "%.2f" .PricePerUnit}}
+                                    ₦{{money .PricePerUnit}}
                                 </strong>
                             </p>
 
@@ -310,7 +310,7 @@
 
                 <p>
                     Negotiated total:
-                    <strong>₦{{printf "%.2f" .Total}}</strong>
+                    <strong>₦{{money .Total}}</strong>
                 </p>
 
                 <p>

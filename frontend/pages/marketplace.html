@@ -22,16 +22,6 @@
         {{if not .IsBuyer}}
             <a href="/storage">Storage</a>
         {{end}}
-
-<<<<<<< Updated upstream
-        <a href="/marketplace" aria-current="page">Marketplace</a>
-        <a href="/negotiations">Negotiations</a>
-        <a href="/cart">Cart</a>
-
-=======
-        <a href="/marketplace">Marketplace</a>
-        <a href="/chat">Chat</a>
->>>>>>> Stashed changes
         {{if not .IsBuyer}}
             <a href="/ai-assistant">AI Assistant</a>
         {{end}}
@@ -94,7 +84,7 @@
                 <h3>{{.Name}}</h3>
 
                 <p class="price">
-                    ₦{{printf "%.2f" .PricePerUnit}} / {{.Unit}}
+                    ₦{{money .PricePerUnit}} / {{.Unit}}
                 </p>
 
                 <p>
@@ -105,11 +95,17 @@
                     {{.Quantity}} {{.Unit}} available
                 </p>
 
+                <p class="product-location">
+                    <strong>Location:</strong>
+                    {{if .Location}}
+                        <a href="https://www.google.com/maps/search/?api=1&query={{urlquery .Location}}" target="_blank" rel="noopener" aria-label="View {{.Name}} location on Google Maps">{{.Location}} <span>↗</span></a>
+                    {{else}}
+                        Location not provided
+                    {{end}}
+                </p>
+
                 <!-- Opens the Product Details page. -->
-                <a
-                    href="/product?id={{.ID}}"
-                    class="view-product"
-                >
+                <a href="/product?id={{.ID}}" class="view-product" aria-label="View {{.Name}} product details">
                     View Product
                 </a>
 

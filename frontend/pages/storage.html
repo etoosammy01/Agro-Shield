@@ -64,7 +64,7 @@
                 <td>{{.Quantity}}</td>
                 <td>{{.Unit}}</td>
                 <td>{{.Location}}</td>
-                <td>₦{{printf "%.2f" .PricePerUnit}}</td>
+                <td>₦{{money .PricePerUnit}}</td>
                 <td>{{if .ListedForSale}}Yes{{else}}No{{end}}</td>
                 <td>{{.CreatedAt.Format "02 Jan 2006"}}</td>
                 <td class="product-actions">
@@ -103,14 +103,14 @@
             <label>Unit</label>
             <input type="text" name="unit" id="unit" value="{{if .EditCrop}}{{.EditCrop.Unit}}{{end}}" placeholder="Bags, Kg, Tons..." required>
 
-            <label>Storage Location</label>
-            <input type="text" name="location" id="location" value="{{if .EditCrop}}{{.EditCrop.Location}}{{end}}" placeholder="Warehouse A" required>
+            <label>Farm Location Name</label>
+            <input type="text" name="location" id="location" value="{{if .EditCrop}}{{.EditCrop.Location}}{{end}}" placeholder="e.g. Otukpo farm" required>
 
-            <input type="hidden" name="latitude" id="latitude">
-            <input type="hidden" name="longitude" id="longitude">
-            <input type="hidden" name="location_accuracy" id="location-accuracy">
+            <input type="hidden" name="latitude" id="latitude" value="{{if .EditCrop}}{{.EditCrop.Latitude}}{{end}}">
+            <input type="hidden" name="longitude" id="longitude" value="{{if .EditCrop}}{{.EditCrop.Longitude}}{{end}}">
+            <input type="hidden" name="location_accuracy" id="location-accuracy" value="{{if .EditCrop}}{{.EditCrop.LocationAccuracy}}{{end}}">
             <button type="button" id="capture-location">Capture farm location</button>
-            <small id="location-status">GPS location is required before saving.</small>
+            <small id="location-status">{{if and .EditCrop (hasCoordinates .EditCrop.Latitude .EditCrop.Longitude)}}Saved GPS location will be kept unless you capture it again.{{else}}Capture GPS while physically at the farm location.{{end}}</small>
 
             <label>Price per Unit (₦)</label>
             <input type="number" step="0.01" min="0" name="price" id="price" value="{{if .EditCrop}}{{.EditCrop.PricePerUnit}}{{end}}" placeholder="Required if listing for sale" required>

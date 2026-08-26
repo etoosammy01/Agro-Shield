@@ -47,7 +47,7 @@
         {{range .Messages}}
         <div class="chat-bubble {{if eq .SenderID $.UserID}}mine{{else}}theirs{{end}}">
             {{if eq .MessageType "offer"}}
-            <p class="offer">₦{{printf "%.2f" .OfferPrice}}</p>
+            <p class="offer">₦{{money .OfferPrice}}</p>
             <span class="offer-status offer-status-{{.OfferStatus}}">{{.OfferStatus}}</span>
             {{end}}
             {{if .Message}}<p class="text">{{.Message}}</p>{{end}}

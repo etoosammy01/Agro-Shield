@@ -46,7 +46,7 @@
 
         <div>
             <span>Total revenue</span>
-            <strong>₦{{printf "%.2f" .Total}}</strong>
+            <strong>₦{{money .Total}}</strong>
             <small>Across completed sales</small>
         </div>
 
@@ -80,7 +80,7 @@
                         <td>{{.CropName}}</td>
                         <td>{{.BuyerName}}</td>
                         <td>{{printf "%.0f" .Quantity}}</td>
-                        <td>₦{{printf "%.2f" .TotalPrice}}</td>
+                        <td>₦{{money .TotalPrice}}</td>
 
                         <td>
                             <span class="sale-status">

@@ -37,7 +37,7 @@
             {{end}}
 
             <p class="product-price">
-                ₦{{printf "%.0f" .Crop.PricePerUnit}} / {{.Crop.Unit}}
+                ₦{{money0 .Crop.PricePerUnit}} / {{.Crop.Unit}}
             </p>
 
             <p class="product-info">
@@ -47,10 +47,10 @@
 
             <p class="product-info">
                 <strong>Location:</strong>
-                {{if and (ne .Crop.Latitude 0) (ne .Crop.Longitude 0)}}
-                    <a class="map-location-link" href="https://www.google.com/maps/search/?api=1&query={{.Crop.Latitude}},{{.Crop.Longitude}}" target="_blank" rel="noopener">{{.Crop.Location}} <span>↗ View on map</span></a>
+                {{if .Crop.Location}}
+                    <a class="map-location-link" href="https://www.google.com/maps/search/?api=1&query={{urlquery .Crop.Location}}" target="_blank" rel="noopener">{{.Crop.Location}} <span>↗ View on map</span></a>
                 {{else}}
-                    {{.Crop.Location}}
+                    Location not provided
                 {{end}}
             </p>
 

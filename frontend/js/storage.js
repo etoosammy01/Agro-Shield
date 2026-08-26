@@ -35,6 +35,9 @@ function openModal(editProduct = null) {
         document.getElementById("quantity").value = editProduct.quantity;
         document.getElementById("unit").value = editProduct.unit;
         document.getElementById("location").value = editProduct.location;
+        document.getElementById("latitude").value = editProduct.latitude || "";
+        document.getElementById("longitude").value = editProduct.longitude || "";
+        document.getElementById("location-accuracy").value = editProduct.accuracy || "";
         document.getElementById("price").value = editProduct.price;
         document.getElementById("list-for-sale").checked = editProduct.listed === "true";
         imageInput.required = false;

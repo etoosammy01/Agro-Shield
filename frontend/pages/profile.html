@@ -92,7 +92,7 @@
                         <td>{{.CropName}}</td>
                         <td>{{.SellerName}}</td>
                         <td>{{.Quantity}}</td>
-                        <td>₦{{printf "%.2f" .TotalPrice}}</td>
+                        <td>₦{{money .TotalPrice}}</td>
                         <td>{{.CreatedAt.Format "02 Jan 2006"}}</td>
                     </tr>
                     {{end}}
@@ -126,7 +126,7 @@
                         <td>{{.Name}}</td>
                         <td>{{.Quantity}} {{.Unit}}</td>
                         <td>{{if .ListedForSale}}Yes{{else}}No{{end}}</td>
-                        <td>₦{{printf "%.2f" .PricePerUnit}}</td>
+                        <td>₦{{money .PricePerUnit}}</td>
                     </tr>
                     {{end}}
                 </tbody>
@@ -158,7 +158,7 @@
                         <td>{{.CropName}}</td>
                         <td>{{.BuyerName}}</td>
                         <td>{{.Quantity}}</td>
-                        <td>₦{{printf "%.2f" .TotalPrice}}</td>
+                        <td>₦{{money .TotalPrice}}</td>
                         <td>{{.CreatedAt.Format "02 Jan 2006"}}</td>
                     </tr>
                     {{end}}

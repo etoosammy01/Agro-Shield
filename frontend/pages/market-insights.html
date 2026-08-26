@@ -30,11 +30,11 @@
         {{range .Summaries}}
         <div class="produce-demand-summary">
             <strong>{{.ProduceType}}</strong><span>{{.Activity}} · {{.Views}} views · {{.CartAdds}} cart adds · {{.Orders}} orders</span>
-            <span>Your average price: ₦{{printf "%.0f" .FarmerPrice}}</span>
-            {{if .PriceAvailable}}<span>Independent local median: ₦{{printf "%.0f" .LocalPriceMedian}}</span>{{else}}<span>No independent local price comparison is available yet.</span>{{end}}
-            {{if .StateListings}}<span>State: {{.StateListings}} other listings · median ₦{{printf "%.0f" .StatePriceMedian}}</span>{{end}}
-            {{if .NearbyListings}}<span>Nearby LGAs: {{.NearbyListings}} other listings · median ₦{{printf "%.0f" .NearbyPriceMedian}}</span>{{end}}
-            {{if .NationalListings}}<span>National: {{.NationalListings}} other listings · median ₦{{printf "%.0f" .NationalPriceMedian}}</span>{{end}}
+            <span>Your average price: ₦{{money0 .FarmerPrice}}</span>
+            {{if .PriceAvailable}}<span>Independent local median: ₦{{money0 .LocalPriceMedian}}</span>{{else}}<span>No independent local price comparison is available yet.</span>{{end}}
+            {{if .StateListings}}<span>State: {{.StateListings}} other listings · median ₦{{money0 .StatePriceMedian}}</span>{{end}}
+            {{if .NearbyListings}}<span>Nearby LGAs: {{.NearbyListings}} other listings · median ₦{{money0 .NearbyPriceMedian}}</span>{{end}}
+            {{if .NationalListings}}<span>National: {{.NationalListings}} other listings · median ₦{{money0 .NationalPriceMedian}}</span>{{end}}
             <small>{{.Recommendation}}</small>
         </div>
         {{else}}<div class="empty-state"><p>Add produce to storage to begin receiving market insights.</p></div>{{end}}
