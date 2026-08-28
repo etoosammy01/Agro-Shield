@@ -27,6 +27,8 @@ func NewCropService(repo *repository.CropRepository) *CropService {
 //
 // Responsibility:
 // - Validate the product information.
+// - Require at least one product picture.
+// - Allow multiple product pictures.
 // - Create the product through the repository.
 func (s *CropService) AddCrop(
 	farmerID int,
@@ -36,7 +38,7 @@ func (s *CropService) AddCrop(
 	quantity float64,
 	price float64,
 	listForSale bool,
-	imageURL string,
+	imageURLs []string,
 	latitude, longitude, accuracy float64,
 ) error {
 
@@ -52,10 +54,6 @@ func (s *CropService) AddCrop(
 		return errors.New("crop name is required")
 	}
 
-	if strings.TrimSpace(imageURL) == "" {
-		return errors.New("crop picture is required")
-	}
-
 	if unit == "" {
 		return errors.New("unit is required")
 	}
@@ -63,7 +61,30 @@ func (s *CropService) AddCrop(
 	if location == "" {
 		return errors.New("location is required")
 	}
-	if latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || (latitude == 0 && longitude == 0) || accuracy <= 0 {
+
+	// A product must have at least one picture.
+	// More pictures are allowed.
+	var validImages []string
+
+	for _, imageURL := range imageURLs {
+		imageURL = strings.TrimSpace(imageURL)
+
+		if imageURL != "" {
+			validImages = append(validImages, imageURL)
+		}
+	}
+
+	if len(validImages) == 0 {
+		return errors.New("at least one crop picture is required")
+	}
+
+	// Validate GPS location.
+	if latitude < -90 ||
+		latitude > 90 ||
+		longitude < -180 ||
+		longitude > 180 ||
+		(latitude == 0 && longitude == 0) ||
+		accuracy <= 0 {
 		return errors.New("valid farm GPS location is required")
 	}
 
@@ -75,19 +96,31 @@ func (s *CropService) AddCrop(
 		return errors.New("price must be greater than zero to list for sale")
 	}
 
+	// Create the crop record.
 	crop := &models.Crop{
-		FarmerID:      farmerID,
-		Name:          name,
-		Quantity:      quantity,
-		Unit:          unit,
-		Location:      location,
-		PricePerUnit:  price,
-		ListedForSale: listForSale,
-		ImageURL:      imageURL,
-		Latitude:      latitude, Longitude: longitude, LocationAccuracy: accuracy,
+		FarmerID:         farmerID,
+		Name:             name,
+		Quantity:         quantity,
+		Unit:             unit,
+		Location:         location,
+		PricePerUnit:     price,
+		ListedForSale:    listForSale,
+		ImageURL:         validImages[0],
+		Latitude:         latitude,
+		Longitude:        longitude,
+		LocationAccuracy: accuracy,
 	}
 
-	return s.repo.Create(crop)
+	if err := s.repo.Create(crop); err != nil {
+		return err
+	}
+
+	// Save all product pictures.
+	if err := s.repo.AddImages(crop.ID, validImages); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // MyCrops returns all products belonging to a farmer.
@@ -104,17 +137,11 @@ func (s *CropService) MyCrops(farmerID int) ([]models.Crop, error) {
 
 // AvailableCrops returns products currently available
 // for buyers in the marketplace.
-//
-// Responsibility:
-// - Return only products that are listed and have quantity remaining.
 func (s *CropService) AvailableCrops() ([]models.Crop, error) {
 	return s.repo.ListAvailable()
 }
 
 // GetCrop retrieves one product by ID.
-//
-// Responsibility:
-// - Return the product requested by the caller.
 func (s *CropService) GetCrop(cropID int) (*models.Crop, error) {
 	if cropID <= 0 {
 		return nil, errors.New("invalid crop ID")
@@ -123,12 +150,26 @@ func (s *CropService) GetCrop(cropID int) (*models.Crop, error) {
 	return s.repo.GetByID(cropID)
 }
 
+// GetCropImages retrieves all images belonging to a product.
+//
+// Responsibility:
+// - Return all product pictures.
+// - Keep image retrieval inside the service layer.
+func (s *CropService) GetCropImages(cropID int) ([]models.CropImage, error) {
+	if cropID <= 0 {
+		return nil, errors.New("invalid crop ID")
+	}
+
+	return s.repo.ListImages(cropID)
+}
+
 // UpdateCrop updates a farmer's own product.
 //
 // Responsibility:
 // - Verify the farmer owns the product.
 // - Validate the new product information.
-// - Save the changes.
+// - Allow multiple product pictures.
+// - Keep existing pictures when no new pictures are supplied.
 func (s *CropService) UpdateCrop(
 	farmerID int,
 	cropID int,
@@ -138,7 +179,7 @@ func (s *CropService) UpdateCrop(
 	quantity float64,
 	price float64,
 	listForSale bool,
-	imageURL string,
+	imageURLs []string,
 	latitude, longitude, accuracy float64,
 ) error {
 
@@ -165,7 +206,14 @@ func (s *CropService) UpdateCrop(
 	if location == "" {
 		return errors.New("location is required")
 	}
-	if latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || (latitude == 0 && longitude == 0) || accuracy <= 0 {
+
+	// Validate GPS location.
+	if latitude < -90 ||
+		latitude > 90 ||
+		longitude < -180 ||
+		longitude > 180 ||
+		(latitude == 0 && longitude == 0) ||
+		accuracy <= 0 {
 		return errors.New("valid farm GPS location is required")
 	}
 
@@ -177,7 +225,7 @@ func (s *CropService) UpdateCrop(
 		return errors.New("price must be greater than zero to list for sale")
 	}
 
-	// Make sure this product belongs to the logged-in farmer.
+	// Find the existing product.
 	crop, err := s.repo.GetByID(cropID)
 	if err != nil {
 		return err
@@ -187,24 +235,52 @@ func (s *CropService) UpdateCrop(
 		return errors.New("crop not found")
 	}
 
+	// Make sure the logged-in farmer owns the product.
 	if crop.FarmerID != farmerID {
 		return errors.New("you are not allowed to modify this product")
 	}
 
+	// Update product information.
 	crop.Name = name
 	crop.Unit = unit
 	crop.Location = location
 	crop.Quantity = quantity
 	crop.PricePerUnit = price
 	crop.ListedForSale = listForSale
-	crop.Latitude, crop.Longitude, crop.LocationAccuracy = latitude, longitude, accuracy
+	crop.Latitude = latitude
+	crop.Longitude = longitude
+	crop.LocationAccuracy = accuracy
 
-	// Only replace the image when a new image was provided.
-	if strings.TrimSpace(imageURL) != "" {
-		crop.ImageURL = imageURL
+	// Process new pictures.
+	var validImages []string
+
+	for _, imageURL := range imageURLs {
+		imageURL = strings.TrimSpace(imageURL)
+
+		if imageURL != "" {
+			validImages = append(validImages, imageURL)
+		}
 	}
 
-	return s.repo.Update(crop)
+	// If new pictures were supplied,
+	// make the first one the main product picture.
+	if len(validImages) > 0 {
+		crop.ImageURL = validImages[0]
+	}
+
+	// Update the main crop record.
+	if err := s.repo.Update(crop); err != nil {
+		return err
+	}
+
+	// Save any new pictures.
+	if len(validImages) > 0 {
+		if err := s.repo.AddImages(crop.ID, validImages); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // UnlistCrop removes a farmer's product from the marketplace.
@@ -292,13 +368,8 @@ func (s *CropService) RelistCrop(
 // DeleteCrop permanently deletes a farmer's product.
 //
 // Responsibility:
-//   - Verify ownership.
-//   - Prevent deletion of products that already have
-//     business history.
-//
-// NOTE:
-// The transaction-history protection will be expanded when
-// we connect the crop lifecycle to orders and negotiations.
+// - Verify ownership.
+// - Delete the product through the repository.
 func (s *CropService) DeleteCrop(
 	farmerID int,
 	cropID int,
@@ -326,4 +397,13 @@ func (s *CropService) DeleteCrop(
 	}
 
 	return s.repo.Delete(cropID, farmerID)
+}
+
+// ListImages retrieves all images belonging to a crop.
+func (s *CropService) ListImages(cropID int) ([]models.CropImage, error) {
+	if cropID <= 0 {
+		return nil, errors.New("invalid crop ID")
+	}
+
+	return s.repo.ListImages(cropID)
 }

@@ -27,8 +27,16 @@ type Crop struct {
 	// as a marketplace listing.
 	ListedForSale bool
 
-	// Optional image representing the product.
-	ImageURL string
+	// Product images.
+//
+// ImageURL is kept temporarily for backward compatibility
+// with the existing crops.image_url column.
+//
+// Images contains all product pictures.
+// A product must have at least one image when created.
+ImageURL string
+Images   []CropImage
+
 
 	// Timestamps for tracking the listing lifecycle.
 	CreatedAt                              time.Time
@@ -40,4 +48,13 @@ type Crop struct {
 	// results. It is not stored directly on the crops table.
 	SellerName     string
 	SellerPhotoURL string
+}
+// CropImage represents one picture belonging to a crop/product.
+type CropImage struct {
+	ID        int
+	CropID    int
+	ImageURL  string
+	IsPrimary bool
+	SortOrder int
+	CreatedAt time.Time
 }

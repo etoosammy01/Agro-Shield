@@ -13,13 +13,29 @@
 <body>
 
     <header class="navbar">
-        <a class="logo" href="/dashboard"><img src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield"></a>
+
+        <a class="logo" href="/dashboard">
+            <img
+                src="/static/assets/logo/Agro-Shield_logo.png"
+                alt="Agro-Shield"
+            >
+        </a>
+
         <nav aria-label="Main navigation">
-            <a href="/dashboard">Dashboard</a><a href="/storage">Storage</a><a href="/marketplace" aria-current="page">Marketplace</a><a href="/negotiations">Negotiations</a><a href="/cart">Cart</a><a href="/ai-assistant">AI Assistant</a><a href="/profile">Profile</a><a href="/notifications">Notifications</a><a href="/logout">Logout</a>
+            <a href="/dashboard">Dashboard</a>
+            <a href="/storage">Storage</a>
+            <a href="/marketplace" aria-current="page">Marketplace</a>
+            <a href="/negotiations">Negotiations</a>
+            <a href="/cart">Cart</a>
+            <a href="/ai-assistant">AI Assistant</a>
+            <a href="/profile">Profile</a>
+            <a href="/notifications">Notifications</a>
+            <a href="/logout">Logout</a>
         </nav>
+
     </header>
 
-    <!-- Product Details Page: displays information about one product. -->
+
     <main class="product-page">
 
         <section class="product-card">
@@ -28,45 +44,123 @@
                 {{.Crop.Name}}
             </h1>
 
-            {{if .Crop.ImageURL}}
-                <img
-                    class="product-image"
-                    src="{{.Crop.ImageURL}}"
-                    alt="{{.Crop.Name}}"
-                >
-            {{end}}
+
+            <!-- PRODUCT IMAGES -->
+
+            <div class="product-gallery">
+
+                {{if .Images}}
+
+                    {{range .Images}}
+
+                        <div class="product-gallery-item">
+
+                            <img
+                                class="product-image"
+                                src="{{.ImageURL}}"
+                                alt="{{$.Crop.Name}}"
+                                loading="lazy"
+                            >
+
+                        </div>
+
+                    {{end}}
+
+                {{else}}
+
+                    {{if .Crop.ImageURL}}
+
+                        <div class="product-gallery-item">
+
+                            <img
+                                class="product-image"
+                                src="{{.Crop.ImageURL}}"
+                                alt="{{.Crop.Name}}"
+                            >
+
+                        </div>
+
+                    {{else}}
+
+                        <div class="product-no-image">
+                            <p>No product image available.</p>
+                        </div>
+
+                    {{end}}
+
+                {{end}}
+
+            </div>
+
+
+            <!-- PRICE -->
 
             <p class="product-price">
                 ₦{{money0 .Crop.PricePerUnit}} / {{.Crop.Unit}}
             </p>
+
+
+            <!-- QUANTITY -->
 
             <p class="product-info">
                 <strong>Available:</strong>
                 {{.Crop.Quantity}} {{.Crop.Unit}}
             </p>
 
+
+            <!-- LOCATION -->
+
             <p class="product-info">
+
                 <strong>Location:</strong>
+
                 {{if .Crop.Location}}
-                    <a class="map-location-link" href="https://www.google.com/maps/search/?api=1&query={{urlquery .Crop.Location}}" target="_blank" rel="noopener">{{.Crop.Location}} <span>↗ View on map</span></a>
+
+                    <a
+                        class="map-location-link"
+                        href="https://www.google.com/maps/search/?api=1&query={{urlquery .Crop.Location}}"
+                        target="_blank"
+                        rel="noopener"
+                    >
+                        {{.Crop.Location}}
+                        <span>↗ View on map</span>
+                    </a>
+
                 {{else}}
+
                     Location not provided
+
                 {{end}}
+
             </p>
 
+
+            <!-- PRODUCT STATUS -->
+
             {{if .Crop.ListedForSale}}
+
                 <span class="product-status available">
                     Available for Sale
                 </span>
+
             {{else}}
+
                 <span class="product-status not-available">
                     Not Available
                 </span>
+
             {{end}}
+
 
             <br>
 
-            <a class="back-button" href="/marketplace">
+
+            <!-- BACK BUTTON -->
+
+            <a
+                class="back-button"
+                href="/marketplace"
+            >
                 Back to Marketplace
             </a>
 
@@ -74,8 +168,9 @@
 
     </main>
 
-    <script src="/static/js/product.js"></script>
 
-<script src="/static/js/navigation.js"></script>
+    <script src="/static/js/product.js"></script>
+    <script src="/static/js/navigation.js"></script>
+
 </body>
 </html>
