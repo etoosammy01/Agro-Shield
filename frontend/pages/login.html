@@ -1,96 +1,158 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Login | Agro-Shield</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<link rel="stylesheet" href="/static/css/style.css">
-<link rel="stylesheet" href="/static/css/login.css">
+    <title>Login | Agro-Shield</title>
 
-<!-- Font Awesome -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/login.css">
+
+    <!-- Font Awesome -->
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    >
 </head>
 
 <body>
 
 <div class="auth-container">
 
-<div class="auth-left">
+    <!-- =========================
+         LEFT SIDE
+    ========================== -->
+    <div class="auth-left">
 
-<img
-id="auth-background"
-class="background-image"
-src="/static/assets/images/login-image1.jpeg"
-alt="Farmer"
->
+        <img
+            id="auth-background"
+            class="background-image"
+            src="/static/assets/images/login-image1.jpeg"
+            alt="Farmer"
+        >
 
-<div class="overlay"></div>
+        <div class="overlay"></div>
 
-<div class="left-content">
+        <div class="left-content">
 
-<h1>Welcome Back</h1>
+            <h1>Welcome Back</h1>
 
-<p>
-            Sign in to continue managing your farm,
-            monitor produce, access the marketplace,
-            and use AI-powered farming assistance.
-</p>
+            <p>
+                Sign in to continue managing your farm,
+                monitor produce, access the marketplace,
+                and use AI-powered farming assistance.
+            </p>
 
-</div>
+        </div>
 
-</div>
+    </div>
 
-<div class="auth-right">
 
-<img class="auth-brand" src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield">
+    <!-- =========================
+         RIGHT SIDE
+    ========================== -->
+    <div class="auth-right">
 
-<form id="login-form" method="POST" action="/login">
+        <!-- Logo / Brand Area -->
+        <div class="brand-area">
 
-<h2>Login</h2>
+            <!-- Green upward-opening shape -->
+            <div class="brand-roof"></div>
+
+            <!-- Agro-Shield logo -->
+            <img
+                class="auth-brand"
+                src="/static/assets/logo/Agro-Shield_logo.png"
+                alt="Agro-Shield"
+            >
+
+        </div>
+
+
+        <!-- Login Form -->
+        <form id="login-form" method="POST" action="/login">
+
+            <h2>Login</h2>
 
             {{if .Error}}
-<p class="message" style="color:red;">{{.Error}}</p>
+            <p class="message">{{.Error}}</p>
             {{end}}
 
-<label>Phone Number</label>
-<input
-type="tel"
-id="phone"
-name="phone"
-placeholder="Enter your phone number"
-required
->
 
-<label>Password</label>
-<div class="password-wrapper">
-<input
-type="password"
-id="password"
-name="password"
-placeholder="Enter your password"
-required
->
-<i
-class="fa-solid fa-eye toggle-password"
-id="toggle-password"
-></i>
-</div>
+            <!-- Phone Number -->
+            <label for="phone">
+                Phone Number
+            </label>
 
-<button type="submit">Sign In</button>
+            <div class="input-wrapper">
 
-<p><a href="/forgot-password">Forgot password?</a></p>
+                <i class="fa-solid fa-phone input-icon"></i>
 
-<p>
+                <input
+                    type="tel"
+                    id="phone"
+                    name="phone"
+                    placeholder="Enter your phone number"
+                    required
+                >
+
+            </div>
+
+
+            <!-- Password -->
+            <label for="password">
+                Password
+            </label>
+
+            <div class="password-wrapper">
+
+                <i class="fa-solid fa-lock input-icon"></i>
+
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="Enter your password"
+                    required
+                >
+
+                <i
+                    class="fa-solid fa-eye toggle-password"
+                    id="toggle-password"
+                ></i>
+
+            </div>
+
+
+            <!-- Submit -->
+            <button type="submit">
+                Sign In
+            </button>
+
+
+            <!-- Forgot Password -->
+            <p class="forgot-password">
+                <a href="/forgot-password">
+                    Forgot password?
+                </a>
+            </p>
+
+
+            <!-- Register -->
+            <p class="register-link">
                 Don't have an account?
-<a href="/register">Create one</a>
-</p>
+                <a href="/register">
+                    Create one
+                </a>
+            </p>
 
-</form>
+        </form>
+
+    </div>
 
 </div>
 
-</div>
 
 <script src="/static/js/login.js"></script>
 

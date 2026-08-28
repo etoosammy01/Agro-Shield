@@ -1,152 +1,709 @@
-*{
-margin:0;
-padding:0;
-box-sizing:border-box;
+/* =========================================
+   RESET
+========================================= */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
 
-html, body{
-height:100%;
+html,
+body {
+    width: 100%;
+    min-height: 100%;
 }
 
-.auth-container{
-    display:grid;
-grid-template-columns:1fr 1fr;
-min-height:100vh;
+
+/* =========================================
+   PAGE CONTAINER
+========================================= */
+
+.auth-container {
+    display: grid;
+
+    /*
+        Target design:
+        Left = approximately 42%
+        Right = approximately 58%
+    */
+    grid-template-columns: 42% 58%;
+
+    min-height: 100vh;
 }
 
-.auth-left{
-position:relative;
-overflow:hidden;
-background:green; /* fallback while image loads */
-color:white;
-display:flex;
-flex-direction:column;
-justify-content:center;
-padding:80px;
+
+/* =========================================
+   LEFT SIDE
+========================================= */
+
+.auth-left {
+    position: relative;
+
+    overflow: hidden;
+
+    background: #1b7d3a;
+
+    color: white;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+
+    padding: 80px;
 }
 
-.background-image{
-position:absolute;
-top:0;
-left:0;
-width:100%;
-height:100%;
-object-fit:cover;
-transition:opacity .4s ease;
-z-index:0;
+
+/* Background image */
+
+.background-image {
+    position: absolute;
+
+    top: 0;
+    left: 0;
+
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+
+    z-index: 0;
 }
 
-.overlay{
-position:absolute;
-top:0;
-left:0;
-width:100%;
-height:100%;
-background:rgba(0,100,0,.75);
-z-index:1;
+
+/* Green image overlay */
+
+.overlay {
+    position: absolute;
+
+    top: 0;
+    left: 0;
+
+    width: 100%;
+    height: 100%;
+
+    background: rgba(0, 100, 0, 0.75);
+
+    z-index: 1;
 }
 
-.left-content{
-position:relative;
-z-index:2;
+
+/* Left text */
+
+.left-content {
+    position: relative;
+
+    max-width: 560px;
+
+    z-index: 2;
 }
 
-.auth-left h1{
-font-size:60px;
-margin-bottom:20px;
+
+.auth-left h1 {
+    font-size: clamp(42px, 4vw, 62px);
+
+    line-height: 1.1;
+
+    margin-bottom: 25px;
+
+    font-weight: 700;
 }
 
-.auth-left p{
-font-size:22px;
-line-height:1.7;
+
+.auth-left p {
+    font-size: 21px;
+
+    line-height: 1.7;
+
+    max-width: 540px;
 }
 
-.auth-right{
-display:flex;
-justify-content:center;
-align-items:center;
-background:#f4f4f4;
-padding:50px;
+
+/* =========================================
+   RIGHT SIDE
+========================================= */
+
+.auth-right {
+    position: relative;
+
+    min-height: auto;
+
+    display: flex;
+    flex-direction: column;
+
+    justify-content: center;
+    align-items: center;
+
+    background: #f7f8f7;
+
+    padding: 25px 40px;
+
+    overflow: hidden;
 }
 
-form{
-width:100%;
-max-width:420px;
-background:white;
-padding:50px;
-border-radius:16px;
-box-shadow:0 10px 40px rgba(0,0,0,.08);
+
+/* =========================================
+   BRAND AREA
+========================================= */
+
+.brand-area {
+    position: relative;
+
+    width: 100%;
+
+    max-width: 760px;
+
+    height: 290px;
+
+    display: flex;
+
+    justify-content: center;
+    align-items: center;
+
+    flex-shrink: 0;
+
+    margin-bottom: -10px;
+
+    z-index: 1;
 }
 
-form h2{
-margin-bottom:30px;
-font-size:36px;
+
+/* =========================================
+   UPWARD-OPENING GREEN SHAPE
+========================================= */
+
+.brand-roof {
+    position: absolute;
+
+    /*
+        The shape is intentionally much
+        wider than the logo.
+    */
+
+    width: 780px;
+    height: 310px;
+
+    top: -20px;
+
+    left: 50%;
+
+    transform: translateX(-50%);
+
+    /*
+        Creates the large upward-opening
+        geometric roof shape.
+    */
+    clip-path: polygon(
+        50% 0%,
+        100% 82%,
+        100% 85%,
+        50% 8%,
+        0% 85%,
+        0% 82%
+    );
+
+    background: #4caf50;
+
+    z-index: 0;
 }
 
-label{
-display:block;
-margin-top:20px;
-margin-bottom:8px;
-font-weight:bold;
+
+/*
+    Inner lighter line.
+
+    This gives the shape the second,
+    subtle line visible in your reference.
+*/
+
+.brand-roof::after {
+    content: "";
+
+    position: absolute;
+
+    width: 750px;
+    height: 290px;
+
+    top: 12px;
+    left: 50%;
+
+    transform: translateX(-50%);
+
+    clip-path: polygon(
+        50% 0%,
+        100% 82%,
+        100% 84%,
+        50% 7%,
+        0% 84%,
+        0% 82%
+    );
+
+    background: #e7f0e7;
 }
 
-input{
-width:100%;
-padding:15px;
-border:1px solid lightgray;
-border-radius:8px;
-font-size:16px;
+
+/* =========================================
+   AGRO-SHIELD LOGO
+========================================= */
+
+.auth-brand {
+    position: relative;
+
+    width: 250px;
+    max-width: 70%;
+
+    height: auto;
+
+    object-fit: contain;
+
+    z-index: 2;
+
+    /*
+        Moves the logo slightly downward
+        from the peak.
+    */
+    margin-top: 25px;
+
+    filter: drop-shadow(
+        0 5px 8px rgba(0, 0, 0, 0.08)
+    );
 }
 
-input:focus{
-outline:none;
-border-color:green;
+
+/* =========================================
+   LOGIN FORM
+========================================= */
+
+.auth-right form {
+    position: relative;
+
+    width: 100%;
+
+    max-width: 570px;
+
+    background: #ffffff;
+
+    padding: 52px 46px 48px;
+
+    border-radius: 20px;
+
+    border: 1px solid rgba(0, 0, 0, 0.03);
+
+    box-shadow:
+        0 12px 35px rgba(0, 0, 0, 0.08);
+
+    z-index: 3;
 }
 
-button{
-width:100%;
-margin-top:30px;
-padding:16px;
-font-size:18px;
-border:none;
-border-radius:8px;
-background:green;
-color:white;
-cursor:pointer;
+
+/* =========================================
+   FORM HEADING
+========================================= */
+
+.auth-right form h2 {
+    text-align: center;
+
+    color: #123d20;
+
+    font-size: 42px;
+
+    line-height: 1.2;
+
+    margin-bottom: 38px;
+
+    font-weight: 700;
 }
 
-button:hover{
-background:darkgreen;
+
+/*
+    Small green line underneath Login
+*/
+
+.auth-right form h2::after {
+    content: "";
+
+    display: block;
+
+    width: 65px;
+    height: 3px;
+
+    margin: 14px auto 0;
+
+    background: #43a047;
+
+    border-radius: 10px;
 }
 
-button:disabled{
-opacity:.7;
-cursor:not-allowed;
+
+/* =========================================
+   LABELS
+========================================= */
+
+.auth-right form label {
+    display: block;
+
+    margin-top: 22px;
+
+    margin-bottom: 9px;
+
+    color: #202020;
+
+    font-size: 17px;
+
+    font-weight: 600;
 }
 
-form p{
-margin-top:25px;
-text-align:center;
-}
 
-.message{
-margin-top:20px;
-font-weight:bold;
-}
+/* =========================================
+   INPUT WRAPPER
+========================================= */
 
+.input-wrapper,
 .password-wrapper {
-position: relative;
+    position: relative;
+
+    width: 100%;
 }
 
+
+/* =========================================
+   INPUTS
+========================================= */
+
+.input-wrapper input,
 .password-wrapper input {
-padding-right: 2.5rem;
+    width: 100%;
+
+    height: 62px;
+
+    padding: 0 50px 0 58px;
+
+    border: 1.5px solid #d7dcd8;
+
+    border-radius: 13px;
+
+    background: #ffffff;
+
+    color: #222;
+
+    font-size: 16px;
+
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
 }
+
+
+.input-wrapper input::placeholder,
+.password-wrapper input::placeholder {
+    color: #a5aaa6;
+}
+
+
+/* Focus */
+
+.input-wrapper input:focus,
+.password-wrapper input:focus {
+    outline: none;
+
+    border-color: #4caf50;
+
+    box-shadow:
+        0 0 0 3px rgba(76, 175, 80, 0.12);
+}
+
+
+/* =========================================
+   INPUT ICONS
+========================================= */
+
+.input-icon {
+    position: absolute;
+
+    left: 15px;
+
+    top: 50%;
+
+    transform: translateY(-50%);
+
+    width: 34px;
+    height: 34px;
+
+    display: flex;
+
+    justify-content: center;
+    align-items: center;
+
+    background: #eef7ee;
+
+    border-radius: 9px;
+
+    color: #398d3f;
+
+    font-size: 15px;
+
+    z-index: 2;
+
+    pointer-events: none;
+}
+
+
+/* =========================================
+   PASSWORD EYE
+========================================= */
 
 .toggle-password {
-color: #888;
-position: absolute;
-right: 12px;
-top: 50%;
-transform: translateY(-50%);
-cursor: pointer;
+    position: absolute;
+
+    right: 17px;
+
+    top: 50%;
+
+    transform: translateY(-50%);
+
+    color: #398d3f;
+
+    font-size: 19px;
+
+    cursor: pointer;
+
+    z-index: 3;
+}
+
+
+.toggle-password:hover {
+    color: #236c2d;
+}
+
+
+/* =========================================
+   SIGN IN BUTTON
+========================================= */
+
+.auth-right form button {
+    width: 100%;
+
+    height: 62px;
+
+    margin-top: 32px;
+
+    padding: 0 20px;
+
+    border: none;
+
+    border-radius: 13px;
+
+    background: #248c2b;
+
+    color: #ffffff;
+
+    font-size: 19px;
+
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition:
+        background 0.2s ease,
+        transform 0.15s ease,
+        box-shadow 0.2s ease;
+}
+
+
+.auth-right form button:hover {
+    background: #1d7424;
+
+    box-shadow:
+        0 7px 18px rgba(36, 140, 43, 0.22);
+}
+
+
+.auth-right form button:active {
+    transform: translateY(1px);
+}
+
+
+.auth-right form button:disabled {
+    opacity: 0.7;
+
+    cursor: not-allowed;
+}
+
+
+/* =========================================
+   LINKS
+========================================= */
+
+.auth-right form p {
+    text-align: center;
+}
+
+
+/* Forgot password */
+
+.forgot-password {
+    margin-top: 32px;
+}
+
+
+.forgot-password a,
+.register-link a {
+    color: #27852d;
+
+    text-decoration: underline;
+
+    font-weight: 500;
+}
+
+
+.forgot-password a:hover,
+.register-link a:hover {
+    color: #185e1e;
+}
+
+
+/* Register */
+
+.register-link {
+    margin-top: 34px;
+
+    color: #333;
+
+    font-size: 16px;
+}
+
+
+/* =========================================
+   ERROR MESSAGE
+========================================= */
+
+.auth-right form .message {
+    margin-bottom: 15px;
+
+    color: #d32f2f;
+
+    text-align: center;
+
+    font-weight: 600;
+}
+
+
+/* =========================================
+   RESPONSIVE DESIGN
+========================================= */
+
+@media (max-width: 1000px) {
+
+    .auth-container {
+        grid-template-columns: 1fr;
+    }
+
+    .auth-left {
+        min-height: 400px;
+
+        padding: 60px;
+    }
+
+    .auth-right {
+        min-height: auto;
+
+        padding: 50px 25px 70px;
+    }
+
+    .brand-area {
+        height: 260px;
+    }
+
+    .brand-roof {
+        width: 700px;
+    }
+
+    .brand-roof::after {
+        width: 670px;
+    }
+
+}
+
+
+/* =========================================
+   MOBILE
+========================================= */
+
+@media (max-width: 600px) {
+
+    .auth-left {
+        min-height: 350px;
+
+        padding: 40px 30px;
+
+        justify-content: flex-end;
+    }
+
+    .auth-left h1 {
+        font-size: 40px;
+    }
+
+    .auth-left p {
+        font-size: 17px;
+
+        line-height: 1.6;
+    }
+
+
+    .auth-right {
+        padding: 20px 18px 50px;
+    }
+
+
+    .brand-area {
+        height: 220px;
+    }
+
+
+    .brand-roof {
+        width: 560px;
+
+        height: 240px;
+    }
+
+
+    .brand-roof::after {
+        width: 535px;
+
+        height: 225px;
+    }
+
+
+    .auth-brand {
+        width: 205px;
+
+        margin-top: 25px;
+    }
+
+
+    .auth-right form {
+        padding: 38px 25px 35px;
+
+        border-radius: 16px;
+    }
+
+
+    .auth-right form h2 {
+        font-size: 34px;
+
+        margin-bottom: 30px;
+    }
+
+
+    .input-wrapper input,
+    .password-wrapper input {
+        height: 57px;
+
+        font-size: 15px;
+    }
+
+
+    .auth-right form button {
+        height: 57px;
+    }
+
 }
