@@ -347,11 +347,14 @@ func main() {
 	// http://localhost:8080
 	// ============================================================
 
-	log.Println(
-		"Server Starting on: http://localhost:8080...",
-	)
+	port := os.Getenv("PORT")
+    if port == "" {
+       port = "8080"
+    }
 
-	if err := http.ListenAndServe(":8080", nil); err != nil {
-		log.Println(err)
-	}
+    log.Println("Server starting on port:", port)
+
+    if err := http.ListenAndServe(":"+port, nil); err != nil {
+       log.Println(err)
+    }
 }
