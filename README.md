@@ -270,6 +270,10 @@ Agro-Shield/
 │   └── go.sum
 │
 ├── frontend/
+│   ├── assets
+│   ├── css
+│   ├── js
+│   └── pages
 │
 ├── docs/
 │
@@ -379,7 +383,7 @@ Planned support includes:
 
 * English
 * Idoma
-* Egede
+* Igede
 * Apa
 * Ufia
 * Other relevant local languages
