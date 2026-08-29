@@ -1,370 +1,737 @@
 document.addEventListener("DOMContentLoaded", () => {
+    /* ============================================================
+       ELEMENTS
+       ============================================================ */
+
+    const form = document.getElementById("ai-form");
+    const submitStatus = document.getElementById("submit-status");
+
     const imageButton = document.getElementById("add-image");
     const imageInput = document.getElementById("image");
-    const imageStatus = document.getElementById("image-status");
     const imagePreview = document.getElementById("image-preview");
     const imageWrap = document.getElementById("image-preview-wrap");
+    const imageStatus = document.getElementById("image-status");
     const removeImage = document.getElementById("remove-image");
-    if (imageButton && imageInput) {
-        const menu = document.getElementById("attachment-menu");
-        imageButton.addEventListener("click", () => { if (menu) menu.hidden = !menu.hidden; });
-        document.getElementById("upload-photo")?.addEventListener("click", () => imageInput.click());
-        document.getElementById("take-photo")?.addEventListener("click", () => { imageInput.setAttribute("capture", "environment"); imageInput.click(); });
-        document.getElementById("upload-video")?.addEventListener("click", () => document.getElementById("video")?.click());
-        document.getElementById("record-video")?.addEventListener("click", () => document.getElementById("start-video")?.click());
-        imageInput.addEventListener("change", () => {
-            if (imageInput.files.length) { imageStatus.textContent = `${imageInput.files[0].name} attached`; imagePreview.src = URL.createObjectURL(imageInput.files[0]); imageWrap.hidden = false; }
+
+    const videoInput = document.getElementById("video");
+
+    const attachmentMenu = document.getElementById("attachment-menu");
+    const uploadPhoto = document.getElementById("upload-photo");
+    const takePhoto = document.getElementById("take-photo");
+    const uploadVideo = document.getElementById("upload-video");
+    const recordVideo = document.getElementById("record-video");
+
+    const thinkToggle = document.getElementById("think-toggle");
+    const thinkingInput = document.getElementById("thinking");
+
+
+    /* ============================================================
+       ATTACHMENT MENU
+       ============================================================ */
+
+    if (imageButton && attachmentMenu) {
+        imageButton.addEventListener("click", (event) => {
+            event.stopPropagation();
+            attachmentMenu.hidden = !attachmentMenu.hidden;
         });
-        removeImage.addEventListener("click", () => { imageInput.value = ""; imageWrap.hidden = true; imagePreview.removeAttribute("src"); imageStatus.textContent = ""; });
+
+        document.addEventListener("click", (event) => {
+            if (
+                !attachmentMenu.contains(event.target) &&
+                event.target !== imageButton
+            ) {
+                attachmentMenu.hidden = true;
+            }
+        });
     }
-    const thinkToggle = document.getElementById("think-toggle"), thinking = document.getElementById("thinking");
-    thinkToggle?.addEventListener("click", () => { const on = thinkToggle.getAttribute("aria-pressed") !== "true"; thinkToggle.setAttribute("aria-pressed", String(on)); thinking.value = String(on); });
-    const form = document.getElementById("ai-form"), submitStatus = document.getElementById("submit-status");
-    form?.addEventListener("submit", () => { form.querySelector(".send-button").disabled = true; submitStatus.textContent = "Analysing your farming issue… Please wait."; });
+
+
+    /* ============================================================
+       UPLOAD PHOTO
+       ============================================================ */
+
+    uploadPhoto?.addEventListener("click", () => {
+        attachmentMenu.hidden = true;
+
+        if (!imageInput) {
+            return;
+        }
+
+        imageInput.removeAttribute("capture");
+        imageInput.click();
+    });
+
+
+    /* ============================================================
+       TAKE PHOTO
+       ============================================================ */
+
+    takePhoto?.addEventListener("click", () => {
+        attachmentMenu.hidden = true;
+
+        if (!imageInput) {
+            return;
+        }
+
+        imageInput.setAttribute("capture", "environment");
+        imageInput.click();
+    });
+
+
+    /* ============================================================
+       UPLOAD VIDEO
+       ============================================================ */
+
+    uploadVideo?.addEventListener("click", () => {
+        attachmentMenu.hidden = true;
+
+        if (!videoInput) {
+            return;
+        }
+
+        videoInput.removeAttribute("capture");
+        videoInput.click();
+    });
+
+
+    /* ============================================================
+       RECORD VIDEO
+       ============================================================ */
+
+    recordVideo?.addEventListener("click", () => {
+        attachmentMenu.hidden = true;
+
+        if (!videoInput) {
+            return;
+        }
+
+        /*
+         * We do NOT have a separate video recorder anymore.
+         *
+         * The browser's native camera picker handles recording.
+         */
+        videoInput.setAttribute("capture", "environment");
+        videoInput.click();
+    });
+
+
+    /* ============================================================
+       IMAGE SELECTION
+       ============================================================ */
+
+    imageInput?.addEventListener("change", () => {
+        if (!imageInput.files || imageInput.files.length === 0) {
+            return;
+        }
+
+        const file = imageInput.files[0];
+
+        if (!file.type.startsWith("image/")) {
+            imageInput.value = "";
+
+            if (imageStatus) {
+                imageStatus.textContent =
+                    "Please select a valid image.";
+            }
+
+            return;
+        }
+
+        if (imagePreview) {
+            imagePreview.src = URL.createObjectURL(file);
+        }
+
+        if (imageStatus) {
+            imageStatus.textContent =
+                `${file.name} attached`;
+        }
+
+        if (imageWrap) {
+            imageWrap.hidden = false;
+        }
+    });
+
+
+    /* ============================================================
+       REMOVE IMAGE
+       ============================================================ */
+
+    removeImage?.addEventListener("click", () => {
+        if (imageInput) {
+            imageInput.value = "";
+        }
+
+        if (imagePreview) {
+            imagePreview.removeAttribute("src");
+        }
+
+        if (imageStatus) {
+            imageStatus.textContent = "";
+        }
+
+        if (imageWrap) {
+            imageWrap.hidden = true;
+        }
+    });
+
+
+    /* ============================================================
+       VIDEO SELECTION
+       ============================================================ */
+
+    videoInput?.addEventListener("change", () => {
+        if (!videoInput.files || videoInput.files.length === 0) {
+            return;
+        }
+
+        const file = videoInput.files[0];
+
+        if (!file.type.startsWith("video/")) {
+            videoInput.value = "";
+            return;
+        }
+
+        showVideoAttachment(file);
+    });
+
+
+    /* ============================================================
+       VIDEO ATTACHMENT DISPLAY
+       ============================================================ */
+
+    function showVideoAttachment(file) {
+        /*
+         * The old page had a complete video recorder section.
+         * That has been removed.
+         *
+         * We simply tell the user that the video is attached.
+         */
+
+        let existing = document.getElementById(
+            "video-attachment-status"
+        );
+
+        if (!existing) {
+            existing = document.createElement("p");
+            existing.id = "video-attachment-status";
+            existing.className = "attachment-status";
+
+            const composerFeedback =
+                document.querySelector(".composer-feedback");
+
+            if (composerFeedback) {
+                composerFeedback.appendChild(existing);
+            }
+        }
+
+        existing.textContent =
+            `🎥 ${file.name} attached`;
+
+        existing.setAttribute("aria-live", "polite");
+    }
+
+
+    /* ============================================================
+       THINK TOGGLE
+       ============================================================ */
+
+    thinkToggle?.addEventListener("click", () => {
+        const currentlyPressed =
+            thinkToggle.getAttribute("aria-pressed") === "true";
+
+        const enabled = !currentlyPressed;
+
+        thinkToggle.setAttribute(
+            "aria-pressed",
+            String(enabled)
+        );
+
+        if (thinkingInput) {
+            thinkingInput.value = String(enabled);
+        }
+    });
+
+
+    /* ============================================================
+       AUDIO RECORDER
+       ============================================================ */
+
     setupAudioRecorder();
-    setupVideoRecorder();
+
+
+    /* ============================================================
+       FORM SUBMISSION
+       ============================================================ */
+
+    form?.addEventListener("submit", () => {
+        const sendButton =
+            form.querySelector(".send-button");
+
+        if (sendButton) {
+            sendButton.disabled = true;
+        }
+
+        if (submitStatus) {
+            submitStatus.textContent =
+                "Analysing your farming issue… Please wait.";
+        }
+    });
 });
 
-function getSupportedMimeType(types) {
-    if (!window.MediaRecorder) {
-        return "";
-    }
 
-    for (const type of types) {
-        if (MediaRecorder.isTypeSupported(type)) {
-            return type;
-        }
-    }
-
-    return "";
-}
-
-function placeBlobInFileInput(blob, inputID, filename) {
-    const input = document.getElementById(inputID);
-
-    if (!input) {
-        console.error(`Input element not found: ${inputID}`);
-        return;
-    }
-
-    let extension = "webm";
-
-    if (blob.type.includes("mp4")) {
-        extension = "mp4";
-    } else if (blob.type.includes("ogg")) {
-        extension = "ogg";
-    }
-
-    const file = new File(
-        [blob],
-        `${filename}.${extension}`,
-        {
-            type: blob.type,
-            lastModified: Date.now()
-        }
-    );
-
-    const dataTransfer = new DataTransfer();
-    dataTransfer.items.add(file);
-
-    input.files = dataTransfer.files;
-}
+/* ================================================================
+   AUDIO RECORDER
+   ================================================================ */
 
 function setupAudioRecorder() {
-    const startButton = document.getElementById("start-audio");
-    const stopButton = document.getElementById("stop-audio");
-    const status = document.getElementById("audio-status");
-    const preview = document.getElementById("audio-preview");
-    const removeButton = document.getElementById("remove-audio");
-    const playButton = document.getElementById("play-audio");
+    const startButton =
+        document.getElementById("start-audio");
 
-    if (!startButton || !stopButton || !status || !preview) {
+    const stopButton =
+        document.getElementById("stop-audio");
+
+    const status =
+        document.getElementById("audio-status");
+
+    const preview =
+        document.getElementById("audio-preview");
+
+    const removeButton =
+        document.getElementById("remove-audio");
+
+    const playButton =
+        document.getElementById("play-audio");
+
+    const audioInput =
+        document.getElementById("audio");
+
+
+    if (
+        !startButton ||
+        !stopButton ||
+        !status ||
+        !preview
+    ) {
         return;
     }
+
 
     let recorder = null;
     let stream = null;
     let chunks = [];
     let previewURL = "";
 
-    const clearPreview = () => {
+
+    /* ============================================================
+       SUPPORTED AUDIO FORMAT
+       ============================================================ */
+
+    function getSupportedAudioMimeType() {
+        if (!window.MediaRecorder) {
+            return "";
+        }
+
+        const types = [
+            "audio/webm;codecs=opus",
+            "audio/ogg;codecs=opus",
+            "audio/webm",
+            "audio/mp4"
+        ];
+
+        for (const type of types) {
+            if (MediaRecorder.isTypeSupported(type)) {
+                return type;
+            }
+        }
+
+        return "";
+    }
+
+
+    /* ============================================================
+       RELEASE MICROPHONE
+       ============================================================ */
+
+    function releaseStream() {
+        if (!stream) {
+            return;
+        }
+
+        stream.getTracks().forEach((track) => {
+            track.stop();
+        });
+
+        stream = null;
+    }
+
+
+    /* ============================================================
+       CLEAR AUDIO PREVIEW
+       ============================================================ */
+
+    function clearPreview() {
         if (previewURL) {
             URL.revokeObjectURL(previewURL);
             previewURL = "";
         }
+
         preview.pause();
         preview.removeAttribute("src");
         preview.load();
+
         preview.hidden = true;
-    };
 
-    startButton.addEventListener("click", async () => {
-        if (recorder && recorder.state === "recording") {
-            stopRecording();
+        if (playButton) {
+            playButton.hidden = true;
+        }
+    }
+
+
+    /* ============================================================
+       PUT RECORDING INTO FILE INPUT
+       ============================================================ */
+
+    function putAudioIntoInput(blob) {
+        if (!audioInput) {
             return;
         }
-        if (!navigator.mediaDevices ||
-            !navigator.mediaDevices.getUserMedia) {
-            status.textContent =
-                "Audio recording is not supported by this browser.";
-            return;
+
+        let extension = "webm";
+
+        if (blob.type.includes("ogg")) {
+            extension = "ogg";
+        } else if (blob.type.includes("mp4")) {
+            extension = "mp4";
         }
 
-        try {
-            clearPreview();
-            removeButton.hidden = true;
-            stream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true
+        const file = new File(
+            [blob],
+            `voice-recording.${extension}`,
+            {
+                type: blob.type,
+                lastModified: Date.now()
+            }
+        );
+
+        const dataTransfer =
+            new DataTransfer();
+
+        dataTransfer.items.add(file);
+
+        audioInput.files =
+            dataTransfer.files;
+    }
+
+
+    /* ============================================================
+       START RECORDING
+       ============================================================ */
+
+    startButton.addEventListener(
+        "click",
+        async () => {
+
+            if (
+                recorder &&
+                recorder.state === "recording"
+            ) {
+                stopRecording();
+                return;
+            }
+
+
+            if (
+                !navigator.mediaDevices ||
+                !navigator.mediaDevices.getUserMedia ||
+                !window.MediaRecorder
+            ) {
+                status.textContent =
+                    "Audio recording is not supported by this browser.";
+
+                return;
+            }
+
+
+            try {
+                clearPreview();
+
+                if (removeButton) {
+                    removeButton.hidden = true;
                 }
-            });
 
-            chunks = [];
 
-            // Opus is compact and well suited to voice/AI uploads.
-            const mimeType = getSupportedMimeType([
-                "audio/webm;codecs=opus",
-                "audio/ogg;codecs=opus",
-                "audio/webm",
-                "audio/mp4"
-            ]);
+                stream =
+                    await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true
+                        }
+                    });
 
-            const options = mimeType
-                ? { mimeType: mimeType }
-                : undefined;
 
-            recorder = options
-                ? new MediaRecorder(stream, {...options, videoBitsPerSecond: 900000, audioBitsPerSecond: 64000})
-                : new MediaRecorder(stream);
+                chunks = [];
 
-            recorder.addEventListener("dataavailable", (event) => {
-                if (event.data && event.data.size > 0) {
-                    chunks.push(event.data);
-                }
-            });
 
-            recorder.addEventListener("stop", () => {
-                const blob = new Blob(chunks, {
-                    type: recorder.mimeType || "audio/webm"
-                });
+                const mimeType =
+                    getSupportedAudioMimeType();
 
-                placeBlobInFileInput(
-                    blob,
-                    "audio",
-                    "voice-recording"
+
+                recorder = mimeType
+                    ? new MediaRecorder(
+                        stream,
+                        {
+                            mimeType: mimeType
+                        }
+                    )
+                    : new MediaRecorder(stream);
+
+
+                recorder.addEventListener(
+                    "dataavailable",
+                    (event) => {
+                        if (
+                            event.data &&
+                            event.data.size > 0
+                        ) {
+                            chunks.push(event.data);
+                        }
+                    }
                 );
 
-                if (blob.size === 0) {
-                    status.textContent = "No voice audio was captured. Please try again.";
-                    releaseStream(stream);
-                    stream = null;
-                    return;
-                }
 
-                previewURL = URL.createObjectURL(blob);
-                preview.src = previewURL;
-                preview.controls = true;
-                preview.volume = 1;
-                preview.load();
-                preview.hidden = false;
-                if (playButton) playButton.hidden = false;
-                preview.onloadedmetadata = () => { preview.currentTime = 0; };
-                preview.onerror = () => { status.textContent = "This browser cannot play the recorded format. Try Chrome or Firefox."; };
+                recorder.addEventListener(
+                    "stop",
+                    () => {
+
+                        const blob =
+                            new Blob(
+                                chunks,
+                                {
+                                    type:
+                                        recorder.mimeType ||
+                                        "audio/webm"
+                                }
+                            );
+
+
+                        if (blob.size === 0) {
+                            status.textContent =
+                                "No voice audio was captured. Please try again.";
+
+                            releaseStream();
+
+                            recorder = null;
+
+                            return;
+                        }
+
+
+                        putAudioIntoInput(blob);
+
+
+                        previewURL =
+                            URL.createObjectURL(blob);
+
+                        preview.src =
+                            previewURL;
+
+                        preview.hidden = false;
+
+                        preview.controls = true;
+
+                        if (playButton) {
+                            playButton.hidden = false;
+                        }
+
+
+                        if (removeButton) {
+                            removeButton.hidden = false;
+                        }
+
+
+                        status.textContent =
+                            "Voice recording is ready. Play it before sending.";
+
+
+                        releaseStream();
+
+                        chunks = [];
+
+                        recorder = null;
+
+                        startButton.classList.remove(
+                            "recording"
+                        );
+
+                        startButton.setAttribute(
+                            "aria-label",
+                            "Start voice recording"
+                        );
+
+                        stopButton.hidden = true;
+
+                        stopButton.disabled = true;
+                    }
+                );
+
+
+                recorder.addEventListener(
+                    "error",
+                    (event) => {
+
+                        console.error(
+                            "Audio recorder error:",
+                            event.error
+                        );
+
+                        status.textContent =
+                            "An error occurred while recording audio.";
+
+                        releaseStream();
+
+                        recorder = null;
+
+                        startButton.classList.remove(
+                            "recording"
+                        );
+
+                        startButton.setAttribute(
+                            "aria-label",
+                            "Start voice recording"
+                        );
+
+                        stopButton.hidden = true;
+
+                        stopButton.disabled = true;
+                    }
+                );
+
+
+                recorder.start(1000);
+
+
+                startButton.classList.add(
+                    "recording"
+                );
+
+                startButton.setAttribute(
+                    "aria-label",
+                    "Stop voice recording"
+                );
+
+
+                stopButton.hidden = false;
+                stopButton.disabled = false;
+
 
                 status.textContent =
-                    "Voice recording is ready. Play it before sending.";
-                removeButton.hidden = false;
+                    "Recording voice...";
 
-                releaseStream(stream);
-                stream = null;
-                chunks = [];
-                recorder = null;
-                stopButton.hidden = true;
-                stopButton.disabled = true;
-            });
 
-            recorder.addEventListener("error", (event) => {
-                console.error("Audio recorder error:", event.error);
+            } catch (error) {
+
+                console.error(
+                    "Microphone error:",
+                    error
+                );
 
                 status.textContent =
-                    "An error occurred while recording audio.";
+                    "Microphone permission was denied or unavailable.";
 
-                releaseStream(stream);
-                stream = null;
-                recorder = null;
-                startButton.classList.remove("recording");
-                startButton.setAttribute("aria-label", "Start voice recording");
-                stopButton.hidden = true;
-                stopButton.disabled = true;
-            });
-
-            recorder.start(1000);
-
-            startButton.disabled = false;
-            startButton.classList.add("recording");
-            startButton.setAttribute("aria-label", "Stop voice recording");
-            stopButton.disabled = false;
-            stopButton.hidden = false;
-            status.textContent = "Recording voice...";
-        } catch (error) {
-            console.error("Microphone error:", error);
-
-            status.textContent =
-                "Microphone permission was denied or unavailable.";
-
-            releaseStream(stream);
-            stream = null;
+                releaseStream();
+            }
         }
-    });
+    );
 
-    const stopRecording = () => {
-        if (!recorder || recorder.state === "inactive") {
+
+    /* ============================================================
+       STOP RECORDING
+       ============================================================ */
+
+    function stopRecording() {
+        if (
+            !recorder ||
+            recorder.state === "inactive"
+        ) {
             return;
         }
 
         recorder.stop();
 
-        startButton.classList.remove("recording");
-        startButton.setAttribute("aria-label", "Start voice recording");
+        startButton.classList.remove(
+            "recording"
+        );
+
+        startButton.setAttribute(
+            "aria-label",
+            "Start voice recording"
+        );
+
         stopButton.disabled = true;
         stopButton.hidden = true;
-        status.textContent = "Preparing voice recording...";
-    };
 
-    stopButton.addEventListener("click", stopRecording);
-    playButton?.addEventListener("click", async () => { try { await preview.play(); status.textContent = "Playing your voice recording."; } catch { status.textContent = "The recording cannot be played in this browser. Try Chrome or Firefox."; } });
-    removeButton?.addEventListener("click", () => { document.getElementById("audio").value = ""; clearPreview(); removeButton.hidden = true; if (playButton) playButton.hidden = true; status.textContent = "Voice recording removed."; });
-}
-
-function setupVideoRecorder() {
-    const startButton = document.getElementById("start-video");
-    const stopButton = document.getElementById("stop-video");
-    const status = document.getElementById("video-status");
-    const preview = document.getElementById("video-preview");
-    const removeButton = document.getElementById("remove-video");
-
-    if (!startButton || !stopButton || !status || !preview) {
-        return;
+        status.textContent =
+            "Preparing voice recording...";
     }
 
-    let recorder = null;
-    let stream = null;
-    let chunks = [];
 
-    startButton.addEventListener("click", async () => {
-        if (!navigator.mediaDevices ||
-            !navigator.mediaDevices.getUserMedia) {
-            status.textContent =
-                "Video recording is not supported by this browser.";
-            return;
-        }
+    stopButton.addEventListener(
+        "click",
+        stopRecording
+    );
 
-        try {
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: {
-                        ideal: "environment"
-                    }
-                },
-                audio: true
-            });
 
-            chunks = [];
+    /* ============================================================
+       PLAY RECORDING
+       ============================================================ */
 
-            const mimeType = getSupportedMimeType([
-                "video/webm;codecs=vp9,opus",
-                "video/webm;codecs=vp8,opus",
-                "video/webm",
-                "video/mp4"
-            ]);
+    playButton?.addEventListener(
+        "click",
+        async () => {
 
-            const options = mimeType
-                ? { mimeType: mimeType }
-                : undefined;
+            try {
+                await preview.play();
 
-            recorder = options
-                ? new MediaRecorder(stream, options)
-                : new MediaRecorder(stream);
+                status.textContent =
+                    "Playing your voice recording.";
 
-            recorder.addEventListener("dataavailable", (event) => {
-                if (event.data && event.data.size > 0) {
-                    chunks.push(event.data);
-                }
-            });
+            } catch (error) {
 
-            recorder.addEventListener("stop", () => {
-                const blob = new Blob(chunks, {
-                    type: recorder.mimeType || "video/webm"
-                });
-
-                placeBlobInFileInput(
-                    blob,
-                    "video",
-                    "farm-video"
+                console.error(
+                    "Audio playback error:",
+                    error
                 );
 
-                preview.src = URL.createObjectURL(blob);
-                preview.load();
-                preview.hidden = false;
-
                 status.textContent =
-                    "Video recording is ready to submit.";
-                removeButton.hidden = false;
+                    "The recording cannot be played in this browser.";
+            }
+        }
+    );
 
-                releaseStream(stream);
-                stream = null;
-                chunks = [];
-            });
 
-            recorder.addEventListener("error", (event) => {
-                console.error("Video recorder error:", event.error);
+    /* ============================================================
+       REMOVE AUDIO
+       ============================================================ */
 
-                status.textContent =
-                    "An error occurred while recording video.";
+    removeButton?.addEventListener(
+        "click",
+        () => {
 
-                releaseStream(stream);
-                stream = null;
-            });
+            if (audioInput) {
+                audioInput.value = "";
+            }
 
-            recorder.start();
+            clearPreview();
 
-            startButton.disabled = true;
-            stopButton.disabled = false;
-            status.textContent = "Recording video...";
-        } catch (error) {
-            console.error("Camera error:", error);
+            removeButton.hidden = true;
+
+            if (playButton) {
+                playButton.hidden = true;
+            }
 
             status.textContent =
-                "Camera or microphone permission was denied.";
-
-            releaseStream(stream);
-            stream = null;
+                "Voice recording removed.";
         }
-    });
-
-    stopButton.addEventListener("click", () => {
-        if (!recorder || recorder.state === "inactive") {
-            return;
-        }
-
-        recorder.stop();
-
-                startButton.disabled = false;
-                stopButton.disabled = true;
-                recorder = null;
-        status.textContent = "Preparing video recording...";
-    });
-    removeButton?.addEventListener("click", () => { document.getElementById("video").value = ""; preview.hidden = true; preview.removeAttribute("src"); removeButton.hidden = true; status.textContent = ""; });
-}
-
-function releaseStream(stream) {
-    if (!stream) {
-        return;
-    }
-
-    stream.getTracks().forEach((track) => {
-        track.stop();
-    });
+    );
 }

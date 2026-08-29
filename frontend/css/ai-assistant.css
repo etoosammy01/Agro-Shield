@@ -1,299 +1,1182 @@
+/* ============================================================
+   AGRO-SHIELD
+   AI ASSISTANT
+   Clean Responsive Design
+   ============================================================ */
+
+
+/* ============================================================
+   PAGE
+   ============================================================ */
+
 .ai-assistant {
+    width: 100%;
     max-width: 1200px;
     margin: 0 auto;
-    padding: 50px 80px;
+    padding: 45px 60px 60px;
+    box-sizing: border-box;
 }
+
+
+/* ============================================================
+   PAGE HEADER
+   ============================================================ */
 
 .ai-assistant h1 {
-    margin-bottom: 10px;
-    color: #1f2937;
-    font-size: 40px;
+    margin: 0 0 10px;
+
+    color: var(--color-ink, #17231c);
+
+    font-size: 2.4rem;
+    font-weight: 700;
+    line-height: 1.25;
 }
 
-.ai-assistant > p {
-    color: #6b7280;
-    margin-top: 8px;
-    margin-bottom: 30px;
+
+.assistant-intro {
+    margin: 8px 0 30px;
+
+    color: var(--color-muted, #66756c);
+
+    font-size: 1rem;
     line-height: 1.6;
 }
 
+
+/* ============================================================
+   MESSAGES
+   ============================================================ */
+
 .message {
     margin-bottom: 20px;
+
     padding: 14px 16px;
-    border-radius: 8px;
-    font-weight: bold;
+
+    border-radius: 10px;
+
+    font-weight: 700;
 }
+
 
 .error-message {
     color: #991b1b;
+
     background: #fee2e2;
+
     border: 1px solid #ef4444;
 }
 
-/* Main form */
+
+/* ============================================================
+   MAIN FORM
+   ============================================================ */
 
 .ai-form {
-.attachment-menu-wrap{position:relative}.attachment-menu{position:absolute;bottom:48px;left:0;z-index:5;display:grid;gap:5px;min-width:150px;padding:7px;background:#fff;border:1px solid #d7e2da;border-radius:9px;box-shadow:0 8px 22px rgba(0,0,0,.14)}.attachment-menu[hidden]{display:none}.attachment-menu button{text-align:left;font-size:.82rem!important;padding:9px!important;background:#f3f8f4!important;color:#166534!important}
     display: flex;
+
     flex-direction: column;
-    align-items: stretch;
+
     gap: 12px;
-    background: #ffffff;
+
+    width: 100%;
+
     padding: 30px;
-    border-radius: 14px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+
+    box-sizing: border-box;
+
+    background: var(--color-surface, #ffffff);
+
+    border: 1px solid var(
+        --color-border,
+        #dbe7dc
+    );
+
+    border-radius: 16px;
+
+    box-shadow:
+        0 8px 30px rgba(23, 35, 28, 0.08);
+
     margin-bottom: 30px;
 }
 
+
+/* ============================================================
+   FORM LABELS
+   ============================================================ */
+
 .ai-form label {
-    margin-top: 10px;
-    color: #1f2937;
-    font-size: 16px;
+    margin-top: 8px;
+
+    color: var(
+        --color-ink,
+        #17231c
+    );
+
+    font-size: 0.95rem;
+
     font-weight: 700;
 }
 
-.ai-form small {
-    color: #6b7280;
-    font-size: 13px;
-    font-weight: normal;
-}
 
-/* Form fields */
+/* ============================================================
+   SELECT
+   ============================================================ */
 
-.ai-form select,
-.ai-form textarea,
-.ai-form input[type="file"] {
+.ai-form select {
     width: 100%;
+
+    min-height: 48px;
+
+    padding: 12px 14px;
+
     box-sizing: border-box;
-    padding: 12px;
+
     border: 1px solid #d1d5db;
-    border-radius: 8px;
+
+    border-radius: 10px;
+
     background: #ffffff;
+
     color: #1f2937;
+
     font: inherit;
+
+    cursor: pointer;
 }
 
-.ai-form select:focus,
-.ai-form textarea:focus,
-.ai-form input[type="file"]:focus {
+
+.ai-form select:focus {
     outline: none;
+
     border-color: #15803d;
-    box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
+
+    box-shadow:
+        0 0 0 3px rgba(
+            21,
+            128,
+            61,
+            0.15
+        );
 }
 
-.ai-form textarea {
-    resize: vertical;
-    min-height: 130px;
+
+/* ============================================================
+   AI COMPOSER
+   ============================================================ */
+
+.assistant-composer {
+    position: relative;
+
+    width: 100%;
+
+    box-sizing: border-box;
+
+    border: 1px solid #3a3a3a;
+
+    border-radius: 30px;
+
+    background: #202020;
+
+    box-shadow:
+        0 8px 22px rgba(0, 0, 0, 0.18);
+
+    transition:
+        border-color 160ms ease,
+        box-shadow 160ms ease;
 }
 
-.assistant-composer{position:relative;border:1px solid #3a3a3a;border-radius:30px;background:#202020;box-shadow:0 8px 22px rgba(0,0,0,.18);transition:border-color 160ms,box-shadow 160ms;}
-.assistant-composer:focus-within{border-color:#555;box-shadow:0 0 0 3px rgba(31,122,77,.16),0 10px 28px rgba(0,0,0,.22);}
-.assistant-composer textarea{display:block;width:100%;height:64px;min-height:64px;padding:19px 180px 12px 50px;border:0!important;border-radius:30px;background:transparent;color:#f4f4f4;resize:none;box-shadow:none!important;}
-.assistant-composer textarea::placeholder{color:#a9a9a9;}
-.composer-controls{position:absolute;left:10px;right:12px;bottom:10px;display:flex;align-items:center;justify-content:flex-end;gap:14px;pointer-events:none;}
-.composer-controls .composer-icon:first-child{margin-right:auto;}
-.composer-icon{display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;background:transparent;color:#f2f2f2;font-size:25px;line-height:1;cursor:pointer;transition:transform 160ms,color 160ms;pointer-events:auto;}
-.composer-icon:hover{transform:scale(1.12);color:#fff;}
-.think-toggle{display:flex;align-items:center;gap:5px;padding:0;border:0;background:transparent;color:#d4d4d4;font-size:14px;cursor:pointer;pointer-events:auto;}
-.think-toggle:hover{color:#fff;}
-.think-toggle[aria-pressed="true"]{color:#fff;background:#166534;border-radius:16px;padding:6px 10px;}
-.microphone-button{font-size:18px;}
-.microphone-button svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
-.send-button{display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:50%;background:#3478d5;color:#fff;font-size:18px;cursor:pointer;transition:transform 160ms,background 160ms;pointer-events:auto;}
-.send-button:hover{transform:scale(1.06);background:#4b8be5;}
-.send-button svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;}
-.ai-form #start-audio.microphone-button{background:transparent;color:#f2f2f2;padding:0;}
-.ai-form #start-audio.microphone-button:hover{background:transparent;color:#fff;}
-.ai-form #start-audio.microphone-button.recording{color:#fff;background:#b42318;border-color:#b42318;animation:recording-pulse 1.2s infinite;}
-@keyframes recording-pulse{50%{box-shadow:0 0 0 6px rgba(180,35,24,.15)}}
-.composer-feedback{min-height:24px;margin-top:-4px;color:#6b7280;font-size:13px;}
-.composer-feedback p{margin:4px 0;}
-.composer-feedback audio{max-width:100%;height:34px;}
-.attachment-preview{display:grid;grid-template-columns:52px 1fr auto;align-items:center;gap:10px;margin-top:8px;}
-.attachment-preview[hidden]{display:none;}
-.attachment-preview img{width:52px;height:52px;object-fit:cover;border-radius:6px;}
-.ai-form .remove-attachment{width:max-content;margin-top:8px;padding:7px 10px;border:1px solid #d1d5db;background:#fff;color:#991b1b;font-size:13px;font-weight:700;}
-.submit-status{min-height:22px;color:#166534;font-weight:700;}
-.history-link-wrap{margin:24px 0 40px;text-align:center;}
-.history-link{display:inline-block;padding:12px 18px;border:1px solid #166534;border-radius:8px;color:#166534;font-weight:700;text-decoration:none;background:#fff;}
-.history-link:hover{background:#166534;color:#fff;}
-.ai-form .composer-controls button{padding:0;}
-.ai-form .composer-controls .think-toggle[aria-pressed="true"]{padding:6px 10px;}
 
-/* Media sections */
+.assistant-composer:focus-within {
+    border-color: #555;
 
-.media-section {
-    margin-top: 18px;
-    padding: 20px;
+    box-shadow:
+        0 0 0 3px rgba(
+            31,
+            122,
+            77,
+            0.16
+        ),
+        0 10px 28px rgba(
+            0,
+            0,
+            0,
+            0.22
+        );
+}
+
+
+/* ============================================================
+   TEXTAREA
+   ============================================================ */
+
+.assistant-composer textarea {
+    display: block;
+
+    width: 100%;
+
+    height: 64px;
+
+    min-height: 64px;
+
+    padding: 19px 180px 12px 50px;
+
+    box-sizing: border-box;
+
+    border: 0 !important;
+
+    border-radius: 30px;
+
+    background: transparent;
+
+    color: #f4f4f4;
+
+    font: inherit;
+
+    line-height: 1.5;
+
+    resize: none;
+
+    outline: none;
+
+    box-shadow: none !important;
+}
+
+
+.assistant-composer textarea::placeholder {
+    color: #a9a9a9;
+}
+
+
+/* ============================================================
+   COMPOSER CONTROLS
+   ============================================================ */
+
+.composer-controls {
+    position: absolute;
+
+    left: 10px;
+
+    right: 12px;
+
+    bottom: 10px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: flex-end;
+
+    gap: 14px;
+
+    pointer-events: none;
+}
+
+
+.composer-controls > * {
+    pointer-events: auto;
+}
+
+
+/* ============================================================
+   ATTACHMENT MENU
+   ============================================================ */
+
+.attachment-menu-wrap {
+    position: relative;
+
+    margin-right: auto;
+}
+
+
+.attachment-menu {
+    position: absolute;
+
+    left: 0;
+
+    bottom: 48px;
+
+    z-index: 20;
+
+    display: grid;
+
+    gap: 5px;
+
+    min-width: 170px;
+
+    padding: 7px;
+
+    background: #ffffff;
+
+    border: 1px solid #d7e2da;
+
+    border-radius: 10px;
+
+    box-shadow:
+        0 8px 22px rgba(
+            0,
+            0,
+            0,
+            0.16
+        );
+}
+
+
+.attachment-menu[hidden] {
+    display: none;
+}
+
+
+.attachment-menu button {
+    width: 100%;
+
+    padding: 10px 12px;
+
+    border: 0;
+
+    border-radius: 7px;
+
+    background: #f3f8f4;
+
+    color: #166534;
+
+    font-size: 0.85rem;
+
+    font-weight: 700;
+
+    text-align: left;
+
+    cursor: pointer;
+
+    transition:
+        background 0.15s ease;
+}
+
+
+.attachment-menu button:hover {
+    background: #e2efe5;
+}
+
+
+/* ============================================================
+   PLUS BUTTON
+   ============================================================ */
+
+.composer-icon {
+    display: grid;
+
+    place-items: center;
+
+    width: 30px;
+
+    height: 30px;
+
+    padding: 0;
+
+    border: 0;
+
+    background: transparent;
+
+    color: #f2f2f2;
+
+    font-size: 25px;
+
+    line-height: 1;
+
+    cursor: pointer;
+
+    transition:
+        transform 160ms ease,
+        color 160ms ease;
+}
+
+
+.composer-icon:hover {
+    transform: scale(1.12);
+
+    color: #ffffff;
+}
+
+
+/* ============================================================
+   THINK BUTTON
+   ============================================================ */
+
+.think-toggle {
+    display: flex;
+
+    align-items: center;
+
+    gap: 5px;
+
+    padding: 0;
+
+    border: 0;
+
+    background: transparent;
+
+    color: #d4d4d4;
+
+    font-size: 14px;
+
+    font-weight: 600;
+
+    cursor: pointer;
+}
+
+
+.think-toggle:hover {
+    color: #ffffff;
+}
+
+
+.think-toggle[aria-pressed="true"] {
+    padding: 6px 10px;
+
+    border-radius: 16px;
+
+    background: #166534;
+
+    color: #ffffff;
+}
+
+
+/* ============================================================
+   MICROPHONE
+   ============================================================ */
+
+.microphone-button {
+    font-size: 18px;
+}
+
+
+.microphone-button svg {
+    width: 21px;
+
+    height: 21px;
+
+    fill: none;
+
+    stroke: currentColor;
+
+    stroke-width: 1.8;
+
+    stroke-linecap: round;
+
+    stroke-linejoin: round;
+}
+
+
+#start-audio.microphone-button {
+    padding: 0;
+
+    background: transparent;
+
+    color: #f2f2f2;
+}
+
+
+#start-audio.microphone-button:hover {
+    background: transparent;
+
+    color: #ffffff;
+}
+
+
+#start-audio.microphone-button.recording {
+    background: #b42318;
+
+    color: #ffffff;
+
+    border-radius: 50%;
+
+    animation:
+        recording-pulse 1.2s infinite;
+}
+
+
+@keyframes recording-pulse {
+
+    50% {
+        box-shadow:
+            0 0 0 6px
+            rgba(
+                180,
+                35,
+                24,
+                0.15
+            );
+    }
+
+}
+
+
+/* ============================================================
+   STOP AUDIO
+   ============================================================ */
+
+.stop-audio-button {
+    padding: 7px 10px !important;
+
+    border: 1px solid #b42318 !important;
+
+    border-radius: 8px !important;
+
+    background: #b42318 !important;
+
+    color: #ffffff !important;
+
+    font-size: 0.8rem !important;
+
+    font-weight: 700;
+}
+
+
+/* ============================================================
+   SEND BUTTON
+   ============================================================ */
+
+.send-button {
+    display: grid;
+
+    place-items: center;
+
+    width: 44px;
+
+    height: 44px;
+
+    padding: 0;
+
+    border: 0;
+
+    border-radius: 50%;
+
+    background: #3478d5;
+
+    color: #ffffff;
+
+    cursor: pointer;
+
+    transition:
+        transform 160ms ease,
+        background 160ms ease;
+}
+
+
+.send-button:hover {
+    transform: scale(1.06);
+
+    background: #4b8be5;
+}
+
+
+.send-button:active {
+    transform: scale(0.98);
+}
+
+
+.send-button svg {
+    width: 23px;
+
+    height: 23px;
+
+    fill: none;
+
+    stroke: currentColor;
+
+    stroke-width: 2;
+
+    stroke-linecap: round;
+}
+
+
+/* ============================================================
+   COMPOSER FEEDBACK
+   ============================================================ */
+
+.composer-feedback {
+    min-height: 24px;
+
+    margin-top: -4px;
+
+    color: #6b7280;
+
+    font-size: 13px;
+}
+
+
+.composer-feedback p {
+    margin: 4px 0;
+}
+
+
+/* ============================================================
+   IMAGE ATTACHMENT PREVIEW
+   ============================================================ */
+
+.attachment-preview {
+    display: grid;
+
+    grid-template-columns:
+        56px minmax(0, 1fr) auto;
+
+    align-items: center;
+
+    gap: 12px;
+
+    margin-top: 8px;
+
+    padding: 10px;
+
     border: 1px solid #dbe7dc;
-    border-radius: 12px;
+
+    border-radius: 10px;
+
     background: #f8fcf8;
 }
 
-.media-section h2 {
-    margin-top: 0;
-    margin-bottom: 8px;
-    color: #166534;
-    font-size: 20px;
+
+.attachment-preview[hidden] {
+    display: none;
 }
 
-.media-section p {
-    margin-top: 0;
-    margin-bottom: 14px;
-    color: #6b7280;
-    line-height: 1.5;
-}
 
-/* Recording buttons */
+.attachment-preview img {
+    width: 56px;
 
-.record-controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 15px;
-}
+    height: 56px;
 
-.ai-form button {
-    border: none;
+    object-fit: cover;
+
     border-radius: 8px;
-    padding: 12px 20px;
-    font: inherit;
-    font-weight: 700;
-    cursor: pointer;
-    transition: background 0.2s ease, transform 0.2s ease;
 }
 
-.ai-form button:hover {
-    transform: translateY(-1px);
+
+.attachment-info {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 3px;
+
+    min-width: 0;
+
+    color: #166534;
 }
 
-.ai-form button:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-    transform: none;
+
+.attachment-info strong {
+    font-size: 0.9rem;
 }
 
-#start-audio,
-#start-video {
-    background: #15803d;
-    color: #ffffff;
+
+.attachment-info span {
+    color: #6b7280;
+
+    overflow-wrap: anywhere;
 }
 
-#start-audio:hover,
-#start-video:hover {
-    background: #166534;
+
+/* ============================================================
+   VIDEO FEEDBACK
+   ============================================================ */
+
+.video-feedback {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 10px;
+
+    margin-top: 8px;
+
+    padding: 12px;
+
+    border: 1px solid #dbe7dc;
+
+    border-radius: 10px;
+
+    background: #f8fcf8;
 }
 
-#stop-audio,
-#stop-video {
-    background: #dc2626;
-    color: #ffffff;
+
+.video-feedback[hidden] {
+    display: none;
 }
 
-#stop-audio:hover,
-#stop-video:hover {
-    background: #b91c1c;
+
+.video-feedback-content {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 3px;
+
+    color: #166534;
 }
 
-.submit-button {
+
+.video-feedback-content span {
+    color: #6b7280;
+
+    font-size: 0.85rem;
+}
+
+
+#video-preview {
     width: 100%;
-    margin-top: 20px;
-    background: #166534;
-    color: #ffffff;
-    font-size: 16px;
+
+    max-width: 480px;
+
+    height: auto;
+
+    border-radius: 8px;
+
+    background: #111827;
 }
 
-.submit-button:hover {
-    background: #14532d;
+
+#video-preview[hidden] {
+    display: none;
 }
 
-/* Recording status */
+
+/* ============================================================
+   REMOVE ATTACHMENT
+   ============================================================ */
+
+.remove-attachment {
+    width: max-content;
+
+    padding: 7px 10px !important;
+
+    border: 1px solid #d1d5db !important;
+
+    border-radius: 8px !important;
+
+    background: #ffffff !important;
+
+    color: #991b1b !important;
+
+    font-size: 13px !important;
+
+    font-weight: 700;
+
+    cursor: pointer;
+}
+
+
+.remove-attachment:hover {
+    background: #fef2f2 !important;
+
+    border-color: #fca5a5 !important;
+}
+
+
+/* ============================================================
+   AUDIO
+   ============================================================ */
 
 .recording-status {
     min-height: 20px;
-    margin: 12px 0 0;
+
+    margin: 10px 0 0;
+
     color: #166534 !important;
+
     font-size: 14px;
+
     font-weight: 700;
 }
 
-/* Audio and video previews */
 
-#audio-preview,
-#video-preview {
-    display: block;
-    max-width: 100%;
-    margin-top: 16px;
-    border-radius: 8px;
-    background: #111827;
-}
-#audio-preview[hidden],#video-preview[hidden]{display:none}
-#audio-preview{width:min(100%,420px);height:44px;background:transparent}
+#audio-preview {
+    width: min(100%, 420px);
 
-#video-preview {
-    width: 100%;
-    max-width: 480px;
-    height: auto;
+    height: 44px;
+
+    margin-top: 12px;
+
+    background: transparent;
 }
+
+
+#audio-preview[hidden] {
+    display: none;
+}
+
+
+/* ============================================================
+   MEDIA HELP
+   ============================================================ */
 
 .media-help {
-    margin-top: 20px !important;
+    margin: 5px 0 0 !important;
+
     color: #6b7280;
+
     font-size: 14px;
+
+    line-height: 1.5;
 }
 
-/* AI result */
+
+/* ============================================================
+   SUBMIT STATUS
+   ============================================================ */
+
+.submit-status {
+    min-height: 22px;
+
+    color: #166534;
+
+    font-weight: 700;
+}
+
+
+/* ============================================================
+   AI RESULT
+   ============================================================ */
 
 .ai-result {
-    padding: 24px;
-    border: 1px solid #16a34a;
-    border-radius: 12px;
-    background: #eaf7ea;
     margin-bottom: 40px;
+
+    padding: 24px;
+
+    border: 1px solid #16a34a;
+
+    border-radius: 12px;
+
+    background: #eaf7ea;
+
     line-height: 1.7;
 }
 
+
 .ai-result h2 {
     margin-top: 0;
+
+    margin-bottom: 15px;
+
     color: #166534;
 }
 
-/* Mobile layout */
 
-@media (max-width: 768px) {
+.ai-result-text {
+    color: #1f2937;
+
+    font-size: 16px;
+
+    line-height: 1.8;
+
+    white-space: pre-wrap;
+
+    overflow-wrap: anywhere;
+}
+
+
+/* ============================================================
+   HISTORY LINK
+   ============================================================ */
+
+.history-link-wrap {
+    margin: 24px 0 40px;
+
+    text-align: center;
+}
+
+
+.history-link {
+    display: inline-block;
+
+    padding: 12px 18px;
+
+    border: 1px solid #166534;
+
+    border-radius: 8px;
+
+    background: #ffffff;
+
+    color: #166534;
+
+    font-weight: 700;
+
+    text-decoration: none;
+
+    transition:
+        background 0.2s ease,
+        color 0.2s ease;
+}
+
+
+.history-link:hover {
+    background: #166534;
+
+    color: #ffffff;
+}
+
+
+/* ============================================================
+   GENERAL FORM BUTTON RESET
+   ============================================================ */
+
+.ai-form button {
+    font: inherit;
+
+    cursor: pointer;
+}
+
+
+.ai-form button:disabled {
+    opacity: 0.55;
+
+    cursor: not-allowed;
+}
+
+
+/* ============================================================
+   FOCUS ACCESSIBILITY
+   ============================================================ */
+
+.ai-form button:focus-visible,
+.ai-form select:focus-visible,
+.assistant-composer textarea:focus-visible,
+.history-link:focus-visible {
+    outline: 3px solid rgba(
+        31,
+        122,
+        77,
+        0.25
+    );
+
+    outline-offset: 3px;
+}
+
+
+/* ============================================================
+   TABLET
+   ============================================================ */
+
+@media (max-width: 900px) {
+
     .ai-assistant {
-        padding: 30px 16px;
+        padding: 35px 25px 50px;
     }
+
 
     .ai-assistant h1 {
-        font-size: 30px;
+        font-size: 2rem;
     }
+
 
     .ai-form {
-        padding: 20px;
+        padding: 25px;
     }
 
-    .record-controls {
-        flex-direction: column;
+}
+
+
+/* ============================================================
+   MOBILE
+   ============================================================ */
+
+@media (max-width: 700px) {
+
+    .ai-assistant {
+        padding: 25px 14px 40px;
     }
 
-    .record-controls button {
+
+    .ai-assistant h1 {
+        font-size: 1.7rem;
+
+        line-height: 1.3;
+    }
+
+
+    .assistant-intro {
+        font-size: 0.95rem;
+
+        margin-bottom: 22px;
+    }
+
+
+    .ai-form {
+        padding: 20px 16px;
+
+        border-radius: 14px;
+    }
+
+
+    .assistant-composer textarea {
+        height: 120px;
+
+        min-height: 120px;
+
+        padding:
+            16px
+            16px
+            58px;
+    }
+
+
+    .composer-controls {
+        left: 9px;
+
+        right: 9px;
+
+        bottom: 9px;
+
+        gap: 10px;
+    }
+
+
+    .think-toggle {
+        font-size: 13px;
+    }
+
+
+    .send-button {
+        width: 42px;
+
+        height: 42px;
+    }
+
+
+    .attachment-menu {
+        bottom: 46px;
+
+        min-width: 165px;
+    }
+
+
+    .attachment-preview {
+        grid-template-columns:
+            48px minmax(0, 1fr);
+
+        align-items: center;
+    }
+
+
+    .attachment-preview img {
+        width: 48px;
+
+        height: 48px;
+    }
+
+
+    .attachment-preview
+    .remove-attachment {
+        grid-column: 1 / -1;
+
         width: 100%;
     }
 
-    .assistant-composer textarea{height:120px;min-height:120px;padding:16px 16px 58px;}
-    .composer-controls{gap:10px;}
-    .attachment-preview{grid-template-columns:48px 1fr;}
-    .attachment-preview .remove-attachment{grid-column:1/-1;}
-}
-.ai-result-text {
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    color: #1f2937;
-    line-height: 1.8;
-    font-size: 16px;
+
+    .video-feedback
+    .remove-attachment {
+        width: 100%;
+    }
+
+
+    .stop-audio-button {
+        font-size: 0.75rem !important;
+
+        padding: 6px 8px !important;
+    }
+
 }
 
-.ai-result h2 {
-    margin-top: 0;
+
+/* ============================================================
+   SMALL PHONES
+   ============================================================ */
+
+@media (max-width: 400px) {
+
+    .ai-assistant {
+        padding:
+            18px
+            10px
+            35px;
+    }
+
+
+    .ai-assistant h1 {
+        font-size: 1.45rem;
+    }
+
+
+    .ai-form {
+        padding:
+            17px
+            12px;
+    }
+
+
+    .assistant-composer textarea {
+        height: 115px;
+
+        min-height: 115px;
+    }
+
+
+    .composer-controls {
+        gap: 7px;
+    }
+
+
+    .think-toggle {
+        gap: 3px;
+
+        font-size: 12px;
+    }
+
+
+    .think-toggle[aria-pressed="true"] {
+        padding:
+            5px
+            7px;
+    }
+
+
+    .send-button {
+        width: 40px;
+
+        height: 40px;
+    }
+
+
+    .send-button svg {
+        width: 21px;
+
+        height: 21px;
+    }
+
+}
+
+
+/* ============================================================
+   REDUCED MOTION
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+
+    .assistant-composer,
+    .composer-icon,
+    .send-button,
+    .history-link {
+        transition: none;
+    }
+
+
+    .composer-icon:hover,
+    .send-button:hover {
+        transform: none;
+    }
+
+
+    #start-audio.microphone-button.recording {
+        animation: none;
+    }
+
 }

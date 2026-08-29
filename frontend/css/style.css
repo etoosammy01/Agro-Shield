@@ -104,72 +104,110 @@ nav a.active{
     nav{gap:14px;}
 }
 
-button,input,select,textarea{font:inherit}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid rgba(31,122,77,.24);outline-offset:2px}
-.page-button{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:0 16px;border:0;border-radius:var(--radius-sm);background:var(--color-brand);color:#fff;font-weight:700;cursor:pointer}.page-button:hover{background:var(--color-brand-dark)}
+/* ============================================================
+   BUTTON SYSTEM
+   ============================================================ */
 
-nav a:hover{
-    color:green;
+button,
+input,
+select,
+textarea {
+    font: inherit;
 }
 
-.hero{
-    display:grid;
-    grid-template-columns: 1.2fr 1fr;
-    gap:60px;
-    align-items:center;
-    padding:80px;
-    min-height:85vh;
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 3px solid rgba(31, 122, 77, 0.24);
+    outline-offset: 2px;
 }
 
-.hero-content{
-    max-width:700px;
+/* Base button */
+.page-button,
+.primary-btn,
+.secondary-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 20px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 15px;
+    line-height: 1;
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+        background-color 0.2s ease,
+        color 0.2s ease,
+        border-color 0.2s ease,
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
 }
 
-.hero-content h1{
-    font-size:56px;
-    margin-bottom:20px;
+/* Primary button */
+.page-button,
+.primary-btn {
+    border: 1px solid var(--color-brand);
+    background: var(--color-brand);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(31, 122, 77, 0.16);
 }
 
-
-
-
-.hero-content p{
-    font-size:22px;
-    line-height:1.8;
-    margin-bottom:40px;
-    color:gray;
+.page-button:hover,
+.primary-btn:hover {
+    background: var(--color-brand-dark);
+    border-color: var(--color-brand-dark);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(31, 122, 77, 0.22);
 }
 
-.hero-buttons{
-    display:flex;
-    gap:20px;
+/* Secondary button */
+.secondary-btn {
+    border: 1px solid var(--color-brand);
+    background: #fff;
+    color: var(--color-brand);
 }
 
-.primary-btn{
-    background:green;
-    color:white;
-    padding:16px 36px;
-    border-radius:8px;
-    text-decoration:none;
-    font-weight:bold;
+.secondary-btn:hover {
+    background: var(--color-brand-soft);
+    color: var(--color-brand-dark);
+    border-color: var(--color-brand-dark);
+    transform: translateY(-1px);
 }
 
-.secondary-btn{
-    border:2px solid green;
-    color:green;
-    padding:16px 36px;
-    border-radius:8px;
-    text-decoration:none;
-    font-weight:bold;
+/* Button press effect */
+.page-button:active,
+.primary-btn:active,
+.secondary-btn:active {
+    transform: translateY(0);
+    box-shadow: none;
 }
 
-.primary-btn:hover{
-    background:darkgreen;
+/* Disabled buttons */
+button:disabled,
+.page-button:disabled,
+.primary-btn:disabled,
+.secondary-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
-.secondary-btn:hover{
-    background:green;
-    color:white;
-}
+/* Mobile buttons */
+@media (max-width: 600px) {
+    .page-button,
+    .primary-btn,
+    .secondary-btn {
+        min-height: 42px;
+        padding: 0 16px;
+        font-size: 14px;
+    }
+
 
 .hero-image{
     display:flex;

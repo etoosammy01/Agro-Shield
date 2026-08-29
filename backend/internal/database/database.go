@@ -327,15 +327,18 @@ log.Println("✅ Crop images table migrated successfully")
 	// ========================================================
 
 	diagnosisCompatibilityMigration := `
-	ALTER TABLE diagnoses
-		ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT '';
-
-	ALTER TABLE diagnoses
-		ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT '';
-
-	ALTER TABLE diagnoses
-		ALTER COLUMN image_name DROP NOT NULL;
-	`
+	        ALTER TABLE diagnoses
+	                ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT '';
+	
+	        ALTER TABLE diagnoses
+	                ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT '';
+	
+	        ALTER TABLE diagnoses
+	                ADD COLUMN IF NOT EXISTS image_name TEXT;
+	
+	        ALTER TABLE diagnoses
+	                ALTER COLUMN image_name DROP NOT NULL;
+	        `
 
 	if _, err = db.Exec(diagnosisCompatibilityMigration); err != nil {
 		return fmt.Errorf(

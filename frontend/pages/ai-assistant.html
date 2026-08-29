@@ -7,51 +7,64 @@
     <title>AI Assistant | Agro-Shield</title>
 
     <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/ai-assistant.css?v=20260824-chat-composer">
+    <link rel="stylesheet" href="/static/css/ai-assistant.css?v=20260829-clean">
 </head>
 
 <body>
 
 <header class="navbar">
-    <a class="logo" href="/dashboard"><img src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield"></a>
+    <a class="logo" href="/dashboard">
+        <img
+            src="/static/assets/logo/Agro-Shield_logo.png"
+            alt="Agro-Shield"
+        >
+    </a>
 
     <nav aria-label="Main navigation">
-    <a href="/dashboard">Dashboard</a>
-    <a href="/storage">Storage</a>
-    <a href="/marketplace">Marketplace</a>
-    <a href="/negotiations">Negotiations</a>
-    <a href="/cart">Cart</a>
-    <a href="/chat">Chat</a>
-    <a href="/ai-assistant" aria-current="page">AI Assistant</a>
-    <a href="/profile">Profile</a>
-    <a href="/notifications">Notifications</a>
-    <a href="/logout">Logout</a>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/storage">Storage</a>
+        <a href="/marketplace">Marketplace</a>
+        <a href="/negotiations">Negotiations</a>
+        <a href="/cart">Cart</a>
+        <a href="/chat">Chat</a>
+        <a href="/ai-assistant" aria-current="page">AI Assistant</a>
+        <a href="/profile">Profile</a>
+        <a href="/notifications">Notifications</a>
+        <a href="/logout">Logout</a>
     </nav>
 </header>
+
 
 <main class="ai-assistant">
 
     <h1>🤖 Agro-Shield AI Assistant</h1>
 
-    <p>
+    <p class="assistant-intro">
         Ask questions about farming, describe a problem,
-        or provide audio or video for analysis.
+        or provide photo, video, or voice context for analysis.
     </p>
 
+
     {{if .Error}}
-        <div
-            class="message error-message"
-            role="alert"
-        >
-            {{.Error}}
-        </div>
+    <div
+        class="message error-message"
+        role="alert"
+    >
+        {{.Error}}
+    </div>
     {{end}}
+
+
+    <!-- =====================================================
+         AI FORM
+         ===================================================== -->
 
     <form
         method="POST"
         action="/ai-assistant"
         enctype="multipart/form-data"
-        class="ai-form" id="ai-form"
+        class="ai-form"
+        id="ai-form"
     >
 
         <!-- CATEGORY -->
@@ -102,13 +115,25 @@
             </option>
         </select>
 
-        <!-- DESCRIPTION -->
 
-        <label id="composer-label" for="description">
+        <!-- =================================================
+             AI COMPOSER
+             ================================================= -->
+
+        <label
+            id="composer-label"
+            for="description"
+        >
             What happened?
         </label>
 
-        <div class="assistant-composer" role="group" aria-labelledby="composer-label">
+
+        <div
+            class="assistant-composer"
+            role="group"
+            aria-labelledby="composer-label"
+        >
+
             <textarea
                 id="description"
                 name="description"
@@ -116,49 +141,16 @@
                 placeholder="Describe what you noticed..."
             ></textarea>
 
-            <input type="file" id="image" name="image" accept="image/*" hidden>
-            <input type="file" id="audio" name="audio" accept="audio/*" hidden>
-            <input type="hidden" id="thinking" name="thinking" value="false">
 
-            <div class="composer-controls">
-                <div class="attachment-menu-wrap"><button type="button" id="add-image" class="composer-icon plus-button" aria-label="Add media" title="Add media">+</button><div id="attachment-menu" class="attachment-menu" hidden><button type="button" id="upload-photo">Upload photo</button><button type="button" id="take-photo">Take photo</button><button type="button" id="upload-video">Upload video</button><button type="button" id="record-video">Record video</button></div></div>
-                <button type="button" id="think-toggle" class="think-toggle" aria-label="Use deeper AI analysis" aria-pressed="false"><span aria-hidden="true">◉</span><span>Think</span></button>
-                <button type="button" id="start-audio" class="composer-icon microphone-button" aria-label="Start voice recording" title="Record voice"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a4 4 0 0 0 4-4V6a4 4 0 1 0-8 0v5a4 4 0 0 0 4 4Zm-7-4a7 7 0 0 0 14 0M12 18v3m-3 0h6"/></svg></button>
-                <button type="button" id="stop-audio" hidden disabled>Stop recording</button>
-                <button type="submit" class="send-button" aria-label="Send to AI" title="Send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 12 16-8-6 16-3-7-7-1Z"/><path d="m11 13 4-4"/></svg></button>
-            </div>
-        </div>
+            <!-- Hidden media inputs -->
 
-        <div class="composer-feedback">
-            <div id="image-preview-wrap" class="attachment-preview" hidden>
-                <img id="image-preview" alt="Selected crop or farm image preview">
-                <span id="image-status" aria-live="polite"></span>
-                <button type="button" id="remove-image" class="remove-attachment">Remove image</button>
-            </div>
-
-            <p
-                id="audio-status"
-                class="recording-status"
-                aria-live="polite"
-            ></p>
-
-            <audio
-                id="audio-preview"
-                controls
+            <input
+                type="file"
+                id="image"
+                name="image"
+                accept="image/*"
                 hidden
-            ></audio>
-            <button type="button" id="play-audio" class="remove-attachment" hidden>Play recording</button>
-            <button type="button" id="remove-audio" class="remove-attachment" hidden>Remove voice recording</button>
-        </div>
-
-        <!-- VIDEO -->
-
-        <section class="media-section">
-            <h2>🎥 Video</h2>
-
-            <p>
-                Upload a video or record a new video using your camera.
-            </p>
+            >
 
             <input
                 type="file"
@@ -169,71 +161,323 @@
                 hidden
             >
 
-            <div class="record-controls">
-                <button
-                    type="button"
-                    id="start-video"
-                >
-                    Start Video Recording
-                </button>
+            <input
+                type="file"
+                id="audio"
+                name="audio"
+                accept="audio/*"
+                hidden
+            >
+
+
+            <input
+                type="hidden"
+                id="thinking"
+                name="thinking"
+                value="false"
+            >
+
+
+            <!-- =================================================
+                 COMPOSER CONTROLS
+                 ================================================= -->
+
+            <div class="composer-controls">
+
+                <!-- ATTACHMENT MENU -->
+
+                <div class="attachment-menu-wrap">
+
+                    <button
+                        type="button"
+                        id="add-image"
+                        class="composer-icon plus-button"
+                        aria-label="Add media"
+                        aria-expanded="false"
+                        title="Add media"
+                    >
+                        +
+                    </button>
+
+
+                    <div
+                        id="attachment-menu"
+                        class="attachment-menu"
+                        hidden
+                    >
+
+                        <button
+                            type="button"
+                            id="upload-photo"
+                        >
+                            📷 Upload photo
+                        </button>
+
+                        <button
+                            type="button"
+                            id="take-photo"
+                        >
+                            📸 Take photo
+                        </button>
+
+                        <button
+                            type="button"
+                            id="upload-video"
+                        >
+                            🎥 Upload video
+                        </button>
+
+                        <button
+                            type="button"
+                            id="record-video"
+                        >
+                            🎬 Record video
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <!-- THINK -->
 
                 <button
                     type="button"
-                    id="stop-video"
+                    id="think-toggle"
+                    class="think-toggle"
+                    aria-label="Use deeper AI analysis"
+                    aria-pressed="false"
+                >
+                    <span aria-hidden="true">◉</span>
+                    <span>Think</span>
+                </button>
+
+
+                <!-- MICROPHONE -->
+
+                <button
+                    type="button"
+                    id="start-audio"
+                    class="composer-icon microphone-button"
+                    aria-label="Start voice recording"
+                    title="Record voice"
+                >
+                    <svg
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                    >
+                        <path d="M12 15a4 4 0 0 0 4-4V6a4 4 0 1 0-8 0v5a4 4 0 0 0 4 4Zm-7-4a7 7 0 0 0 14 0M12 18v3m-3 0h6"/>
+                    </svg>
+                </button>
+
+
+                <!-- STOP AUDIO -->
+
+                <button
+                    type="button"
+                    id="stop-audio"
+                    class="stop-audio-button"
+                    hidden
                     disabled
                 >
-                    Stop Video Recording
+                    Stop recording
                 </button>
+
+
+                <!-- SEND -->
+
+                <button
+                    type="submit"
+                    class="send-button"
+                    aria-label="Send to AI"
+                    title="Send"
+                >
+                    <svg
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                    >
+                        <path d="m4 12 16-8-6 16-3-7-7-1Z"/>
+                        <path d="m11 13 4-4"/>
+                    </svg>
+                </button>
+
             </div>
 
+        </div>
+
+
+        <!-- =================================================
+             ATTACHMENT / RECORDING FEEDBACK
+             ================================================= -->
+
+        <div class="composer-feedback">
+
+            <!-- IMAGE PREVIEW -->
+
+            <div
+                id="image-preview-wrap"
+                class="attachment-preview"
+                hidden
+            >
+
+                <img
+                    id="image-preview"
+                    alt="Selected crop or farm image preview"
+                >
+
+                <div class="attachment-info">
+                    <strong>Photo attached</strong>
+                    <span id="image-status"></span>
+                </div>
+
+                <button
+                    type="button"
+                    id="remove-image"
+                    class="remove-attachment"
+                >
+                    Remove image
+                </button>
+
+            </div>
+
+
+            <!-- VIDEO STATUS -->
+
+            <div
+                id="video-feedback"
+                class="video-feedback"
+                hidden
+            >
+
+                <div class="video-feedback-content">
+
+                    <strong>🎥 Video attached</strong>
+
+                    <span
+                        id="video-status"
+                        aria-live="polite"
+                    ></span>
+
+                </div>
+
+                <video
+                    id="video-preview"
+                    controls
+                    playsinline
+                    hidden
+                ></video>
+
+                <button
+                    type="button"
+                    id="remove-video"
+                    class="remove-attachment"
+                >
+                    Remove video
+                </button>
+
+            </div>
+
+
+            <!-- AUDIO STATUS -->
+
             <p
-                id="video-status"
+                id="audio-status"
                 class="recording-status"
                 aria-live="polite"
             ></p>
 
-            <video
-                id="video-preview"
+
+            <!-- AUDIO PREVIEW -->
+
+            <audio
+                id="audio-preview"
                 controls
-                playsinline
-                width="320"
                 hidden
-            ></video>
-            <button type="button" id="remove-video" class="remove-attachment" hidden>Remove video</button>
-        </section>
+            ></audio>
+
+
+            <button
+                type="button"
+                id="play-audio"
+                class="remove-attachment"
+                hidden
+            >
+                Play recording
+            </button>
+
+
+            <button
+                type="button"
+                id="remove-audio"
+                class="remove-attachment"
+                hidden
+            >
+                Remove voice recording
+            </button>
+
+        </div>
+
 
         <p class="media-help">
-            You can describe the issue or provide audio/video context.
-            Media uploads are optional.
+            You can describe the issue or attach a photo, video,
+            or voice recording. Media uploads are optional.
         </p>
 
-        <div id="submit-status" class="submit-status" role="status" aria-live="polite"></div>
+
+        <!-- SUBMIT STATUS -->
+
+        <div
+            id="submit-status"
+            class="submit-status"
+            role="status"
+            aria-live="polite"
+        ></div>
 
     </form>
 
-    <!-- AI RESULT -->
+
+    <!-- =====================================================
+         AI RESULT
+         ===================================================== -->
 
     {{if .Result}}
-        <section
-            class="ai-result"
-            aria-live="polite"
-        >
-            <h2>🤖 AI Result</h2>
 
-            <div class="ai-result-text">
-                {{.Result}}
-            </div>
-        </section>
+    <section
+        class="ai-result"
+        aria-live="polite"
+    >
+
+        <h2>🤖 AI Result</h2>
+
+        <div class="ai-result-text">
+            {{.Result}}
+        </div>
+
+    </section>
+
     {{end}}
 
+
+    <!-- =====================================================
+         HISTORY
+         ===================================================== -->
+
     <p class="history-link-wrap">
-        <a class="history-link" href="/ai-diagnosis-history">View AI diagnosis history</a>
+
+        <a
+            class="history-link"
+            href="/ai-diagnosis-history"
+        >
+            View AI diagnosis history
+        </a>
+
     </p>
 
 </main>
 
-<script src="/static/js/ai_assistant.js?v=20260826-audio-preview3"></script>
 
+<script src="/static/js/ai_assistant.js?v=20260829-clean"></script>
 <script src="/static/js/navigation.js"></script>
+
 </body>
 </html>

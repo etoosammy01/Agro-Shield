@@ -1,182 +1,329 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Create Account | Agro-Shield</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<link rel="stylesheet" href="/static/css/style.css">
-<link rel="stylesheet" href="/static/css/register.css">
-<link rel="stylesheet" href="/static/css/register-extra.css">
+    <title>Create Account | Agro-Shield</title>
 
-<!-- Font Awesome -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/register.css">
+    <link rel="stylesheet" href="/static/css/register-extra.css">
 
+    <!-- Font Awesome -->
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    >
 </head>
 
 <body>
 
-<div class="auth-container">
+    <main class="auth-container">
 
-<div class="auth-left">
+        <!-- LEFT SIDE -->
+        <section class="auth-left">
 
-<h1>Join Agro-Shield</h1>
+            <h1>Join Agro-Shield</h1>
 
-<p>
-            Create your account to monitor farm produce,
-            connect with buyers, receive AI-powered crop
-            diagnosis, and grow your agricultural business.
-</p>
+            <p>
+                Create your account to monitor farm produce,
+                connect with buyers, receive AI-powered crop
+                diagnosis, and grow your agricultural business.
+            </p>
 
-</div>
+        </section>
 
-<div class="auth-right">
 
-<img class="auth-brand" src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield">
+        <!-- RIGHT SIDE -->
+        <section class="auth-right">
 
-<form id="register-form" action="/register" method="POST" enctype="multipart/form-data">
-<h2>Create Account</h2>
+            <div class="auth-form-wrapper">
 
-<label for="profile-picture">Profile Picture</label>
-<input id="profile-picture" name="profile_picture" type="file" accept="image/*" required>
+                <!-- LOGO -->
+                <img
+                    class="auth-brand"
+                    src="/static/assets/logo/Agro-Shield_logo.png"
+                    alt="Agro-Shield"
+                >
 
-<label>I am a</label>
-<div class="row role-select">
+                <!-- REGISTRATION FORM -->
+                <form
+                    id="register-form"
+                    action="/register"
+                    method="POST"
+                    enctype="multipart/form-data"
+                >
 
-<label class="role-option">
-<input type="radio" name="role" value="farmer" checked>
-                    🌾 Farmer — I grow and sell produce
-</label>
+                    <h2>Create Account</h2>
 
-<label class="role-option">
-<input type="radio" name="role" value="buyer">
-                    🛒 Buyer — I want to buy produce
-</label>
 
-</div>
+                    <!-- ROLE -->
+                    <label>I am a</label>
 
-<div class="row">
+                    <div class="row role-select">
 
-<div>
-<label for="first-name">First Name</label>
-<input
-name="first-name"
-type="text"
-id="first-name"
-placeholder="First Name"
-required
->
-</div>
+                        <label class="role-option">
+                            <input
+                                type="radio"
+                                name="role"
+                                value="farmer"
+                                checked
+                            >
 
-<div>
-<label for="last-name">Last Name</label>
-<input
-name="last-name"
-type="text"
-id="last-name"
-placeholder="Last Name"
-required
->
-</div>
+                            <span>
+                                🌾 Farmer — I grow and sell produce
+                            </span>
+                        </label>
 
-</div>
+                        <label class="role-option">
+                            <input
+                                type="radio"
+                                name="role"
+                                value="buyer"
+                            >
 
-<label for="email">Email Address</label>
-<input
-name="email"
-type="email"
-id="email"
-placeholder="Enter your email"
-required
->
+                            <span>
+                                🛒 Buyer — I want to buy produce
+                            </span>
+                        </label>
 
-<label for="phone">Phone Number</label>
-<input
-name="phone"
-type="tel"
-id="phone"
-placeholder="Enter your phone number"
-required
->
+                    </div>
 
-<label for="location">Location (LGA)</label>
-<select
-name="location"
-id="location"
-required
->
-<option value="" disabled selected>Select your LGA</option>
-<option value="Ado">Ado</option>
-<option value="Agatu">Agatu</option>
-<option value="Apa">Apa</option>
-<option value="Buruku">Buruku</option>
-<option value="Gboko">Gboko</option>
-<option value="Guma">Guma</option>
-<option value="Gwer East">Gwer East</option>
-<option value="Gwer West">Gwer West</option>
-<option value="Katsina-Ala">Katsina-Ala</option>
-<option value="Konshisha">Konshisha</option>
-<option value="Kwande">Kwande</option>
-<option value="Logo">Logo</option>
-<option value="Makurdi">Makurdi</option>
-<option value="Obi">Obi</option>
-<option value="Ogbadibo">Ogbadibo</option>
-<option value="Ohimini">Ohimini</option>
-<option value="Oju">Oju</option>
-<option value="Okpokwu">Okpokwu</option>
-<option value="Otukpo">Otukpo</option>
-<option value="Tarka">Tarka</option>
-<option value="Ukum">Ukum</option>
-<option value="Ushongo">Ushongo</option>
-<option value="Vandeikya">Vandeikya</option>
-</select>
 
-<label for="password">Password</label>
-<div class="password-wrapper">
-<input
-name="password"
-type="password"
-id="password"
-placeholder="Create password"
-required
->
-<i
-class="fa-solid fa-eye toggle-password"
-id="toggle-password"
-></i>
-</div>
+                    <!-- FIRST NAME + LAST NAME -->
+                    <div class="row">
 
-<label for="confirm-password">Confirm Password</label>
-<div class="password-wrapper">
-<input
-name="confirm-password"
-type="password"
-id="confirm-password"
-placeholder="Confirm password"
-required
->
-<i
-class="fa-solid fa-eye toggle-password"
-id="toggle-confirm-password"
-></i>
-</div>
+                        <div class="form-group">
 
-<button type="submit">
-                Create Account
-</button>
+                            <label for="first-name">
+                                First Name
+                            </label>
 
-<p>
-                Already have an account?
-<a href="/login">Login</a>
-</p>
+                            <input
+                                name="first-name"
+                                type="text"
+                                id="first-name"
+                                placeholder="First Name"
+                                autocomplete="given-name"
+                                required
+                            >
 
-</form>
+                        </div>
 
-</div>
+                        <div class="form-group">
 
-</div>
+                            <label for="last-name">
+                                Last Name
+                            </label>
 
-<script src="/static/js/register.js"></script>
+                            <input
+                                name="last-name"
+                                type="text"
+                                id="last-name"
+                                placeholder="Last Name"
+                                autocomplete="family-name"
+                                required
+                            >
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- EMAIL -->
+                    <div class="form-group">
+
+                        <label for="email">
+                            Email Address
+                        </label>
+
+                        <input
+                            name="email"
+                            type="email"
+                            id="email"
+                            placeholder="Enter your email"
+                            autocomplete="email"
+                            required
+                        >
+
+                    </div>
+
+
+                    <!-- PHONE -->
+                    <div class="form-group">
+
+                        <label for="phone">
+                            Phone Number
+                        </label>
+
+                        <input
+                            name="phone"
+                            type="tel"
+                            id="phone"
+                            placeholder="Enter your phone number"
+                            autocomplete="tel"
+                            required
+                        >
+
+                    </div>
+
+
+                    <!-- LOCATION -->
+                    <div class="form-group">
+
+                        <label for="location">
+                            Location (LGA)
+                        </label>
+
+                        <select
+                            name="location"
+                            id="location"
+                            required
+                        >
+
+                            <option value="" disabled selected>
+                                Select your LGA
+                            </option>
+
+                            <option value="Ado">Ado</option>
+                            <option value="Agatu">Agatu</option>
+                            <option value="Apa">Apa</option>
+                            <option value="Buruku">Buruku</option>
+                            <option value="Gboko">Gboko</option>
+                            <option value="Guma">Guma</option>
+                            <option value="Gwer East">Gwer East</option>
+                            <option value="Gwer West">Gwer West</option>
+                            <option value="Katsina-Ala">Katsina-Ala</option>
+                            <option value="Konshisha">Konshisha</option>
+                            <option value="Kwande">Kwande</option>
+                            <option value="Logo">Logo</option>
+                            <option value="Makurdi">Makurdi</option>
+                            <option value="Obi">Obi</option>
+                            <option value="Ogbadibo">Ogbadibo</option>
+                            <option value="Ohimini">Ohimini</option>
+                            <option value="Oju">Oju</option>
+                            <option value="Okpokwu">Okpokwu</option>
+                            <option value="Otukpo">Otukpo</option>
+                            <option value="Tarka">Tarka</option>
+                            <option value="Ukum">Ukum</option>
+                            <option value="Ushongo">Ushongo</option>
+                            <option value="Vandeikya">Vandeikya</option>
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- PASSWORD -->
+                    <div class="form-group">
+
+                        <label for="password">
+                            Password
+                        </label>
+
+                        <div class="password-wrapper">
+
+                            <input
+                                name="password"
+                                type="password"
+                                id="password"
+                                placeholder="Create password"
+                                autocomplete="new-password"
+                                required
+                            >
+
+                            <i
+                                class="fa-solid fa-eye toggle-password"
+                                id="toggle-password"
+                                aria-label="Show password"
+                                role="button"
+                                tabindex="0"
+                            ></i>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- CONFIRM PASSWORD -->
+                    <div class="form-group">
+
+                        <label for="confirm-password">
+                            Confirm Password
+                        </label>
+
+                        <div class="password-wrapper">
+
+                            <input
+                                name="confirm-password"
+                                type="password"
+                                id="confirm-password"
+                                placeholder="Confirm password"
+                                autocomplete="new-password"
+                                required
+                            >
+
+                            <i
+                                class="fa-solid fa-eye toggle-password"
+                                id="toggle-confirm-password"
+                                aria-label="Show confirm password"
+                                role="button"
+                                tabindex="0"
+                            ></i>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- PROFILE PICTURE -->
+                    <div class="form-group profile-upload">
+
+                        <label for="profile-picture">
+                            Profile Picture
+                        </label>
+
+                        <input
+                            id="profile-picture"
+                            name="profile_picture"
+                            type="file"
+                            accept="image/*"
+                            required
+                        >
+
+                    </div>
+
+
+                    <!-- SUBMIT -->
+                    <button type="submit">
+                        Create Account
+                    </button>
+
+
+                    <!-- LOGIN LINK -->
+                    <p class="auth-footer">
+
+                        Already have an account?
+
+                        <a href="/login">
+                            Login
+                        </a>
+
+                    </p>
+
+                </form>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <script src="/static/js/register.js"></script>
 
 </body>
+
 </html>

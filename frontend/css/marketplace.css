@@ -1,132 +1,446 @@
-.marketplace{
-    padding:50px 80px;
+cat > frontend/css/marketplace.css <<'EOF'
+/* ============================================================
+   AGRO-SHIELD MARKETPLACE
+   ============================================================ */
+
+.marketplace {
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 50px 60px 80px;
 }
 
-.market-header{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:30px;
+/* ============================================================
+   HEADER
+   ============================================================ */
+
+.market-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 28px;
 }
 
-.market-header h1{
-    font-size:40px;
+.market-header h1 {
+    margin: 0;
+    font-size: 40px;
+    line-height: 1.2;
+    color: var(--color-ink);
 }
 
-.market-header p{
-    color:gray;
-    margin-top:8px;
+.market-header p {
+    margin: 8px 0 0;
+    color: var(--color-muted);
+    line-height: 1.6;
 }
 
-.search-box{
-    width:100%;
-    max-width:400px;
-    padding:14px;
-    border:1px solid lightgray;
-    border-radius:8px;
-    margin-bottom:40px;
-    display:block;
+/* ============================================================
+   SEARCH
+   ============================================================ */
+
+.marketplace-search-form {
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+    width: 100%;
+    max-width: 700px;
+    margin: 0 0 40px;
 }
 
-.message{
-    margin-bottom:20px;
-    font-weight:bold;
+.search-box {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+    min-height: 48px;
+    padding: 0 16px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-size: 16px;
+    margin: 0;
 }
 
-.product-grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
-    gap:30px;
+.search-box:focus {
+    outline: none;
+    border-color: var(--color-brand);
+    box-shadow: 0 0 0 3px rgba(31, 122, 77, .12);
 }
 
-.product-card{
-    background:white;
-    border-radius:12px;
-    overflow:hidden;
-    box-shadow:0 6px 20px lightgray;
-    transition:.3s;
-    padding:20px;
+.marketplace-search-form button {
+    flex: 0 0 auto;
+    min-width: 110px;
+    min-height: 48px;
+    padding: 0 20px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: var(--color-brand);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .2s ease, transform .2s ease;
 }
 
-.product-card:hover{
-    transform:translateY(-8px);
+.marketplace-search-form button:hover {
+    background: var(--color-brand-dark);
+    transform: translateY(-1px);
 }
 
-.product-card h3{
-    color:green;
-    margin:6px 0;
+.marketplace-search-form button:active {
+    transform: translateY(0);
 }
 
-.product-card .price{
-    font-weight:bold;
-    font-size:18px;
+/* ============================================================
+   MESSAGES
+   ============================================================ */
+
+.message {
+    margin: 0 0 20px;
+    font-weight: 700;
 }
 
-.product-image{
-    width:100%;
-    height:160px;
-    object-fit:cover;
-    border-radius:8px;
-    margin-bottom:10px;
+/* ============================================================
+   PRODUCT GRID
+   ============================================================ */
+
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 28px;
+    align-items: stretch;
 }
 
-.buy-form{
-    display:flex;
-    gap:10px;
-    margin-top:16px;
+/* ============================================================
+   PRODUCT CARD
+   ============================================================ */
+
+.product-card {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    overflow: hidden;
+    padding: 18px;
+    box-shadow: 0 6px 20px rgba(23, 35, 28, .08);
+    transition: transform .2s ease, box-shadow .2s ease;
 }
 
-.buy-form input{
-    flex:1;
-    padding:10px;
-    border:1px solid lightgray;
-    border-radius:8px;
+.product-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 28px rgba(23, 35, 28, .12);
 }
 
-.buy-form button{
-    background:green;
-    color:white;
-    border:none;
-    padding:10px 18px;
-    border-radius:8px;
-    font-weight:bold;
-    cursor:pointer;
+/* ============================================================
+   PRODUCT IMAGE
+   ============================================================ */
+
+.product-image {
+    display: block;
+    width: 100%;
+    height: 190px;
+    object-fit: cover;
+    border-radius: 12px;
+    margin: 0 0 14px;
 }
 
-.buy-form button:hover{
-    background:darkgreen;
+/* ============================================================
+   PRODUCT INFORMATION
+   ============================================================ */
+
+.product-card h3 {
+    margin: 4px 0 6px;
+    color: var(--color-brand-dark);
+    font-size: 20px;
+    line-height: 1.3;
 }
 
-.negotiate-form{
-    display:flex;
-    gap:8px;
-    margin-top:10px;
+.product-card p {
+    margin: 7px 0;
+    line-height: 1.5;
 }
 
-.negotiate-form input{
-    flex:1;
-    padding:10px;
-    border:1px solid lightgray
+.product-card .price {
+    margin: 4px 0 10px;
+    color: var(--color-ink);
+    font-size: 19px;
+    font-weight: 800;
 }
-/* View Product button
-   Purpose: Lets users open the full details of a marketplace product.
-*/
+
+.product-location {
+    color: var(--color-muted);
+    font-size: .92rem;
+}
+
+.product-location a {
+    color: var(--color-brand-dark);
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.product-location a:hover {
+    text-decoration: underline;
+}
+
+/* ============================================================
+   SELLER
+   ============================================================ */
+
+.seller-identity,
+.negotiation-person {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.seller-identity img,
+.negotiation-person img {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid var(--color-border);
+}
+
+/* ============================================================
+   VIEW PRODUCT
+   ============================================================ */
 
 .view-product {
-    display: inline-block;
-    margin: 12px 0;
-    padding: 10px 16px;
-    background: #2e7d32;
-    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 44px;
+    margin: 14px 0 8px;
+    padding: 0 16px;
+    border-radius: 8px;
+    background: var(--color-brand);
+    color: #fff;
     text-decoration: none;
-    border-radius: 6px;
-    font-weight: bold;
-    transition: background 0.2s ease;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .2s ease, transform .2s ease;
 }
 
-.view-product:hover {
-    background: #1b5e20;
+.view-product:hover,
+.view-product:focus-visible {
+    background: var(--color-brand-dark);
+    color: #fff;
+    transform: translateY(-1px);
 }
-.seller-identity,.negotiation-person{display:inline-flex;align-items:center;gap:8px}.seller-identity img,.negotiation-person img{width:28px;height:28px;border-radius:50%;object-fit:cover}
-.view-product{display:flex;align-items:center;justify-content:center;width:100%;min-height:44px;margin:14px 0 8px;padding:0 16px;border-radius:8px;background:#1f7a4d;color:#fff;text-decoration:none;font-weight:700;cursor:pointer;position:relative;z-index:2}.view-product:hover,.view-product:focus-visible{background:#14532d;color:#fff}
-.product-location{color:#53635a;font-size:.92rem}.product-location a{color:#176b42;font-weight:700;text-decoration:none}.product-location a:hover{text-decoration:underline}.product-location a span{font-size:1rem}
+
+/* ============================================================
+   BUY FORM
+   ============================================================ */
+
+.buy-form {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    width: 100%;
+    margin-top: 12px;
+}
+
+.buy-form input {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+}
+
+.buy-form button {
+    flex: 0 0 auto;
+    min-height: 44px;
+    padding: 0 18px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--color-brand);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.buy-form button:hover {
+    background: var(--color-brand-dark);
+}
+
+/* ============================================================
+   NEGOTIATION FORM
+   ============================================================ */
+
+.negotiate-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 8px;
+    width: 100%;
+    margin-top: 10px;
+}
+
+.negotiate-form input {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 0 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+}
+
+.negotiate-form button {
+    min-height: 44px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--color-brand);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.negotiate-form button:hover {
+    background: var(--color-brand-dark);
+}
+
+/* ============================================================
+   TABLET
+   ============================================================ */
+
+@media (max-width: 900px) {
+
+    .marketplace {
+        padding: 40px 28px 60px;
+    }
+
+    .market-header h1 {
+        font-size: 34px;
+    }
+
+    .product-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px;
+    }
+
+}
+
+/* ============================================================
+   PHONE
+   ============================================================ */
+
+@media (max-width: 600px) {
+
+    .marketplace {
+        padding: 28px 16px 50px;
+    }
+
+    .market-header {
+        margin-bottom: 22px;
+    }
+
+    .market-header h1 {
+        font-size: 30px;
+    }
+
+    .market-header p {
+        font-size: 15px;
+    }
+
+    /* Search button stays visible and never gets covered */
+    .marketplace-search-form {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+        max-width: none;
+        margin-bottom: 30px;
+    }
+
+    .search-box {
+        width: 100%;
+        min-height: 48px;
+    }
+
+    .marketplace-search-form button {
+        width: 100%;
+        min-height: 48px;
+    }
+
+    /* Products become one clean column */
+    .product-grid {
+        grid-template-columns: 1fr;
+        gap: 18px;
+    }
+
+    .product-card {
+        padding: 15px;
+        border-radius: 14px;
+    }
+
+    .product-image {
+        height: 200px;
+    }
+
+    /* Buy form */
+    .buy-form {
+        display: grid;
+        grid-template-columns: 1fr auto;
+    }
+
+    .buy-form input,
+    .buy-form button {
+        width: 100%;
+    }
+
+    /* Negotiation form */
+    .negotiate-form {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .negotiate-form input {
+        width: 100%;
+    }
+
+    .negotiate-form button {
+        grid-column: 1 / -1;
+        width: 100%;
+    }
+
+}
+
+/* ============================================================
+   VERY SMALL PHONES
+   ============================================================ */
+
+@media (max-width: 380px) {
+
+    .marketplace {
+        padding: 24px 12px 40px;
+    }
+
+    .market-header h1 {
+        font-size: 27px;
+    }
+
+    .product-card {
+        padding: 13px;
+    }
+
+    .product-image {
+        height: 175px;
+    }
+
+    .buy-form {
+        grid-template-columns: 1fr;
+    }
+
+    .negotiate-form {
+        grid-template-columns: 1fr;
+    }
+
+    .negotiate-form button {
+        grid-column: auto;
+    }
+
+}

@@ -1,1 +1,1 @@
-.role-select{display:flex;flex-direction:column;gap:10px;margin-bottom:20px}.role-option{display:flex;align-items:center;gap:10px;font-weight:400;border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:12px 16px;cursor:pointer;background:var(--color-surface)}.role-option:hover{border-color:var(--color-brand);background:var(--color-brand-soft)}.role-option input{width:auto}
+/* Registration page extra styles are handled by register.css */
