@@ -701,3 +701,58 @@ const Dashboard = (() => {
     };
 
 })();
+
+/* ============================================================
+   NEW FEATURES ADDED - Real-Time Activity Simulation
+   ============================================================ */
+
+(function() {
+    const activityList = document.querySelector(".activity-list");
+    if (!activityList) return;
+
+    // Sample activities
+    const sampleActivities = [
+        { icon: "🌾", title: "New Product Listed", desc: "You listed 10kg of Fresh Tomatoes", value: "+₦5,000", time: "Just now" },
+        { icon: "💰", title: "New Sale", desc: "Mary's Restaurant bought 5kg of Cassava", value: "+₦3,500", time: "Just now" },
+        { icon: "📈", title: "Performance Update", desc: "Your farm revenue increased by 5%", value: "+5%", time: "2 mins ago" },
+        { icon: "🌾", title: "New Product Listed", desc: "You listed 20kg of Organic Maize", value: "+₦8,000", time: "3 mins ago" },
+        { icon: "💰", title: "New Sale", desc: "John's Supermarket bought 15kg of Yams", value: "+₦6,500", time: "5 mins ago" }
+    ];
+
+    function addActivity(activity) {
+        const row = document.createElement("div");
+        row.className = "activity-row";
+        row.innerHTML = `
+            <span class="activity-mark"></span>
+            <div class="activity-main">
+                <h3>${activity.icon} ${activity.title}</h3>
+                <p>${activity.desc} • ${activity.time}</p>
+            </div>
+            <div class="activity-value">
+                <strong>${activity.value}</strong>
+                <span>${activity.time}</span>
+            </div>
+        `;
+        activityList.insertBefore(row, activityList.firstChild);
+    }
+
+    // Add initial activities
+    sampleActivities.forEach(activity => addActivity(activity));
+
+    // Simulate real-time updates
+    setInterval(() => {
+        const newActivity = {
+            icon: ["🌾", "💰", "📈"][Math.floor(Math.random() * 3)],
+            title: ["New Product Listed", "New Sale", "Performance Update"][Math.floor(Math.random() * 3)],
+            desc: ["You listed fresh vegetables", "A buyer purchased 10kg of produce", "Your farm rating improved"][Math.floor(Math.random() * 3)],
+            value: ["+₦2,000", "+₦4,500", "+3%"][Math.floor(Math.random() * 3)],
+            time: "Just now"
+        };
+        addActivity(newActivity);
+
+        // Keep activity list short (max 10 items)
+        while (activityList.children.length > 10) {
+            activityList.removeChild(activityList.lastChild);
+        }
+    }, 10000); // Adds a new activity every 10 seconds
+})();

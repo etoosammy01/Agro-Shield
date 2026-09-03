@@ -75,3 +75,44 @@ function changeBackground() {
 }
 
 setInterval(changeBackground, 4000);
+
+/* ============================================================
+   NEW FEATURES ADDED - Better Error Handling
+   ============================================================ */
+
+// ---------- Forgot Password Link ----------
+const forgotPassword = document.getElementById("forgot-password-link");
+
+if (forgotPassword) {
+    forgotPassword.addEventListener("click", function (event) {
+        event.preventDefault();
+        if (!phone.value.trim()) {
+            message.textContent = "Please enter your phone number first.";
+            message.style.color = "red";
+            phone.focus();
+            return;
+        }
+        // Simulate sending reset link (in production, this goes to backend)
+        message.textContent = `Password reset link sent to ${phone.value.trim()}. Check your phone.`;
+        message.style.color = "green";
+    });
+}
+
+// ---------- Better Phone Validation ----------
+phone.addEventListener("blur", () => {
+    const phonePattern = /^\+?[0-9]{10,15}$/;
+    if (phone.value.trim() && !phonePattern.test(phone.value.trim())) {
+        message.textContent = "Please enter a valid phone number.";
+        message.style.color = "red";
+        phone.focus();
+    }
+});
+
+// ---------- Password Length Check on Blur ----------
+password.addEventListener("blur", () => {
+    if (password.value.length > 0 && password.value.length < 8) {
+        message.textContent = "Password must be at least 8 characters.";
+        message.style.color = "red";
+        password.focus();
+    }
+});

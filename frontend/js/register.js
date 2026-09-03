@@ -136,3 +136,62 @@ function changeBackground() {
 }
 changeBackground();
 setInterval(changeBackground, 4000);
+
+/* ============================================================
+   NEW FEATURES ADDED - Forgot Password + Better Error Handling
+   ============================================================ */
+
+// ---------- Forgot Password Link ----------
+const forgotPasswordLink = document.getElementById("forgot-password-link");
+
+if (forgotPasswordLink) {
+    forgotPasswordLink.addEventListener("click", function (event) {
+        event.preventDefault();
+        if (!email.value.trim()) {
+            message.textContent = "Please enter your email first to reset your password.";
+            message.style.color = "red";
+            email.focus();
+            return;
+        }
+        // Simulate sending a reset link (in production, this goes to backend)
+        message.textContent = `Password reset link sent to ${email.value.trim()}. Check your email.`;
+        message.style.color = "green";
+    });
+}
+
+// ---------- Better Email Validation ----------
+email.addEventListener("blur", () => {
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (email.value.trim() && !emailPattern.test(email.value.trim())) {
+        message.textContent = "Please enter a valid email address.";
+        message.style.color = "red";
+        email.focus();
+    }
+});
+
+// ---------- Better Phone Validation ----------
+phone.addEventListener("blur", () => {
+    const phonePattern = /^\+?[0-9]{10,15}$/;
+    if (phone.value.trim() && !phonePattern.test(phone.value.trim())) {
+        message.textContent = "Please enter a valid phone number (10-15 digits, optional +).";
+        message.style.color = "red";
+        phone.focus();
+    }
+});
+
+// ---------- Better Name Validation ----------
+firstName.addEventListener("blur", () => {
+    if (firstName.value.trim().length < 2) {
+        message.textContent = "First name must be at least 2 characters.";
+        message.style.color = "red";
+        firstName.focus();
+    }
+});
+
+lastName.addEventListener("blur", () => {
+    if (lastName.value.trim().length < 2) {
+        message.textContent = "Last name must be at least 2 characters.";
+        message.style.color = "red";
+        lastName.focus();
+    }
+});
