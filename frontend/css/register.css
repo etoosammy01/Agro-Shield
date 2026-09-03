@@ -613,3 +613,36 @@ body {
     }
 
 }
+/* ============================================================
+   TEAMMATE CORRECTIONS - REGISTRATION PAGE
+   ============================================================ */
+
+/* 1. Remove Profile Picture field entirely */
+.profile-upload {
+    display: none !important;
+}
+
+/* 2. Role Selector Text - Simplified */
+.auth-right form .role-option {
+    font-size: 15px;
+    font-weight: 600;
+    padding: 15px 18px;
+}
+
+/* 3. Phone number as primary - Add visual emphasis */
+.auth-right form input[type="tel"] {
+    border-color: var(--color-brand, #1f7a4d);
+    border-width: 2px;
+}
+
+/* 4. Make the form slightly wider for better readability */
+.auth-form-wrapper {
+    max-width: 600px;
+}
+
+/* 5. Ensure text is always readable */
+.auth-right form input,
+.auth-right form select {
+    color: #17231c !important;
+    background: #ffffff !important;
+}

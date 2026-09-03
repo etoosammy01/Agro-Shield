@@ -1180,3 +1180,75 @@
     }
 
 }
+/* ============================================================
+   TEAMMATE CORRECTIONS - AI ASSISTANT
+   ============================================================ */
+
+/* 1. Remove emoji icon */
+.ai-assistant-icon,
+.ai-icon,
+.assistant-icon {
+    display: none !important;
+}
+
+/* 2. Custom brand SVG icon */
+.ai-brand-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #1f7a4d, #14532d);
+    color: #ffffff;
+}
+
+.ai-brand-icon svg {
+    width: 24px;
+    height: 24px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+}
+
+/* 3. Custom Assistant UI (not ChatGPT clone) */
+.ai-assistant-container {
+    background: #f8fcf8;
+    border: 1px solid #dbe7dc;
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0 8px 30px rgba(23, 35, 28, 0.08);
+}
+
+/* Custom floating widget */
+.ai-floating-widget {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 1000;
+}
+
+.ai-floating-widget-button {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: #1f7a4d;
+    color: white;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(31, 122, 77, 0.4);
+    display: grid;
+    place-items: center;
+    transition: transform 0.2s ease;
+}
+
+.ai-floating-widget-button:hover {
+    transform: scale(1.1);
+}
+
+.ai-floating-widget-button svg {
+    width: 28px;
+    height: 28px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+}

@@ -796,3 +796,47 @@
         transform: none;
     }
 }
+/* ============================================================
+   TEAMMATE CORRECTIONS - PRODUCT PAGE
+   ============================================================ */
+
+/* 1. Location Proximity Link */
+.product-location {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #166534;
+    font-weight: 600;
+}
+
+.product-location svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+}
+
+.product-location-link {
+    color: #008000;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.product-location-link:hover {
+    text-decoration: underline;
+}
+
+/* 2. Show distance badge */
+.product-distance {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 12px;
+    background: #eaf7ea;
+    color: #166534;
+    font-size: 12px;
+    font-weight: 700;
+    margin-top: 8px;
+}
