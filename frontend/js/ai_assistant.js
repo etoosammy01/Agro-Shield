@@ -735,3 +735,99 @@ function setupAudioRecorder() {
         }
     );
 }
+/* ============================================================
+   NEW FEATURES ADDED (Voice Input + File Validation)
+   ============================================================ */
+
+document.addEventListener("DOMContentLoaded", () => {
+    // Voice Input (Speech-to-Text)
+    const voiceInputButton = document.getElementById("voice-input");
+    const voiceStatus = document.getElementById("voice-status");
+    const textArea = document.querySelector(".assistant-composer textarea");
+
+    let recognition = null;
+    let isRecording = false;
+
+    function initSpeechRecognition() {
+        if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
+            if (voiceStatus) voiceStatus.textContent = "Speech recognition not supported in this browser.";
+            return;
+        }
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.lang = "en-US";
+
+        recognition.onstart = () => {
+            isRecording = true;
+            if (voiceStatus) voiceStatus.textContent = "Listening...";
+            if (voiceInputButton) voiceInputButton.classList.add("recording");
+        };
+
+        recognition.onresult = (event) => {
+            let transcript = "";
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                transcript += event.results[i][0].transcript;
+            }
+            if (textArea) textArea.value = transcript;
+        };
+
+        recognition.onerror = (event) => {
+            if (voiceStatus) voiceStatus.textContent = "Error: " + event.error;
+        };
+
+        recognition.onend = () => {
+            isRecording = false;
+            if (voiceStatus) voiceStatus.textContent = "";
+            if (voiceInputButton) voiceInputButton.classList.remove("recording");
+        };
+    }
+
+    if (voiceInputButton && textArea) {
+        initSpeechRecognition();
+        voiceInputButton.addEventListener("click", () => {
+            if (isRecording) {
+                recognition.stop();
+            } else {
+                try {
+                    recognition.start();
+                } catch (error) {
+                    console.error("Speech recognition error:", error);
+                }
+            }
+        });
+    }
+
+    // File Validation for Image Upload
+    const VALID_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+
+    function validateImageFile(file) {
+        if (!file) return { valid: false, error: "No file selected." };
+        if (!VALID_IMAGE_TYPES.includes(file.type)) {
+            return { valid: false, error: "Invalid image type. Please upload JPG, PNG, WEBP, or GIF." };
+        }
+        if (file.size > MAX_IMAGE_SIZE) {
+            return { valid: false, error: "Image too large. Maximum size is 5MB." };
+        }
+        return { valid: true };
+    }
+
+    const imageInput = document.getElementById("image");
+    const imageStatus = document.getElementById("image-status");
+
+    if (imageInput) {
+        imageInput.addEventListener("change", () => {
+            const file = imageInput.files[0];
+            const validation = validateImageFile(file);
+            if (!validation.valid) {
+                imageInput.value = "";
+                if (imageStatus) imageStatus.textContent = validation.error;
+            } else {
+                if (imageStatus) imageStatus.textContent = file.name + " attached";
+            }
+        });
+    }
+});
