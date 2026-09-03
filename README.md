@@ -119,23 +119,23 @@ Buyers have a dedicated dashboard for:
 
 # 🗄️ Database Architecture
 
-Agro-Shield initially used **SQLite** because it was lightweight and suitable for rapid MVP development and local testing.
+Agro-Shield initially used **SQLite** during MVP development because it was lightweight and suitable for rapid development and local testing.
 
-As the platform moves toward multi-user and production deployment, we are migrating to **PostgreSQL**.
+The project has now been successfully migrated to **PostgreSQL** to provide a stronger foundation for production deployment, multi-user access, and future marketplace transactions.
 
 ### Why PostgreSQL?
 
-The migration is intended to provide:
+PostgreSQL provides Agro-Shield with:
 
 - Better support for concurrent users
-- Stronger transactional capabilities
+- Strong transactional capabilities
 - Improved data integrity
 - Better scalability
 - Production and cloud deployment readiness
-- A stronger foundation for the future marketplace
-- Better support for larger farmer, buyer, and transaction datasets
+- A stronger foundation for marketplace transactions
+- Support for larger farmer, buyer, and transaction datasets
 
-### Current Database Evolution
+### Database Evolution
 
 #### Initial MVP
 
@@ -149,7 +149,7 @@ Repository Layer
 SQLite
 ```
 
-### Target Architecture
+### Current Production Architecture
 
 ```text
 Frontend
@@ -186,13 +186,13 @@ The migration is being implemented in stages:
 8. Configure production database deployment.
 9. Remove the SQLite dependency after PostgreSQL integration has been fully validated.
 
-> **Current Status:** PostgreSQL migration is in progress. SQLite remains part of the project's initial MVP development history.
+> **Current Status:** PostgreSQL migration is complete. SQLite remains part of the project's initial MVP development history.
 
 ---
 
 # ✅ Backend Architecture
 
-The project follows a layered architecture designed to separate responsibilities and make the system easier to maintain and scale.
+Agro-Shield follows a layered backend architecture designed to separate responsibilities, improve maintainability, and support future scalability.
 
 ```text
 Handlers
@@ -203,23 +203,31 @@ Repositories
     ↓
 Database Layer
     ↓
-SQLite → PostgreSQL
+PostgreSQL
 ```
 
 Current backend components include:
 
-* Routing
+* HTTP routing
 * Middleware
-* Repository Pattern
-* Service Layer
-* DTOs
-* Models
+* Handler layer
+* Service layer
+* Repository pattern
+* Data Transfer Objects (DTOs)
+* Domain models
+* PostgreSQL database
 * Database migrations
-* PostgreSQL migration
-* HTML Templates
-* Static Asset Serving
+* Authentication and authorization
+* HTML template rendering
+* Static asset serving
+* AI-powered agricultural assistance
+* Marketplace functionality
+* Order and negotiation management
+* Cart management
+* Notifications
+* Conversations and messaging
 
-For detailed migration documentation, see [Database Migration](docs/database-migration.md).
+For historical details about the database migration, see Database Migration (docs/database-migration.md).
 
 ---
 
@@ -227,12 +235,16 @@ For detailed migration documentation, see [Database Migration](docs/database-mig
 
 ### Backend
 
-* Go (Golang)
-* `net/http`
-* PostgreSQL
-* SQLite *(initial MVP database)*
-* bcrypt
-* Go HTML Templates
+- Go (Golang)
+- `net/http`
+- PostgreSQL
+- bcrypt
+- Go HTML Templates
+- Google Gemini API
+
+### Previous MVP Technology
+
+- SQLite
 
 ### Frontend
 
