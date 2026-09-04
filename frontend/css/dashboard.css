@@ -1583,6 +1583,7 @@
    
 }
 
+
 /* 2. SVG NOTIFICATION ICON */
 .notification-icon {
     display: inline-grid;
@@ -1700,4 +1701,13 @@
     stroke-width: 2;
     stroke-linecap: round;
     stroke-linejoin: round;
+}
+
+.notification-nav-link.notification-icon svg {
+   transform: none
+}
+
+.notification-nav-link.notification-icon{
+    position: relative;
+    top: -8px;
 }
