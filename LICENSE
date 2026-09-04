@@ -1,21 +1,43 @@
-MIT License
+# Agro-Shield Proprietary License
 
-Copyright (c) 2026 Team Agro-Shield
+**Copyright © 2026 Team Agro-Shield. All rights reserved.**
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+## 1. Ownership
+Agro-Shield, including its original source code, architecture, database schema, documentation, designs, branding, workflows, and other original project materials, is proprietary intellectual property of **Team Agro-Shield / the Agro-Shield owning entity**, subject to the ownership and contribution terms agreed by the team.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+## 2. No Unauthorized Use
+Except where expressly permitted in writing by the owner, no person or organization may:
+- copy or reproduce the Software;
+- modify, adapt, or create derivative works;
+- publish or redistribute the Software or substantial portions of it;
+- sublicense, license, rent, lease, or transfer it;
+- sell, resell, or commercially exploit it;
+- use substantial proprietary portions to build a competing commercial product;
+- remove ownership notices; or
+- make the source code available to third parties.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+## 3. Team Access
+Approved contributors may access and modify the Software for authorized Agro-Shield development and operations. Repository access does not grant an individual contributor an independent right to sell, publish, redistribute, or commercially exploit Agro-Shield.
+
+Contributor ownership and intellectual-property matters are governed by `docs/TEAM_AGREEMENT.md`.
+
+## 4. Third-Party Software
+This license applies only to original Agro-Shield materials owned by the project. Third-party libraries, APIs, fonts, images, and other dependencies remain subject to their respective licenses and terms.
+
+## 5. Confidential Information
+Non-public source code, credentials, API keys, database credentials, security configurations, business plans, customer information, unreleased features, and other confidential Agro-Shield information must not be disclosed without authorization.
+
+## 6. Commercial Licensing
+Third parties wishing to use Agro-Shield proprietary software or materials commercially must obtain prior written permission and, where applicable, a separate commercial license.
+
+## 7. Disclaimer
+To the maximum extent permitted by applicable law, the Software is provided **"AS IS"**, without warranties of any kind, express or implied. The owner and contributors are not liable for claims, damages, losses, or other liabilities arising from unauthorized use.
+
+## 8. Contact
+**Project:** Agro-Shield  
+**Owner/Entity:** [Insert registered company or legal owner]  
+**Email:** [Insert official Agro-Shield email]
+
+**Effective date:** [Insert date]
+
+This license should be read together with `docs/TEAM_AGREEMENT.md`.
