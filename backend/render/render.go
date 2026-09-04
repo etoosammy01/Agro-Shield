@@ -7,6 +7,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"encoding/json"
+
 )
 
 func commaNumber(value float64, decimals int) string {
@@ -56,4 +58,12 @@ var TMPL = loadTemplates()
 
 func RenderTemplates(w http.ResponseWriter, name string, data any) error {
 	return TMPL.ExecuteTemplate(w, name, data)
+}
+
+
+// JSON writes v as a JSON response with the given status code.
+func JSON(w http.ResponseWriter, status int, v interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(v)
 }
