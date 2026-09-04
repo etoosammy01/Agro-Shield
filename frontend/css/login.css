@@ -292,6 +292,15 @@ body {
         0 12px 35px rgba(0, 0, 0, 0.08);
 
     z-index: 3;
+
+    transition:
+            transform 0.25s ease,
+            box-shadow 0.25s ease
+}
+
+.auth-right form:active {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.1);
 }
 
 
