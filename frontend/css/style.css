@@ -9,7 +9,7 @@ box-sizing:border-box;
 }
 
 html, body{
-height:100%;
+    min-height: 100%;
 }
 
 
@@ -25,10 +25,13 @@ body{
 
 .navbar{
     display:flex;
+    outline: 1px solid green;
+    background-color: papayawhip;
+    top: 0;
     justify-content:space-between;
     align-items:center;
     gap:24px;
-    padding:16px 48px;background:var(--color-surface);box-shadow:var(--shadow-sm);position:relative;z-index:10;
+    padding:16px 48px;background:var(--color-surface);box-shadow:var(--shadow-sm);position:sticky;z-index:9999;
 }
 
 .logo{
@@ -207,6 +210,8 @@ button:disabled,
         padding: 0 16px;
         font-size: 14px;
     }
+
+}
 
 
 .hero-image{
