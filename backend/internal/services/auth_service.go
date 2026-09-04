@@ -22,7 +22,7 @@ func NewAuthService(repo *repository.FarmerRepository) *AuthService {
 
 // Register creates a new farmer or buyer account. role should be "farmer" or
 // "buyer" — anything else defaults to "farmer".
-func (s *AuthService) Register(firstName, lastName, phone, email, password, location, role, photoURL string) error {
+func (s *AuthService) Register(firstName, lastName, phone, email, password, location, role, photoURL, bankName, accountName, accountNumber string) error {
 
 	if firstName == "" || lastName == "" {
 		return errors.New("name is required")
@@ -57,14 +57,18 @@ func (s *AuthService) Register(firstName, lastName, phone, email, password, loca
 	}
 
 	farmer := &models.Farmer{
-		FullName:     firstName + " " + lastName,
-		Phone:        phone,
-		Email:        email,
-		PasswordHash: string(hash),
-		Location:     location,
-		Role:         role,
-		PhotoURL:     photoURL,
-	}
+	FullName:      firstName + " " + lastName,
+	Phone:         phone,
+	Email:         email,
+	PasswordHash:  string(hash),
+	Location:      location,
+	Role:          role,
+	PhotoURL:      photoURL,
+
+	BankName:      bankName,
+	AccountName:   accountName,
+	AccountNumber: accountNumber,
+}
 
 	return s.repo.Create(farmer)
 }

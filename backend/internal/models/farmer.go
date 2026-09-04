@@ -14,6 +14,10 @@ type Farmer struct {
 	PhotoURL            string // passport photograph
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
+
+	BankName           string
+	AccountName        string
+	AccountNumber      string
 }
 
 func (f *Farmer) IsBuyer() bool {
