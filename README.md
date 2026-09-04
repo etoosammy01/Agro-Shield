@@ -481,6 +481,11 @@ technology that empowers farmers and reduces post-harvest losses.
 | Akilozi Samuel | Team Lead |
 | Otete Benjamin Agogo | Frontend Engineer |
 | Adewa James | Backend Engineer |
+| Emmanuel Elaigwu | Backend Engineer |
+| Agene Okoh | Frontend Engineer |
+| Alex Ugwu | Backend Engineer |
+| Ogaba Gabriel Eko | Backend Engineer |
+
 
 For detailed team profiles, see [`docs/team/`](docs/team/).
 ---
