@@ -7,6 +7,7 @@ import (
 	"backend/middleware"
 	"backend/ussd"
 	"net/http"
+
 )
 
 func RegisterRoutes(container *app.Container) {
@@ -612,4 +613,17 @@ func RegisterRoutes(container *app.Container) {
 			),
 		),
 	)
+}
+
+// New builds the full set of HTTP routes for the app. As other feature
+// areas grow (e.g. an orders or auth handler), wire their routes in here
+// alongside the payment ones.
+func New(paymentHandlers *handlers.PaymentHandlers) *http.ServeMux {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("POST /orders/pay", paymentHandlers.InitiatePayment)
+	mux.HandleFunc("GET /payments/callback", paymentHandlers.Callback)
+	mux.HandleFunc("POST /webhooks/flutterwave", paymentHandlers.Webhook)
+
+	return mux
 }
