@@ -27,6 +27,7 @@ type Container struct {
 	Auth         *services.AuthService
 	Crop         *services.CropService
 	Order        *services.OrderService
+	Delivery     *services.DeliveryService // ← added
 	Cart         *services.CartService
 	AI           *services.AIService
 	Negotiation  *services.NegotiationService
@@ -46,6 +47,7 @@ func NewContainer(
 	farmerRepo *repository.FarmerRepository,
 	cropRepo *repository.CropRepository,
 	orderRepo *repository.OrderRepository,
+	deliveryRepo *repository.DeliveryRepository, // ← added
 	cartRepo *repository.CartRepository,
 	diagnosisRepo *repository.DiagnosisRepository,
 	negotiationRepo *repository.NegotiationRepository,
@@ -99,23 +101,6 @@ func NewContainer(
 	// 4. CHAT SERVICE
 	//
 	// Chat is completely separate from negotiation.
-	//
-	// Negotiation:
-	//
-	// Buyer ↔ Seller
-	//     ↓
-	// Offers
-	//     ↓
-	// Accept/Reject
-	//
-	// Normal Chat:
-	//
-	// User ↔ User
-	// Group
-	//     ↓
-	// Unlimited normal conversation
-	//
-	// The negotiation expiration time does NOT affect ChatService.
 	// ========================================================
 
 	chatService := services.NewChatService(
@@ -126,7 +111,16 @@ func NewContainer(
 	)
 
 	// ========================================================
-	// 5. RETURN APPLICATION CONTAINER
+	// 5. DELIVERY SERVICE
+	// ========================================================
+
+	deliveryService := services.NewDeliveryService(
+		deliveryRepo,
+		orderRepo,
+	)
+
+	// ========================================================
+	// 6. RETURN APPLICATION CONTAINER
 	// ========================================================
 
 	return &Container{
@@ -155,6 +149,12 @@ func NewContainer(
 			orderRepo,
 			cropRepo,
 		),
+
+		// ----------------------------------------------------
+		// DELIVERY
+		// ----------------------------------------------------
+
+		Delivery: deliveryService,
 
 		// ----------------------------------------------------
 		// CART

@@ -7,7 +7,6 @@ import (
 	"backend/middleware"
 	"backend/ussd"
 	"net/http"
-
 )
 
 func RegisterRoutes(container *app.Container) {
@@ -610,6 +609,168 @@ func RegisterRoutes(container *app.Container) {
 			middleware.RequireAuth(
 				container.FarmerRepo,
 				chatHandler.DeleteMessageHandler,
+			),
+		),
+	)
+	// ========================================================
+	// ORDERS
+	// ========================================================
+
+	orderHandler := handlers.NewOrderHandler(container.Order)
+
+	// Order list (buyer purchases / farmer sales)
+	// GET /orders
+	http.HandleFunc(
+		"/orders",
+		middleware.OnlyPath(
+			"/orders",
+			middleware.OnlyGet(
+				middleware.RequireAuth(
+					container.FarmerRepo,
+					orderHandler.List,
+				),
+			),
+		),
+	)
+
+	// Single order detail
+	// GET /order?id=123
+	http.HandleFunc(
+		"/order",
+		middleware.OnlyPath(
+			"/order",
+			middleware.OnlyGet(
+				middleware.RequireAuth(
+					container.FarmerRepo,
+					orderHandler.Detail,
+				),
+			),
+		),
+	)
+
+	// Place a new order (marketplace "Buy" form)
+	// POST /orders
+	http.HandleFunc(
+		"/orders/place",
+		middleware.OnlyPath(
+			"/orders/place",
+			middleware.RequireAuth(
+				container.FarmerRepo,
+				orderHandler.Place,
+			),
+		),
+	)
+
+	// ========================================================
+	// DELIVERIES
+	// ========================================================
+
+	deliveryHandler := handlers.NewDeliveryHandler(container.Delivery)
+
+	// Delivery list
+	// GET /deliveries
+	http.HandleFunc(
+		"/deliveries",
+		middleware.OnlyPath(
+			"/deliveries",
+			middleware.OnlyGet(
+				middleware.RequireAuth(
+					container.FarmerRepo,
+					deliveryHandler.List,
+				),
+			),
+		),
+	)
+
+	// Single delivery detail
+	// GET /delivery?id=123
+	http.HandleFunc(
+		"/delivery",
+		middleware.OnlyPath(
+			"/delivery",
+			middleware.OnlyGet(
+				middleware.RequireAuth(
+					container.FarmerRepo,
+					deliveryHandler.Detail,
+				),
+			),
+		),
+	)
+
+	// Create delivery from an order
+	// POST /deliveries/create
+	http.HandleFunc(
+		"/deliveries/create",
+		middleware.OnlyPath(
+			"/deliveries/create",
+			middleware.RequireAuth(
+				container.FarmerRepo,
+				deliveryHandler.Create,
+			),
+		),
+	)
+
+	// Update delivery status
+	// POST /deliveries/status
+	http.HandleFunc(
+		"/deliveries/status",
+		middleware.OnlyPath(
+			"/deliveries/status",
+			middleware.RequireAuth(
+				container.FarmerRepo,
+				deliveryHandler.UpdateStatus,
+			),
+		),
+	)
+
+	// Update tracking info
+	// POST /deliveries/tracking
+	http.HandleFunc(
+		"/deliveries/tracking",
+		middleware.OnlyPath(
+			"/deliveries/tracking",
+			middleware.RequireAuth(
+				container.FarmerRepo,
+				deliveryHandler.UpdateTracking,
+			),
+		),
+	)
+
+	// Mark delivered
+	// POST /deliveries/delivered
+	http.HandleFunc(
+		"/deliveries/delivered",
+		middleware.OnlyPath(
+			"/deliveries/delivered",
+			middleware.RequireAuth(
+				container.FarmerRepo,
+				deliveryHandler.MarkDelivered,
+			),
+		),
+	)
+
+	// Mark failed
+	// POST /deliveries/failed
+	http.HandleFunc(
+		"/deliveries/failed",
+		middleware.OnlyPath(
+			"/deliveries/failed",
+			middleware.RequireAuth(
+				container.FarmerRepo,
+				deliveryHandler.MarkFailed,
+			),
+		),
+	)
+
+	// Cancel delivery
+	// POST /deliveries/cancel
+	http.HandleFunc(
+		"/deliveries/cancel",
+		middleware.OnlyPath(
+			"/deliveries/cancel",
+			middleware.RequireAuth(
+				container.FarmerRepo,
+				deliveryHandler.Cancel,
 			),
 		),
 	)

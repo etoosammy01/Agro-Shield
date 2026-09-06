@@ -61,3 +61,8 @@ func (s *OrderService) MyPurchases(buyerID int) ([]models.Order, error) {
 func (s *OrderService) MySales(farmerID int) ([]models.Order, error) {
 	return s.orderRepo.ListSalesByFarmer(farmerID)
 }
+
+// GetByID returns a single order (used by the order detail page).
+func (s *OrderService) GetByID(id int) (*models.Order, error) {
+	return s.orderRepo.GetByID(id)
+}
