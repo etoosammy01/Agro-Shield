@@ -17,7 +17,7 @@ body {
 
 /* =========================================
    PAGE CONTAINER
-========================================= */
+ ========================================= */
 
 .auth-container {
     display: grid;
@@ -32,6 +32,19 @@ body {
     min-height: 100vh;
 }
 
+
+
+
+
+.forgot-password a,
+.register-link a{
+    text-decoration: none;
+}
+
+
+/* a:hover{
+    text-decoration: underline;
+} */
 
 /* =========================================
    LEFT SIDE
