@@ -38,9 +38,13 @@ body {
 
 .forgot-password a,
 .register-link a{
-    text-decoration: none;
+    text-decoration: none !important;
 }
 
+.forgot-password a:hover,
+.register-link a:hover {
+    text-decoration: underline !important;
+}
 
 /* a:hover{
     text-decoration: underline;
