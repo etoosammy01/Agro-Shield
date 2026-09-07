@@ -22,15 +22,15 @@ const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 
 function validateImageFile(file) {
     if (!file) return { valid: false, error: "No file selected." };
-    
+
     if (!VALID_IMAGE_TYPES.includes(file.type)) {
         return { valid: false, error: "Invalid image type. Please upload JPG, PNG, WEBP, or GIF." };
     }
-    
+
     if (file.size > MAX_IMAGE_SIZE) {
         return { valid: false, error: "Image too large. Maximum size is 5MB." };
     }
-    
+
     return { valid: true };
 }
 
@@ -39,25 +39,25 @@ async function uploadToCloudinary(file) {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-    
+
     const response = await fetch(
         `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
         { method: "POST", body: formData }
     );
-    
+
     if (!response.ok) {
         throw new Error("Image upload failed.");
     }
-    
+
     const data = await response.json();
     return data.secure_url;
 }
 
 // ---------- GPS CAPTURE ----------
 function captureGPS() {
-    if (!navigator.geolocation) { 
-        locationStatus.textContent = "This device does not support GPS."; 
-        return; 
+    if (!navigator.geolocation) {
+        locationStatus.textContent = "This device does not support GPS.";
+        return;
     }
     locationStatus.textContent = "Getting your farm location...";
     navigator.geolocation.getCurrentPosition(position => {
@@ -65,23 +65,23 @@ function captureGPS() {
         document.getElementById("longitude").value = position.coords.longitude;
         document.getElementById("location-accuracy").value = position.coords.accuracy || "";
         locationStatus.textContent = `Location captured (accuracy ${Math.round(position.coords.accuracy)} m)`;
-    }, () => { 
-        locationStatus.textContent = "Location permission is required to register a crop."; 
+    }, () => {
+        locationStatus.textContent = "Location permission is required to register a crop.";
     }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
 }
 
 if (captureLocation) captureLocation.addEventListener("click", captureGPS);
 
-if (form) form.addEventListener("submit", async event => { 
-    if (!document.getElementById("latitude").value || !document.getElementById("longitude").value) { 
-        event.preventDefault(); 
-        captureGPS(); 
+if (form) form.addEventListener("submit", async event => {
+    if (!document.getElementById("latitude").value || !document.getElementById("longitude").value) {
+        event.preventDefault();
+        captureGPS();
         return;
     }
 
     // Handle image upload
     const imageFile = imageInput.files[0];
-    
+
     if (imageFile) {
         const validation = validateImageFile(imageFile);
         if (!validation.valid) {
@@ -89,10 +89,10 @@ if (form) form.addEventListener("submit", async event => {
             imageHelp.textContent = validation.error;
             return;
         }
-        
+
         // Show uploading status
         imageHelp.textContent = "Uploading image to Cloudinary...";
-        
+
         try {
             const uploadedUrl = await uploadToCloudinary(imageFile);
             imageURL.value = uploadedUrl;
@@ -105,7 +105,31 @@ if (form) form.addEventListener("submit", async event => {
     }
 });
 
-// ---------- OPEN MODAL ----------
+// ---------- OPEN / CLOSE MODAL ----------
+// Use the "modal-open" class as the single source of truth for open/closed
+// state (instead of an inline display style), so JS-triggered opens behave
+// identically to the server-rendered edit-mode open. Also lock body scroll
+// while the modal is open so the fixed overlay doesn't visually detach from
+// a background that's still scrolling underneath it.
+
+function lockBodyScroll() {
+    document.body.dataset.scrollY = window.scrollY;
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${window.scrollY}px`;
+    document.body.style.left = "0";
+    document.body.style.right = "0";
+}
+
+function unlockBodyScroll() {
+    const y = parseInt(document.body.dataset.scrollY || "0", 10);
+    document.body.style.position = "";
+    document.body.style.top = "";
+    document.body.style.left = "";
+    document.body.style.right = "";
+    delete document.body.dataset.scrollY;
+    window.scrollTo(0, y);
+}
+
 function openModal(editProduct = null) {
     form.reset();
     if (editProduct) {
@@ -132,19 +156,32 @@ function openModal(editProduct = null) {
         imageInput.required = true;
         imageHelp.textContent = "A product photo is required.";
     }
-    modal.style.display = "flex";
+    modal.classList.add("modal-open");
+    lockBodyScroll();
+}
+
+function closeModal() {
+    modal.classList.remove("modal-open");
+    unlockBodyScroll();
 }
 
 if (addBtn) addBtn.addEventListener("click", () => openModal());
-if (closeBtn) closeBtn.addEventListener("click", () => {
-    modal.style.display = "none";
+if (closeBtn) closeBtn.addEventListener("click", (event) => {
+    event.preventDefault();
+    closeModal();
 });
 
 if (modal) modal.addEventListener("click", (event) => {
     if (event.target === modal) {
-        modal.style.display = "none";
+        closeModal();
     }
 });
+
+// If the page loaded with the modal already open server-side (edit mode),
+// make sure body scroll gets locked to match.
+if (modal && modal.classList.contains("modal-open")) {
+    lockBodyScroll();
+}
 
 // ---------- SEARCH ----------
 if (search) search.addEventListener("keyup", function () {

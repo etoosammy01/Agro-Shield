@@ -154,7 +154,13 @@ tbody tr:hover {
 }
 
 /* ============================================================
-   ADD / EDIT PRODUCT MODAL
+   MODAL BASE
+   These must come BEFORE the responsive media queries below,
+   so the mobile breakpoints can correctly override them.
+   (Previously this block was at the bottom of the file and,
+   because media queries don't add specificity, it was winning
+   the cascade over the mobile rules — that's what was causing
+   the modal to ignore its mobile sizing.)
    ============================================================ */
 
 .modal {
@@ -165,41 +171,37 @@ tbody tr:hover {
     height: 100%;
     background: rgba(0, 0, 0, .55);
 
-    justify-content: center;
-    align-items: center;
-
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
     padding: 20px;
 
-    z-index: 1000;
+    z-index: 10000;
 }
 
 .modal.modal-open {
     display: flex;
+    align-items: flex-start;
+    justify-content: center;
 }
-
-/* The actual form inside the modal */
 
 .modal form#storage-form {
     width: 100%;
     max-width: 480px;
 
     background: white;
-
     padding: 28px;
-
     border-radius: 16px;
-
     box-shadow: 0 24px 60px rgba(0, 0, 0, .25);
 
     display: flex;
     flex-direction: column;
     gap: 7px;
 
-    margin: auto;
-
-    max-height: calc(100vh - 40px);
+    margin: 24px auto;
+    max-height: calc(100vh - 48px);
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 /* ============================================================
@@ -257,6 +259,16 @@ tbody tr:hover {
     outline: none;
     border-color: #1f7a4d;
     box-shadow: 0 0 0 3px rgba(31, 122, 77, .10);
+}
+
+
+/* Hover feedback — text, number, file inputs */
+.modal form#storage-form input[type="text"]:hover,
+.modal form#storage-form input[type="number"]:hover,
+.modal form#storage-form input[type="file"]:hover {
+    border-color: #9fc4ab;
+    box-shadow: 0 2px 6px rgba(31, 122, 77, .08);
+    transition: border-color .15s, box-shadow .15s;
 }
 
 /* File input */
@@ -347,6 +359,13 @@ tbody tr:hover {
     font-weight: 600 !important;
 
     cursor: pointer;
+    padding: 6px 8px;
+    border-radius: 8px;
+    transition: background-color .15s;
+}
+
+.checkbox-row:hover {
+    background-color: #f1f8f3;
 }
 
 .checkbox-row input {
@@ -501,8 +520,6 @@ tbody tr:hover {
 
         border-radius: 14px;
 
-        max-height: calc(100vh - 24px);
-
         gap: 6px;
     }
 
@@ -577,8 +594,6 @@ tbody tr:hover {
         padding: 17px 13px;
 
         border-radius: 12px;
-
-        max-height: calc(100vh - 16px);
     }
 
     .modal form#storage-form h2 {
