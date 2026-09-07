@@ -1,6 +1,3 @@
-// Package services holds clients for external providers - Flutterwave
-// today, potentially others later. Kept separate from repository (our own
-// DB) and handlers (our own HTTP surface).
 package services
 
 import (

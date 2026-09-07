@@ -91,6 +91,12 @@ func main() {
 	conversationMemberRepo := repository.NewConversationMemberRepository(db)
 	chatMessageRepo := repository.NewChatMessageRepository(db)
 
+	// ------------------------------------------------------------
+	// PAYMENT REPOSITORY          ← added
+	// Handles payment and webhook-delivery database operations.
+	// ------------------------------------------------------------
+	paymentRepo := repository.NewPaymentRepository(db)
+
 	// ============================================================
 	// 4. CREATE AI PROVIDER
 	// ============================================================
@@ -99,6 +105,25 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// ============================================================
+	// CREATE FLUTTERWAVE CLIENT          ← added
+	//
+	// Handles communication between Agro-Shield and Flutterwave
+	// for checkout payments.
+	//
+	// Loaded from:
+	//
+	// FLUTTERWAVE_SECRET_KEY
+	// FLUTTERWAVE_SECRET_HASH
+	// PAYMENT_REDIRECT_URL
+	// ============================================================
+
+	flutterwaveClient := services.NewFlutterwaveClient(
+		os.Getenv("FLUTTERWAVE_SECRET_KEY"),
+		os.Getenv("FLUTTERWAVE_SECRET_HASH"),
+		os.Getenv("PAYMENT_REDIRECT_URL"),
+	)
 
 	// ============================================================
 	// 5. CREATE APPLICATION CONTAINER
@@ -123,6 +148,10 @@ func main() {
 
 		// AI provider
 		aiProvider,
+
+		// Payments          ← added
+		paymentRepo,
+		flutterwaveClient,
 	)
 
 	// ============================================================

@@ -33,6 +33,7 @@ type Container struct {
 	Negotiation  *services.NegotiationService
 	Notification *services.NotificationService
 	Chat         *services.ChatService
+	Payment      *services.PaymentService // ← added
 	MarketEvents *repository.MarketEventRepository
 
 	// Used by authentication middleware.
@@ -64,6 +65,13 @@ func NewContainer(
 	chatMessageRepo *repository.ChatMessageRepository,
 
 	aiProvider services.AIProvider,
+
+	// ========================================================
+	// PAYMENTS          ← added
+	// ========================================================
+
+	paymentRepo *repository.PaymentRepository,
+	flutterwaveClient *services.FlutterwaveClient,
 ) *Container {
 
 	// ========================================================
@@ -120,7 +128,19 @@ func NewContainer(
 	)
 
 	// ========================================================
-	// 6. RETURN APPLICATION CONTAINER
+	// 6. PAYMENT SERVICE          ← added
+	//
+	// Coordinates payment records in PostgreSQL with the
+	// Flutterwave API.
+	// ========================================================
+
+	paymentService := services.NewPaymentService(
+		paymentRepo,
+		flutterwaveClient,
+	)
+
+	// ========================================================
+	// 7. RETURN APPLICATION CONTAINER
 	// ========================================================
 
 	return &Container{
@@ -189,6 +209,12 @@ func NewContainer(
 
 		Chat:         chatService,
 		MarketEvents: marketEventRepo,
+
+		// ----------------------------------------------------
+		// PAYMENT          ← added
+		// ----------------------------------------------------
+
+		Payment: paymentService,
 
 		// ----------------------------------------------------
 		// FARMER REPOSITORY

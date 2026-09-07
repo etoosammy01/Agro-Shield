@@ -774,17 +774,62 @@ func RegisterRoutes(container *app.Container) {
 			),
 		),
 	)
-}
 
-// New builds the full set of HTTP routes for the app. As other feature
-// areas grow (e.g. an orders or auth handler), wire their routes in here
-// alongside the payment ones.
-func New(paymentHandlers *handlers.PaymentHandlers) *http.ServeMux {
-	mux := http.NewServeMux()
+	// ========================================================
+	// PAYMENTS
+	// ========================================================
+	//
+	// Checkout via Flutterwave (hosted checkout page, paid by
+	// bank transfer or card).
+	//
+	// ========================================================
 
-	mux.HandleFunc("POST /orders/pay", paymentHandlers.InitiatePayment)
-	mux.HandleFunc("GET /payments/callback", paymentHandlers.Callback)
-	mux.HandleFunc("POST /webhooks/flutterwave", paymentHandlers.Webhook)
+	paymentHandler := handlers.NewPaymentHandler(
+		container.Payment,
+	)
 
-	return mux
+	// Initiate a payment for an order - requires the buyer to
+	// be logged in.
+	//
+	// POST /orders/pay
+
+	http.HandleFunc(
+		"/orders/pay",
+		middleware.OnlyPath(
+			"/orders/pay",
+			middleware.RequireAuth(
+				container.FarmerRepo,
+				paymentHandler.InitiatePayment,
+			),
+		),
+	)
+
+	// Customer is redirected here by Flutterwave after paying.
+	// Not auth-gated - the customer's session may have expired
+	// during checkout, and this only confirms status; it never
+	// gives value on its own (the webhook below does that).
+	//
+	// GET /payments/callback
+
+	http.HandleFunc(
+		"/payments/callback",
+		middleware.OnlyPath(
+			"/payments/callback",
+			paymentHandler.Callback,
+		),
+	)
+
+	// Flutterwave calls this server-to-server. Not auth-gated -
+	// it's verified via the verif-hash header instead, inside
+	// PaymentService.ProcessWebhook.
+	//
+	// POST /webhooks/flutterwave
+
+	http.HandleFunc(
+		"/webhooks/flutterwave",
+		middleware.OnlyPath(
+			"/webhooks/flutterwave",
+			paymentHandler.Webhook,
+		),
+	)
 }
