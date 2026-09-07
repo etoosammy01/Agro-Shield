@@ -1,0 +1,74 @@
+{{define "deliveries.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deliveries — Agro-Shield</title>
+  <link rel="stylesheet" href="/static/assets/css/style.css">
+</head>
+<body>
+  {{template "navbar" .}}
+
+  <main class="container">
+    <div class="page-header">
+      <h1>{{if .IsBuyer}}My Deliveries{{else}}Outgoing Deliveries{{end}}</h1>
+      <p class="muted">
+        {{if .IsBuyer}}Track produce coming to you{{else}}Deliveries you need to fulfil{{end}}
+      </p>
+    </div>
+
+    {{if .Deliveries}}
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Produce</th>
+            <th>Qty</th>
+            <th>{{if .IsBuyer}}Seller{{else}}Buyer{{end}}</th>
+            <th>Address</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Deliveries}}
+          <tr>
+            <td>{{.ID}}</td>
+            <td>
+              {{if .ImageURL}}
+                <img src="{{.ImageURL}}" alt="" class="thumb">
+              {{end}}
+              {{.CropName}}
+            </td>
+            <td>{{.Quantity}} {{.CropUnit}}</td>
+            <td>
+              {{if $.IsBuyer}}{{.SellerName}}{{else}}{{.BuyerName}}{{end}}
+            </td>
+            <td>
+              {{.DeliveryAddress}}{{if .LGA}}, {{.LGA}}{{end}}{{if .State}}, {{.State}}{{end}}
+            </td>
+            <td><span class="badge status-{{.Status}}">{{.Status}}</span></td>
+            <td>{{.CreatedAt.Format "02 Jan 2006"}}</td>
+            <td>
+              <a href="/delivery?id={{.ID}}" class="btn btn-sm">View</a>
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{else}}
+    <div class="empty-state">
+      <p>No deliveries yet.</p>
+      {{if .IsBuyer}}
+        <a href="/orders" class="btn">View Orders</a>
+      {{end}}
+    </div>
+    {{end}}
+  </main>
+</body>
+</html>
+{{end}}

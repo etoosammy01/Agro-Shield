@@ -1,0 +1,146 @@
+{{define "delivery.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delivery #{{.Delivery.ID}} — Agro-Shield</title>
+  <link rel="stylesheet" href="/static/assets/css/style.css">
+</head>
+<body>
+  {{template "navbar" .}}
+
+  <main class="container">
+    <div class="page-header">
+      <a href="/deliveries" class="back-link">← Back to deliveries</a>
+      <h1>Delivery #{{.Delivery.ID}}</h1>
+      <span class="badge status-{{.Delivery.Status}}">{{.Delivery.Status}}</span>
+    </div>
+
+    <div class="grid-2">
+      <!-- Left: details -->
+      <div class="card">
+        <div class="card-body">
+          <h3>Produce</h3>
+          {{if .Delivery.ImageURL}}
+            <img src="{{.Delivery.ImageURL}}" alt="{{.Delivery.CropName}}" class="product-img">
+          {{end}}
+          <p><strong>{{.Delivery.CropName}}</strong></p>
+          <p>{{.Delivery.Quantity}} {{.Delivery.CropUnit}}</p>
+
+          <h3>Address</h3>
+          <p>{{.Delivery.DeliveryAddress}}</p>
+          <p>
+            {{if .Delivery.LGA}}{{.Delivery.LGA}}, {{end}}
+            {{if .Delivery.State}}{{.Delivery.State}}, {{end}}
+            {{.Delivery.Country}}
+          </p>
+
+          <h3>Parties</h3>
+          <p>Buyer: {{.Delivery.BuyerName}}</p>
+          <p>Seller: {{.Delivery.SellerName}}</p>
+
+          {{if .Delivery.CourierName}}
+          <h3>Courier</h3>
+          <p>
+            {{.Delivery.CourierName}}
+            {{if .Delivery.CourierPhone}} · {{.Delivery.CourierPhone}}{{end}}
+          </p>
+          {{if .Delivery.TrackingNumber}}
+            <p>Tracking: {{.Delivery.TrackingNumber}}</p>
+          {{end}}
+          {{if .Delivery.VehicleInfo}}
+            <p>{{.Delivery.VehicleInfo}}</p>
+          {{end}}
+          {{end}}
+
+          {{if .Delivery.Notes}}
+          <h3>Notes</h3>
+          <p>{{.Delivery.Notes}}</p>
+          {{end}}
+
+          {{if .Delivery.FailureReason}}
+          <h3>Failure reason</h3>
+          <p class="text-danger">{{.Delivery.FailureReason}}</p>
+          {{end}}
+
+          {{if .Delivery.ProofOfDelivery}}
+          <h3>Proof of delivery</h3>
+          <img src="{{.Delivery.ProofOfDelivery}}" alt="Proof" class="product-img">
+          {{end}}
+        </div>
+      </div>
+
+      <!-- Right: actions -->
+      <div class="card">
+        <div class="card-body">
+          <h3>Actions</h3>
+
+          {{if not .IsBuyer}}
+          <!-- Farmer actions -->
+          <form method="POST" action="/deliveries/status" class="stack">
+            <input type="hidden" name="id" value="{{.Delivery.ID}}">
+            <label>Update status</label>
+            <select name="status" required>
+              <option value="confirmed">Confirmed</option>
+              <option value="picked_up">Picked up</option>
+              <option value="in_transit">In transit</option>
+              <option value="delivered">Delivered</option>
+              <option value="failed">Failed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <button type="submit" class="btn">Update Status</button>
+          </form>
+
+          <hr>
+
+          <form method="POST" action="/deliveries/tracking" class="stack">
+            <input type="hidden" name="id" value="{{.Delivery.ID}}">
+            <label>Courier name</label>
+            <input type="text" name="courier_name" value="{{.Delivery.CourierName}}">
+            <label>Courier phone</label>
+            <input type="text" name="courier_phone" value="{{.Delivery.CourierPhone}}">
+            <label>Tracking number</label>
+            <input type="text" name="tracking_number" value="{{.Delivery.TrackingNumber}}">
+            <label>Vehicle info</label>
+            <input type="text" name="vehicle_info" value="{{.Delivery.VehicleInfo}}">
+            <button type="submit" class="btn btn-outline">Save Tracking</button>
+          </form>
+
+          <hr>
+
+          <form method="POST" action="/deliveries/delivered" class="stack">
+            <input type="hidden" name="id" value="{{.Delivery.ID}}">
+            <label>Proof of delivery (image URL)</label>
+            <input type="text" name="proof_url" placeholder="Optional">
+            <button type="submit" class="btn btn-success">Mark Delivered</button>
+          </form>
+
+          <form method="POST" action="/deliveries/failed" class="stack">
+            <input type="hidden" name="id" value="{{.Delivery.ID}}">
+            <label>Failure reason</label>
+            <input type="text" name="reason" required>
+            <button type="submit" class="btn btn-danger">Mark Failed</button>
+          </form>
+
+          {{else}}
+          <!-- Buyer actions -->
+          {{if or (eq .Delivery.Status "pending") (eq .Delivery.Status "confirmed")}}
+          <form method="POST" action="/deliveries/cancel">
+            <input type="hidden" name="id" value="{{.Delivery.ID}}">
+            <button type="submit" class="btn btn-danger"
+                    onclick="return confirm('Cancel this delivery?')">
+              Cancel Delivery
+            </button>
+          </form>
+          {{else}}
+          <p class="muted">No actions available for this status.</p>
+          {{end}}
+          {{end}}
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
+{{end}}
