@@ -1,0 +1,75 @@
+{{define "orders.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orders — Agro-Shield</title>
+  <link rel="stylesheet" href="/static/assets/css/style.css">
+</head>
+<body>
+  {{template "navbar" .}}
+
+  <main class="container">
+    <div class="page-header">
+      <h1>{{if .IsBuyer}}My Purchases{{else}}My Sales{{end}}</h1>
+      <p class="muted">
+        {{if .IsBuyer}}Orders you have placed{{else}}Orders from your produce{{end}}
+      </p>
+    </div>
+
+    {{if .Orders}}
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Produce</th>
+            <th>Quantity</th>
+            <th>Total</th>
+            <th>{{if .IsBuyer}}Seller{{else}}Buyer{{end}}</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Orders}}
+          <tr>
+            <td>{{.ID}}</td>
+            <td>
+              {{if .ImageURL}}
+                <img src="{{.ImageURL}}" alt="" class="thumb">
+              {{end}}
+              {{.CropName}}
+            </td>
+            <td>{{.Quantity}} {{.CropUnit}}</td>
+            <td>₦{{money .TotalPrice}}</td>
+            <td>
+              {{if $.IsBuyer}}{{.SellerName}}{{else}}{{.BuyerName}}{{end}}
+            </td>
+            <td><span class="badge">{{.Status}}</span></td>
+            <td>{{.CreatedAt.Format "02 Jan 2006"}}</td>
+            <td>
+              <a href="/order?id={{.ID}}" class="btn btn-sm">View</a>
+              {{if $.IsBuyer}}
+                <a href="/deliveries/create?order_id={{.ID}}" class="btn btn-sm btn-outline">Request Delivery</a>
+              {{end}}
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{else}}
+    <div class="empty-state">
+      <p>No orders yet.</p>
+      {{if .IsBuyer}}
+        <a href="/marketplace" class="btn">Go to Marketplace</a>
+      {{end}}
+    </div>
+    {{end}}
+  </main>
+</body>
+</html>
+{{end}}
