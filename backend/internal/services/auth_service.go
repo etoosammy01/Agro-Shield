@@ -43,6 +43,13 @@ func (s *AuthService) Register(firstName, lastName, phone, email, password, loca
 		role = "farmer"
 	}
 
+	// Bank details are required for farmers
+	if role == "farmer" {
+		if bankName == "" || accountName == "" || accountNumber == "" {
+			return errors.New("bank details are required for farmers")
+		}
+	}
+
 	existing, err := s.repo.GetByPhone(phone)
 	if err != nil {
 		return err

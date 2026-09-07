@@ -8,17 +8,17 @@ import (
 )
 
 type UserReg struct {
-    First_Name       string
-    Last_Name        string
-    Phone            string
-    Email            string
-    Password         string
-    Confirm_Password string
-    Role             string
+	First_Name       string
+	Last_Name        string
+	Phone            string
+	Email            string
+	Password         string
+	Confirm_Password string
+	Role             string
 
-    Bank_Name        string
-    Account_Number   string
-    Account_Name     string
+	Bank_Name      string
+	Account_Number string
+	Account_Name   string
 }
 
 func (h *Register) RegisterHandler(w http.ResponseWriter, r *http.Request) {
@@ -41,19 +41,19 @@ func (h *Register) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-user := UserReg{
-    First_Name:       r.FormValue("first-name"),
-    Last_Name:        r.FormValue("last-name"),
-    Phone:            r.FormValue("phone"),
-    Email:             r.FormValue("email"),
-    Password:          r.FormValue("password"),
-    Confirm_Password:  r.FormValue("confirm-password"),
-    Role:              r.FormValue("role"),
+		user := UserReg{
+			First_Name:       r.FormValue("first-name"),
+			Last_Name:        r.FormValue("last-name"),
+			Phone:            r.FormValue("phone"),
+			Email:            r.FormValue("email"),
+			Password:         r.FormValue("password"),
+			Confirm_Password: r.FormValue("confirm-password"),
+			Role:             r.FormValue("role"),
 
-    Bank_Name:        r.FormValue("bank-name"),
-    Account_Number:   r.FormValue("account-number"),
-    Account_Name:     r.FormValue("account-name"),
-}
+			Bank_Name:      r.FormValue("bank-name"),
+			Account_Number: r.FormValue("account-number"),
+			Account_Name:   r.FormValue("account-name"),
+		}
 		if user.First_Name == "" || user.Last_Name == "" || user.Phone == "" || user.Password == "" || user.Confirm_Password == "" {
 			log.Println("user details must not be empty")
 			http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -63,39 +63,39 @@ user := UserReg{
 			http.Error(w, "Bad Request", http.StatusBadRequest)
 			return
 		}
-if user.Role == "farmer" {
+		if user.Role == "farmer" {
 
-    if user.Bank_Name == "" ||
-       user.Account_Number == "" ||
-       user.Account_Name == "" {
+			if user.Bank_Name == "" ||
+				user.Account_Number == "" ||
+				user.Account_Name == "" {
 
-        http.Error(
-            w,
-            "Bank details are required for farmers",
-            http.StatusBadRequest,
-        )
-        return
-    }
-}
+				http.Error(
+					w,
+					"Bank details are required for farmers",
+					http.StatusBadRequest,
+				)
+				return
+			}
+		}
 		location := r.FormValue("location")
 
 		// Uses the service injected into this handler (h.service), not a
 		// package-level global — a prior version used an uninitialized
 		// global and would have panicked on every registration.
-	err = h.service.Register(
-    user.First_Name,
-    user.Last_Name,
-    user.Phone,
-    user.Email,
-    user.Password,
-    location,
-    user.Role,
-    photoURL,
+		err = h.service.Register(
+			user.First_Name,
+			user.Last_Name,
+			user.Phone,
+			user.Email,
+			user.Password,
+			location,
+			user.Role,
+			photoURL,
 
-	user.Bank_Name,
-	user.Account_Name,
-	user.Account_Number,
-)
+			user.Bank_Name,
+			user.Account_Name,
+			user.Account_Number,
+		)
 
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
