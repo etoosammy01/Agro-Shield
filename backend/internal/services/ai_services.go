@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/json"
 	"errors"
 	"log"
 	"time"
@@ -10,8 +11,9 @@ import (
 )
 
 type AIService struct {
-	repo     *repository.DiagnosisRepository
-	provider AIProvider
+	repo      *repository.DiagnosisRepository
+	provider  AIProvider
+	eventRepo *repository.MarketEventRepository
 }
 
 func (s *AIService) DeleteDiagnosis(farmerID, diagnosisID int) error {
@@ -21,10 +23,12 @@ func (s *AIService) DeleteDiagnosis(farmerID, diagnosisID int) error {
 func NewAIService(
 	repo *repository.DiagnosisRepository,
 	provider AIProvider,
+	eventRepo *repository.MarketEventRepository,
 ) *AIService {
 	return &AIService{
-		repo:     repo,
-		provider: provider,
+		repo:      repo,
+		provider:  provider,
+		eventRepo: eventRepo,
 	}
 }
 
@@ -67,6 +71,20 @@ func (s *AIService) Diagnose(
 	}
 
 	log.Printf("⏱️ Database save took: %v", time.Since(dbStart))
+
+	// Record this diagnosis as an activity event for the dashboard.
+	if s.eventRepo != nil {
+		uid := farmerID
+		metadata := "{}"
+		if b, mErr := json.Marshal(map[string]string{"category": diagnosis.Category}); mErr == nil {
+			metadata = string(b)
+		}
+		_ = s.eventRepo.Record(&models.MarketEvent{
+			EventType: "diagnosis_completed",
+			UserID:    &uid,
+			Metadata:  metadata,
+		})
+	}
 
 	return diagnosis, nil
 }

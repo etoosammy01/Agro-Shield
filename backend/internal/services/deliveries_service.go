@@ -10,15 +10,18 @@ import (
 type DeliveryService struct {
 	deliveryRepo *repository.DeliveryRepository
 	orderRepo    *repository.OrderRepository
+	eventRepo    *repository.MarketEventRepository
 }
 
 func NewDeliveryService(
 	deliveryRepo *repository.DeliveryRepository,
 	orderRepo *repository.OrderRepository,
+	eventRepo *repository.MarketEventRepository,
 ) *DeliveryService {
 	return &DeliveryService{
 		deliveryRepo: deliveryRepo,
 		orderRepo:    orderRepo,
+		eventRepo:    eventRepo,
 	}
 }
 
@@ -152,7 +155,22 @@ func (s *DeliveryService) MarkDelivered(deliveryID, farmerID int, proofURL strin
 		return errors.New("you can only update your own deliveries")
 	}
 
-	return s.deliveryRepo.MarkDelivered(deliveryID, proofURL)
+	if err := s.deliveryRepo.MarkDelivered(deliveryID, proofURL); err != nil {
+		return err
+	}
+
+	// Record this delivery as an activity event for the dashboard.
+	if s.eventRepo != nil {
+		cid := delivery.CropID
+		uid := delivery.FarmerID
+		_ = s.eventRepo.Record(&models.MarketEvent{
+			EventType: "delivery_delivered",
+			CropID:    &cid,
+			UserID:    &uid,
+		})
+	}
+
+	return nil
 }
 
 // MarkFailed records a failed delivery with a reason.

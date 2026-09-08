@@ -11,6 +11,9 @@ type MarketEvent struct {
 	SessionID string
 	Metadata  string
 	CreatedAt time.Time
+
+	// ---- Display-only fields (not stored in the market_events table) ----
+	CropName string
 }
 
 type ProduceDemandSummary struct {

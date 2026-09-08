@@ -31,6 +31,55 @@ func NewDashboardHandler(crop *services.CropService, order *services.OrderServic
 	return &Dashboard{crop: crop, order: order, cart: cart, ai: ai, negotiation: negotiation, weather: weather, notification: notification, events: events}
 }
 
+// ActivityItem is a unified feed entry for the dashboard's "Recent activity"
+// panel. Kind is "order" (a completed purchase/sale), "listing" (a
+// storage/listing change), or "event" (a crop update, AI diagnosis,
+// delivery, or negotiation start recorded via market_events). Only the
+// fields relevant to a given Kind are populated; the template branches on
+// Kind (and, for events, EventType) to decide what to render.
+type ActivityItem struct {
+	Kind       string // "order", "listing", "event"
+	EventType  string // populated when Kind == "event"
+	CreatedAt  time.Time
+	CropName   string
+	Quantity   float64
+	Unit       string
+	TotalPrice float64
+	Status     string
+	BuyerName  string
+	SellerName string
+	Listed     bool
+}
+
+// Title returns the row's headline: the crop name when available, or a
+// sensible fallback for events that aren't tied to a specific crop (e.g. an
+// AI diagnosis, which is recorded against the farmer rather than a crop).
+func (a ActivityItem) Title() string {
+	if strings.TrimSpace(a.CropName) != "" {
+		return a.CropName
+	}
+	if a.Kind == "event" && a.EventType == "diagnosis_completed" {
+		return "Produce health check"
+	}
+	return "Activity"
+}
+
+// EventLabel returns the human-readable description for an event-kind row.
+func (a ActivityItem) EventLabel() string {
+	switch a.EventType {
+	case "crop_updated":
+		return "Updated listing"
+	case "diagnosis_completed":
+		return "Completed AI diagnosis"
+	case "delivery_delivered":
+		return "Order delivered"
+	case "negotiation_started":
+		return "Started a negotiation"
+	default:
+		return "Activity"
+	}
+}
+
 // DashboardData is what dashboard.html renders against. Farmer-only fields
 // and buyer-only fields are both here; the template shows the right set
 // based on IsBuyer.
@@ -76,6 +125,7 @@ type DashboardData struct {
 	Priorities      []DashboardPriority
 	PrimaryPriority DashboardPriority
 	RecentOrders    []models.Order
+	RecentActivity  []ActivityItem
 }
 
 type HealthMetric struct {
@@ -130,6 +180,7 @@ func (h *Dashboard) DashBoard(w http.ResponseWriter, r *http.Request) {
 				if purchases, err := h.order.MyPurchases(farmer.ID); err == nil {
 					data.PurchasesMade = len(purchases)
 					data.RecentOrders = limitOrders(purchases, 5)
+					data.RecentActivity = mergeActivity(ordersToActivity(purchases), 5)
 					for _, p := range purchases {
 						data.TotalSpent += p.TotalPrice
 					}
@@ -189,7 +240,9 @@ func (h *Dashboard) DashBoard(w http.ResponseWriter, r *http.Request) {
 				if count, err := h.ai.CountThisMonth(farmer.ID); err == nil {
 					data.AIDiagnosesThisMonth = count
 				}
-				if sales, err := h.order.MySales(farmer.ID); err == nil {
+				var sales []models.Order
+				if got, err := h.order.MySales(farmer.ID); err == nil {
+					sales = got
 					data.RecentOrders = limitOrders(sales, 5)
 					cutoff := time.Now().Add(-30 * 24 * time.Hour)
 					for _, s := range sales {
@@ -201,6 +254,17 @@ func (h *Dashboard) DashBoard(w http.ResponseWriter, r *http.Request) {
 						}
 					}
 				}
+				var activity []ActivityItem
+				activity = append(activity, ordersToActivity(sales)...)
+				activity = append(activity, cropsToActivity(farmerCrops)...)
+				if h.events != nil {
+					if events, err := h.events.RecentForFarmer(farmer.ID, 5); err != nil {
+						log.Printf("dashboard recent events unavailable for farmer %d: %v", farmer.ID, err)
+					} else {
+						activity = append(activity, eventsToActivity(events)...)
+					}
+				}
+				data.RecentActivity = mergeActivity(activity, 5)
 				if h.negotiation != nil {
 					if negotiations, err := h.negotiation.MyNegotiations(farmer.ID); err == nil {
 						cutoff := time.Now().Add(-30 * 24 * time.Hour)
@@ -330,6 +394,72 @@ func limitOrders(orders []models.Order, max int) []models.Order {
 		return orders
 	}
 	return orders[:max]
+}
+
+// ordersToActivity converts orders (purchases or sales) into unified
+// ActivityItem entries with Kind "order".
+func ordersToActivity(orders []models.Order) []ActivityItem {
+	items := make([]ActivityItem, 0, len(orders))
+	for _, o := range orders {
+		items = append(items, ActivityItem{
+			Kind:       "order",
+			CreatedAt:  o.CreatedAt,
+			CropName:   o.CropName,
+			Quantity:   o.Quantity,
+			Unit:       o.CropUnit,
+			TotalPrice: o.TotalPrice,
+			Status:     o.Status,
+			BuyerName:  o.BuyerName,
+			SellerName: o.SellerName,
+		})
+	}
+	return items
+}
+
+// cropsToActivity converts storage crops into unified ActivityItem entries
+// with Kind "listing" — this is what surfaces "Added to storage" / "Listed
+// for sale" events on the dashboard's Recent activity feed.
+func cropsToActivity(crops []models.Crop) []ActivityItem {
+	items := make([]ActivityItem, 0, len(crops))
+	for _, c := range crops {
+		items = append(items, ActivityItem{
+			Kind:      "listing",
+			CreatedAt: c.CreatedAt,
+			CropName:  c.Name,
+			Quantity:  c.Quantity,
+			Unit:      c.Unit,
+			Listed:    c.ListedForSale,
+		})
+	}
+	return items
+}
+
+// eventsToActivity converts market_events rows (crop updates, AI diagnoses,
+// deliveries, negotiations started) into unified ActivityItem entries with
+// Kind "event".
+func eventsToActivity(events []models.MarketEvent) []ActivityItem {
+	items := make([]ActivityItem, 0, len(events))
+	for _, e := range events {
+		items = append(items, ActivityItem{
+			Kind:      "event",
+			EventType: e.EventType,
+			CreatedAt: e.CreatedAt,
+			CropName:  e.CropName,
+		})
+	}
+	return items
+}
+
+// mergeActivity sorts activity items newest-first and caps the result at
+// limit, regardless of which source(s) they came from.
+func mergeActivity(items []ActivityItem, limit int) []ActivityItem {
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i].CreatedAt.After(items[j].CreatedAt)
+	})
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	return items
 }
 
 func buyerPriorities(data DashboardData) []DashboardPriority {

@@ -3,11 +3,7 @@ package app
 import (
 	"backend/internal/repository"
 	"backend/internal/services"
-
 )
-
-var AuthService *services.AuthService
-
 
 // ============================================================
 // APPLICATION CONTAINER
@@ -31,12 +27,13 @@ type Container struct {
 	Auth         *services.AuthService
 	Crop         *services.CropService
 	Order        *services.OrderService
+	Delivery     *services.DeliveryService // ← added
 	Cart         *services.CartService
 	AI           *services.AIService
 	Negotiation  *services.NegotiationService
 	Notification *services.NotificationService
 	Chat         *services.ChatService
-	Payment      *services.PaymentService
+	Payment      *services.PaymentService // ← added
 	MarketEvents *repository.MarketEventRepository
 
 	// Used by authentication middleware.
@@ -51,6 +48,7 @@ func NewContainer(
 	farmerRepo *repository.FarmerRepository,
 	cropRepo *repository.CropRepository,
 	orderRepo *repository.OrderRepository,
+	deliveryRepo *repository.DeliveryRepository, // ← added
 	cartRepo *repository.CartRepository,
 	diagnosisRepo *repository.DiagnosisRepository,
 	negotiationRepo *repository.NegotiationRepository,
@@ -69,7 +67,7 @@ func NewContainer(
 	aiProvider services.AIProvider,
 
 	// ========================================================
-	// PAYMENTS
+	// PAYMENTS          ← added
 	// ========================================================
 
 	paymentRepo *repository.PaymentRepository,
@@ -111,23 +109,6 @@ func NewContainer(
 	// 4. CHAT SERVICE
 	//
 	// Chat is completely separate from negotiation.
-	//
-	// Negotiation:
-	//
-	// Buyer ↔ Seller
-	//     ↓
-	// Offers
-	//     ↓
-	// Accept/Reject
-	//
-	// Normal Chat:
-	//
-	// User ↔ User
-	// Group
-	//     ↓
-	// Unlimited normal conversation
-	//
-	// The negotiation expiration time does NOT affect ChatService.
 	// ========================================================
 
 	chatService := services.NewChatService(
@@ -138,7 +119,17 @@ func NewContainer(
 	)
 
 	// ========================================================
-	// 5. PAYMENT SERVICE
+	// 5. DELIVERY SERVICE
+	// ========================================================
+
+	deliveryService := services.NewDeliveryService(
+		deliveryRepo,
+		orderRepo,
+		marketEventRepo,
+	)
+
+	// ========================================================
+	// 6. PAYMENT SERVICE          ← added
 	//
 	// Coordinates payment records in PostgreSQL with the
 	// Flutterwave API.
@@ -150,7 +141,7 @@ func NewContainer(
 	)
 
 	// ========================================================
-	// 6. RETURN APPLICATION CONTAINER
+	// 7. RETURN APPLICATION CONTAINER
 	// ========================================================
 
 	return &Container{
@@ -169,6 +160,7 @@ func NewContainer(
 
 		Crop: services.NewCropService(
 			cropRepo,
+			marketEventRepo,
 		),
 
 		// ----------------------------------------------------
@@ -179,6 +171,12 @@ func NewContainer(
 			orderRepo,
 			cropRepo,
 		),
+
+		// ----------------------------------------------------
+		// DELIVERY
+		// ----------------------------------------------------
+
+		Delivery: deliveryService,
 
 		// ----------------------------------------------------
 		// CART
@@ -193,6 +191,7 @@ func NewContainer(
 		AI: services.NewAIService(
 			diagnosisRepo,
 			aiProvider,
+			marketEventRepo,
 		),
 
 		// ----------------------------------------------------
@@ -215,7 +214,7 @@ func NewContainer(
 		MarketEvents: marketEventRepo,
 
 		// ----------------------------------------------------
-		// PAYMENT
+		// PAYMENT          ← added
 		// ----------------------------------------------------
 
 		Payment: paymentService,

@@ -10,16 +10,18 @@ import (
 
 // CropService contains the business logic for crops/products.
 type CropService struct {
-	repo *repository.CropRepository
+	repo      *repository.CropRepository
+	eventRepo *repository.MarketEventRepository
 }
 
 // NewCropService creates a new CropService.
 //
 // Responsibility:
 // - Connect the service to the CropRepository.
-func NewCropService(repo *repository.CropRepository) *CropService {
+func NewCropService(repo *repository.CropRepository, eventRepo *repository.MarketEventRepository) *CropService {
 	return &CropService{
-		repo: repo,
+		repo:      repo,
+		eventRepo: eventRepo,
 	}
 }
 
@@ -278,6 +280,17 @@ func (s *CropService) UpdateCrop(
 		if err := s.repo.AddImages(crop.ID, validImages); err != nil {
 			return err
 		}
+	}
+
+	// Record this update as an activity event for the dashboard.
+	if s.eventRepo != nil {
+		cid := crop.ID
+		uid := farmerID
+		_ = s.eventRepo.Record(&models.MarketEvent{
+			EventType: "crop_updated",
+			CropID:    &cid,
+			UserID:    &uid,
+		})
 	}
 
 	return nil

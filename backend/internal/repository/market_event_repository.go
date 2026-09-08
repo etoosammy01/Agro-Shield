@@ -243,6 +243,51 @@ func (r *MarketEventRepository) Record(event *models.MarketEvent) error {
 	return err
 }
 
+// RecentForFarmer returns recent non-order, non-listing market events
+// relevant to a farmer's dashboard activity feed: crop updates, AI
+// diagnoses, delivered orders, and negotiations started on their produce.
+// Order and listing activity are derived elsewhere from the orders/crops
+// tables directly, so they're deliberately excluded here to avoid duplicates.
+func (r *MarketEventRepository) RecentForFarmer(farmerID int, limit int) ([]models.MarketEvent, error) {
+	if farmerID <= 0 {
+		return nil, fmt.Errorf("invalid farmer id")
+	}
+	if limit <= 0 {
+		limit = 5
+	}
+
+	rows, err := r.db.Query(`
+		SELECT
+			e.id, e.event_type, e.crop_id, e.user_id,
+			COALESCE(e.session_id, ''), e.metadata, e.created_at,
+			COALESCE(c.name, '')
+		FROM market_events e
+		LEFT JOIN crops c ON c.id = e.crop_id
+		WHERE e.event_type IN ('crop_updated', 'diagnosis_completed', 'delivery_delivered', 'negotiation_started')
+		AND ((c.farmer_id = $1) OR (e.crop_id IS NULL AND e.user_id = $1))
+		ORDER BY e.created_at DESC
+		LIMIT $2
+	`, farmerID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var events []models.MarketEvent
+	for rows.Next() {
+		var ev models.MarketEvent
+		if err := rows.Scan(
+			&ev.ID, &ev.EventType, &ev.CropID, &ev.UserID,
+			&ev.SessionID, &ev.Metadata, &ev.CreatedAt,
+			&ev.CropName,
+		); err != nil {
+			return nil, err
+		}
+		events = append(events, ev)
+	}
+	return events, rows.Err()
+}
+
 func (r *MarketEventRepository) RecordSearch(term, normalized, location string, userID *int, sessionID string) error {
 	term = strings.TrimSpace(term)
 	if term == "" {

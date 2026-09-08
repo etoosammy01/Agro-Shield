@@ -180,6 +180,18 @@ func (s *NegotiationService) StartNegotiation(
 		)
 	}
 
+	// Record this as an activity event for the farmer's dashboard.
+	if s.eventRepo != nil {
+		cid := cropID
+		uid := buyerID
+		_ = s.eventRepo.Record(&models.MarketEvent{
+			EventType: "negotiation_started",
+			CropID:    &cid,
+			UserID:    &uid,
+			Metadata:  fmt.Sprintf(`{"quantity":%g}`, quantity),
+		})
+	}
+
 	return negotiation, nil
 }
 
@@ -277,6 +289,9 @@ func (s *NegotiationService) SendMessage(
 
 	return nil
 }
+
+
+
 
 // ============================================================
 // SEND OFFER

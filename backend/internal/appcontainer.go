@@ -125,6 +125,7 @@ func NewContainer(
 	deliveryService := services.NewDeliveryService(
 		deliveryRepo,
 		orderRepo,
+		marketEventRepo,
 	)
 
 	// ========================================================
@@ -159,6 +160,7 @@ func NewContainer(
 
 		Crop: services.NewCropService(
 			cropRepo,
+			marketEventRepo,
 		),
 
 		// ----------------------------------------------------
@@ -189,6 +191,7 @@ func NewContainer(
 		AI: services.NewAIService(
 			diagnosisRepo,
 			aiProvider,
+			marketEventRepo,
 		),
 
 		// ----------------------------------------------------
