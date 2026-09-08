@@ -1037,108 +1037,146 @@
 
         </section>
 
+<!-- =====================================================
+     RECENT ACTIVITY
+====================================================== -->
 
-        <!-- =====================================================
-             RECENT ACTIVITY
-        ====================================================== -->
+<section class="panel activity">
 
-        <section class="panel activity">
+    <div class="section-heading">
 
-            <div class="section-heading">
+        <div>
+            <p class="eyebrow">
+                Latest
+            </p>
 
-                <div>
-                    <p class="eyebrow">
-                        Latest
-                    </p>
+            <h2>
+                Recent activity
+            </h2>
+        </div>
 
-                    <h2>
-                        Recent activity
-                    </h2>
-                </div>
+        <a href="{{if .IsBuyer}}/profile{{else}}/sales{{end}}">
+            View all
+        </a>
 
-                <a href="{{if .IsBuyer}}/profile{{else}}/sales{{end}}">
-                    View all
-                </a>
+    </div>
+
+
+    {{if .RecentActivity}}
+
+    <div class="activity-list">
+
+        {{range .RecentActivity}}
+
+        <article class="activity-row">
+
+            <div class="activity-mark">
+            </div>
+
+
+            <div class="activity-main">
+
+                <h3>
+                    {{.Title}}
+                </h3>
+
+                <p>
+
+                    {{if eq .Kind "listing"}}
+
+                    {{if .Listed}}Listed for sale{{else}}Added to storage{{end}}
+                    ·
+                    {{printf "%.0f" .Quantity}}
+                    {{.Unit}}
+
+                    {{else if eq .Kind "order"}}
+
+                    {{if $.IsBuyer}}
+                    From {{.SellerName}}
+                    {{else}}
+                    Purchased by {{.BuyerName}}
+                    {{end}}
+
+                    ·
+                    {{printf "%.0f" .Quantity}}
+                    {{if .Unit}}{{.Unit}}{{else}}units{{end}}
+
+                    {{else}}
+
+                    {{.EventLabel}}
+
+                    {{end}}
+
+                </p>
 
             </div>
 
 
-            {{if .RecentOrders}}
+            <div class="activity-value">
 
-                <div class="activity-list">
+                {{if eq .Kind "listing"}}
 
-                    {{range .RecentOrders}}
+                <strong>
+                    {{if .Listed}}Listed{{else}}Stored{{end}}
+                </strong>
 
-                        <article class="activity-row">
+                <span>
+                    {{.CreatedAt.Format "2 Jan"}}
+                </span>
 
-                            <div class="activity-mark">
-                            </div>
+                {{else if eq .Kind "order"}}
 
+                <strong>
+                    ₦{{money .TotalPrice}}
+                </strong>
 
-                            <div class="activity-main">
+                <span>
+                    {{.Status}}
+                </span>
 
-                                <h3>
-                                    {{.CropName}}
-                                </h3>
+                {{else}}
 
-                                <p>
+                <strong>
+                    {{.EventLabel}}
+                </strong>
 
-                                    {{if $.IsBuyer}}
-                                        From {{.SellerName}}
-                                    {{else}}
-                                        Purchased by {{.BuyerName}}
-                                    {{end}}
+                <span>
+                    {{.CreatedAt.Format "2 Jan"}}
+                </span>
 
-                                    ·
-                                    {{printf "%.0f" .Quantity}}
-                                    units
+                {{end}}
 
-                                </p>
+            </div>
 
-                            </div>
+        </article>
 
+        {{end}}
 
-                            <div class="activity-value">
+    </div>
 
-                                <strong>
-                                    ₦{{money .TotalPrice}}
-                                </strong>
+    {{else}}
 
-                                <span>
-                                    {{.Status}}
-                                </span>
+    <div class="empty-state">
 
-                            </div>
+        <h3>
+            No activity yet
+        </h3>
 
-                        </article>
+        <p>
 
-                    {{end}}
-
-                </div>
-
+            {{if .IsBuyer}}
+            Your completed purchases will appear here.
             {{else}}
-
-                <div class="empty-state">
-
-                    <h3>
-                        No activity yet
-                    </h3>
-
-                    <p>
-
-                        {{if .IsBuyer}}
-                            Your completed purchases will appear here.
-                        {{else}}
-                            Add a product, publish a listing, and complete your first sale to see performance here.
-                        {{end}}
-
-                    </p>
-
-                </div>
-
+            Add a product, publish a listing, and complete your first sale to see performance here.
             {{end}}
 
-        </section>
+        </p>
+
+    </div>
+
+    {{end}}
+
+</section>
 
 
         <!-- =====================================================
