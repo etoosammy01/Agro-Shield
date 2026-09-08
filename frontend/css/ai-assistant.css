@@ -1180,6 +1180,8 @@
     }
 
 }
+
+
 /* ============================================================
    TEAMMATE CORRECTIONS - AI ASSISTANT
    ============================================================ */
@@ -1219,36 +1221,115 @@
     box-shadow: 0 8px 30px rgba(23, 35, 28, 0.08);
 }
 
-/* Custom floating widget */
-.ai-floating-widget {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    z-index: 1000;
+
+/* ============================================================
+   NEW: UNIQUE AI HEADER & TITLE
+   ============================================================ */
+
+.ai-header-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: linear-gradient(135deg, #f0f9f2, #e3f4e7);
+    border-radius: 16px;
+    border: 1px solid #d0e5d6;
 }
 
-.ai-floating-widget-button {
-    width: 60px;
-    height: 60px;
+.ai-title {
+    font-size: 1.8rem;
+    margin: 0 0 4px;
+    color: #14532d;
+}
+
+.ai-subtitle {
+    color: #4b6a52;
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.ai-brand-icon {
+    flex-shrink: 0;
+}
+
+
+/* ============================================================
+   NEW: VOICE INPUT
+   ============================================================ */
+
+#voice-input {
+    font-size: 18px;
+}
+
+#voice-input svg {
+    width: 21px;
+    height: 21px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+#voice-input.recording {
+    background: #b42318;
+    color: #ffffff;
     border-radius: 50%;
-    background: #1f7a4d;
-    color: white;
-    border: none;
-    cursor: pointer;
-    box-shadow: 0 8px 24px rgba(31, 122, 77, 0.4);
+    animation: recording-pulse 1.2s infinite;
+}
+
+.ai-voice-status {
+    margin-top: 8px;
+    font-size: 13px;
+    color: #166534;
+    font-weight: 600;
+    min-height: 18px;
+}
+
+.ai-voice-status:empty {
+    display: none;
+}
+
+
+/* ============================================================
+   NEW: UNIQUE AI RESULT CARD
+   ============================================================ */
+
+.ai-result-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.ai-result-icon {
     display: grid;
     place-items: center;
-    transition: transform 0.2s ease;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: #166534;
+    color: #ffffff;
 }
 
-.ai-floating-widget-button:hover {
-    transform: scale(1.1);
-}
-
-.ai-floating-widget-button svg {
-    width: 28px;
-    height: 28px;
+.ai-result-icon svg {
+    width: 22px;
+    height: 22px;
     fill: none;
     stroke: currentColor;
     stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.ai-result-header h2 {
+    margin: 0;
+    color: #166534;
+    font-size: 1.3rem;
+}
+
+.ai-history-link {
+    text-align: center;
+    margin-top: 24px;
 }
