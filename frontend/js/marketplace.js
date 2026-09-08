@@ -43,3 +43,18 @@ if (search && grid) {
         }
     });
 })();
+
+/* ============================================================
+   NEW: IMAGE FIX (Fallback for broken product images)
+   ============================================================ */
+
+document.addEventListener("DOMContentLoaded", () => {
+    const productImages = document.querySelectorAll(".product-image");
+    
+    productImages.forEach(img => {
+        img.addEventListener("error", () => {
+            img.src = "/static/assets/placeholder/product-placeholder.jpg";
+            img.style.objectFit = "cover";
+        });
+    });
+});
