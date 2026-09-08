@@ -13,8 +13,8 @@ const captureLocation = document.getElementById("capture-location");
 const locationStatus = document.getElementById("location-status");
 
 // ---------- CLOUDINARY CONFIG (Replace with your own) ----------
-const CLOUDINARY_CLOUD_NAME = "your-cloud-name";
-const CLOUDINARY_UPLOAD_PRESET = "your-upload-preset";
+const CLOUDINARY_CLOUD_NAME = "nirybrdh";
+const CLOUDINARY_UPLOAD_PRESET = "agro_shield_uploads";
 
 // ---------- FILE VALIDATION ----------
 const VALID_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -219,3 +219,56 @@ if (imageInput) {
         }
     });
 }
+
+/* ============================================================
+   NEW: CLOUDINARY UPLOAD SUCCESS INDICATOR
+   ============================================================ */
+
+// This code runs after the existing form submit handler.
+// It ensures the user sees the upload status clearly.
+
+const imageUploadStatus = document.createElement("p");
+imageUploadStatus.id = "image-upload-status";
+imageUploadStatus.style.marginTop = "8px";
+imageUploadStatus.style.fontWeight = "700";
+imageUploadStatus.style.fontSize = "0.85rem";
+imageUploadStatus.style.padding = "6px 10px";
+imageUploadStatus.style.borderRadius = "6px";
+imageUploadStatus.style.display = "none";
+
+if (imageHelp) {
+    imageHelp.parentNode.appendChild(imageUploadStatus);
+}
+
+// Create a progress indicator
+function showUploadStatus(message, color) {
+    imageUploadStatus.textContent = message;
+    imageUploadStatus.style.backgroundColor = color === "green" ? "#eaf7ea" : "#fee2e2";
+    imageUploadStatus.style.color = color === "green" ? "#166534" : "#991b1b";
+    imageUploadStatus.style.display = "block";
+}
+
+// Add a "Uploading..." state to the image input
+if (imageInput) {
+    imageInput.addEventListener("change", () => {
+        if (imageInput.files.length > 0) {
+            showUploadStatus("Image selected — will upload on submit.", "green");
+        }
+    });
+}
+
+// Success message after Cloudinary upload
+async function updateUploadStatusAfterSubmit() {
+    // This is a helper that runs after the main submit handler.
+    // It checks if the image URL has been set to a Cloudinary URL.
+    const interval = setInterval(() => {
+        if (imageURL.value.includes("cloudinary.com")) {
+            showUploadStatus("✅ Image uploaded to Cloudinary successfully.", "green");
+            clearInterval(interval);
+        }
+    }, 500);
+}
+
+// Call this on page load
+updateUploadStatusAfterSubmit();
+
