@@ -79,72 +79,6 @@
         <!-- =====================================================
              DASHBOARD HEADER
         ====================================================== -->
-        <!-- <section class="dashboard-header">
-
-            <div class="dashboard-intro">
-
-                <p class="eyebrow" id="today">
-                    Today
-                </p>
-
-                <h1>
-                    <span id="greeting">
-                        Hi
-                    </span>,
-                    {{.FullName}}
-                </h1>
-
-                {{if .IsBuyer}}
-
-                    <p class="header-copy">
-                        Track purchases and discover fresh produce.
-                    </p>
-
-                {{else}}
-
-                    <p class="header-copy">
-                        Here's what is happening with your farm,
-                        produce, sales, and crop health today.
-                    </p>
-
-                {{end}}
-
-            </div>
-
-
-            <div class="header-actions">
-
-                {{if .IsBuyer}}
-
-                    <a href="/cart" class="action-card">
-                        <span>Cart</span>
-                        <h3>Review cart{{if .CartItemCount}} ({{.CartItemCount}}){{end}}</h3>
-                        <p>{{if .CartItemCount}}Negotiated total: ₦{{money .CartTotal}}{{else}}Accepted negotiated offers will appear here.{{end}}</p>
-                    </a>
-
-                    <a
-                        class="primary-action"
-                        href="/marketplace"
-                    >
-                        Browse marketplace
-                    </a>
-
-                {{else}}
-
-                    <a
-                        class="primary-action"
-                        href="/storage"
-                    >
-                        Open storage
-                    </a>
-
-                {{end}}
-
-            </div>
-
-        </section>
- -->
-
         <section class="dashboard-header">
 
             <div class="dashboard-intro">
@@ -210,7 +144,7 @@
 
         </section>
 
-        <!-- =====================================================
+                <!-- =====================================================
              NOTIFICATION / ATTENTION BANNER
         ====================================================== -->
 
@@ -425,8 +359,7 @@
 
         </section>
 
-
-        <!-- =====================================================
+                <!-- =====================================================
              FARM HEALTH + WEATHER
         ====================================================== -->
 
@@ -517,26 +450,6 @@
                             </div>
 
                         </div>
-
-
-                        <!-- <div class="health-item">
-
-                            <div class="health-item-header">
-                                <span>
-                                    {{with index .HealthMetrics 2}}{{.Name}}{{end}}
-                                </span>
-
-                                <strong>{{with index .HealthMetrics 2}}{{.Percent}}{{end}}%</strong>
-                            </div>
-
-                            <div class="progress">
-                                <span
-                                    class="progress-value"
-                                    data-width="{{with index .HealthMetrics 2}}{{.Percent}}{{end}}%"
-                                ></span>
-                            </div>
-
-                        </div> -->
 
 
                         <div class="health-item">
@@ -665,8 +578,7 @@
 
         {{end}}
 
-
-        <!-- =====================================================
+                <!-- =====================================================
              AI INSIGHT + MARKET OPPORTUNITY
         ====================================================== -->
 
@@ -873,8 +785,7 @@
 
         {{end}}
 
-
-        <!-- =====================================================
+                <!-- =====================================================
              STORAGE OVERVIEW
         ====================================================== -->
 
@@ -1037,8 +948,7 @@
 
         </section>
 
-
-        <!-- =====================================================
+                <!-- =====================================================
              RECENT ACTIVITY
         ====================================================== -->
 
@@ -1387,3 +1297,4 @@
 <script src="/static/js/navigation.js"></script>
 </body>
 </html>
+
