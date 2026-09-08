@@ -59,7 +59,13 @@
         <tbody id="storage-body">
             {{range .Crops}}
             <tr data-product-name="{{.Name}}">
-                <td>{{if .ImageURL}}<img src="{{.ImageURL}}" alt="{{.Name}}" class="thumb">{{else}}—{{end}}</td>
+                <td>
+                    {{if .ImageURL}}
+                        <img src="{{.ImageURL}}" alt="{{.Name}}" class="thumb" onerror="this.onerror=null; this.src='/static/assets/placeholder/product-placeholder.jpg';">
+                    {{else}}
+                        <span>—</span>
+                    {{end}}
+                </td>
                 <td>{{.Name}}</td>
                 <td>{{.Quantity}}</td>
                 <td>{{.Unit}}</td>
@@ -87,7 +93,7 @@
         </tbody>
     </table>
 
-    <div id="modal" class="modal{{if .EditCrop}} modal-open{{end}}">
+        <div id="modal" class="modal{{if .EditCrop}} modal-open{{end}}">
         <form id="storage-form" method="POST" action="/storage" enctype="multipart/form-data">
             <h2 id="modal-title">{{if .EditCrop}}Edit Product{{else}}Add Product{{end}}</h2>
             <input type="hidden" name="action" id="form-action" value="{{if .EditCrop}}update{{else}}create{{end}}">
@@ -134,7 +140,7 @@
 </main>
 
 <script src="/static/js/storage.js?v=20260824-product-actions"></script>
-
 <script src="/static/js/navigation.js"></script>
 </body>
 </html>
+
