@@ -18,14 +18,8 @@
 
     <nav aria-label="Main navigation">
         <a href="/dashboard">Dashboard</a>
-
-        {{if not .IsBuyer}}
-            <a href="/storage">Storage</a>
-        {{end}}
-        {{if not .IsBuyer}}
-            <a href="/ai-assistant">AI Assistant</a>
-        {{end}}
-
+        {{if not .IsBuyer}}<a href="/storage">Storage</a>{{end}}
+        {{if not .IsBuyer}}<a href="/ai-assistant">AI Assistant</a>{{end}}
         <a href="/profile">Profile</a>
         <a href="/notifications">Notifications</a>
         <a href="/logout">Logout</a>
@@ -36,30 +30,15 @@
 <main class="marketplace">
 
     <div class="market-header">
-
         <div>
             <h1>Marketplace</h1>
-
-            {{if .IsBuyer}}
-                <p>Browse fresh produce from farmers and place an order.</p>
-            {{else}}
-                <p>See what's currently listed for sale across Agro-Shield.</p>
-            {{end}}
+            {{if .IsBuyer}}<p>Browse fresh produce from farmers and place an order.</p>
+            {{else}}<p>See what's currently listed for sale across Agro-Shield.</p>{{end}}
         </div>
-
     </div>
 
-    {{if .Message}}
-        <p class="message" style="color:green;">
-            {{.Message}}
-        </p>
-    {{end}}
-
-    {{if .Error}}
-        <p class="message" style="color:red;">
-            {{.Error}}
-        </p>
-    {{end}}
+    {{if .Message}}<p class="message" style="color:green;">{{.Message}}</p>{{end}}
+    {{if .Error}}<p class="message" style="color:red;">{{.Error}}</p>{{end}}
 
     <form method="post" action="/marketplace" class="marketplace-search-form">
         <input type="hidden" name="action" value="search">
@@ -74,128 +53,56 @@
             <div class="product-card">
 
                 {{if .ImageURL}}
-                    <img
-                        src="{{.ImageURL}}"
-                        alt="{{.Name}}"
-                        class="product-image"
-                        onerror="this.onerror=null; this.src='/static/assets/placeholder/product-placeholder.jpg';"
-                    >
+                    <img src="{{.ImageURL}}" alt="{{.Name}}" class="product-image"
+                        onerror="this.onerror=null; this.src='/static/assets/placeholder/product-placeholder.jpg';">
                 {{else}}
-                    <img
-                        src="/static/assets/placeholder/product-placeholder.jpg"
-                        alt="{{.Name}}"
-                        class="product-image"
-                    >
+                    <img src="/static/assets/placeholder/product-placeholder.jpg" alt="{{.Name}}" class="product-image">
                 {{end}}
 
                 <h3>{{.Name}}</h3>
 
-                <p class="price">
-                    ₦{{money .PricePerUnit}} / {{.Unit}}
-                </p>
+                <p class="price">₦{{money .PricePerUnit}} / {{.Unit}}</p>
 
                 <p>
-                    <span class="seller-identity">{{if .SellerPhotoURL}}<img src="{{.SellerPhotoURL}}" alt="{{.SellerName}}" onerror="this.onerror=null; this.src='/static/assets/placeholder/avatar-placeholder.jpg';">{{else}}<span class="seller-avatar-placeholder">👨‍🌾</span>{{end}} Seller: {{.SellerName}}</span>
+                    <span class="seller-identity">
+                        {{if .SellerPhotoURL}}<img src="{{.SellerPhotoURL}}" alt="{{.SellerName}}" onerror="this.onerror=null; this.src='/static/assets/placeholder/avatar-placeholder.jpg';">{{else}}<span class="seller-avatar-placeholder">👨‍🌾</span>{{end}}
+                        Seller: {{.SellerName}}
+                    </span>
                 </p>
 
-                <p>
-                    {{.Quantity}} {{.Unit}} available
-                </p>
+                <p>{{.Quantity}} {{.Unit}} available</p>
 
                 <p class="product-location">
                     <strong>Location:</strong>
                     {{if .Location}}
-                        <a href="https://www.google.com/maps/search/?api=1&query={{urlquery .Location}}" target="_blank" rel="noopener" aria-label="View {{.Name}} location on Google Maps">{{.Location}} <span>↗</span></a>
-                    {{else}}
-                        Location not provided
-                    {{end}}
+                        <a href="https://www.google.com/maps/search/?api=1&query={{urlquery .Location}}" target="_blank" rel="noopener">{{.Location}} <span>↗</span></a>
+                    {{else}}Location not provided{{end}}
                 </p>
 
-                <!-- Opens the Product Details page. -->
-                <a href="/product?id={{.ID}}" class="view-product" aria-label="View {{.Name}} product details">
-                    View Product
-                </a>
+                <a href="/product?id={{.ID}}" class="view-product">View Product</a>
 
                 {{if $.IsBuyer}}
-
-                    <form
-                        method="POST"
-                        action="/marketplace"
-                        class="buy-form"
-                    >
-
-                        <input
-                            type="hidden"
-                            name="crop_id"
-                            value="{{.ID}}"
-                        >
-
-                        <input
-                            type="number"
-                            name="quantity"
-                            min="0.01"
-                            max="{{.Quantity}}"
-                            step="0.01"
-                            placeholder="Qty"
-                            required
-                        >
-
-                        <button type="submit">
-                            Buy
-                        </button>
-
-                    </form>
-
+                <form method="POST" action="/marketplace" class="buy-form">
+                    <input type="hidden" name="crop_id" value="{{.ID}}">
+                    <input type="number" name="quantity" min="0.01" max="{{.Quantity}}" step="0.01" placeholder="Qty" required>
+                    <button type="submit">Buy</button>
+                </form>
                 {{end}}
 
                 {{if ne .FarmerID $.CurrentUserID}}
-
-                    <form
-                        method="POST"
-                        action="/negotiation/start"
-                        class="negotiate-form"
-                    >
-
-                        <input
-                            type="hidden"
-                            name="crop_id"
-                            value="{{.ID}}"
-                        >
-
-                        <input
-                            type="number"
-                            name="quantity"
-                            min="0.01"
-                            max="{{.Quantity}}"
-                            step="0.01"
-                            placeholder="Qty"
-                            required
-                        >
-
-                        <input
-                            type="number"
-                            name="offer_price"
-                            min="0.01"
-                            step="0.01"
-                            placeholder="Your offer ₦"
-                            required
-                        >
-
-                        <button type="submit">
-                            Negotiate
-                        </button>
-
-                    </form>
-
+                <form method="POST" action="/negotiation/start" class="negotiate-form">
+                    <input type="hidden" name="crop_id" value="{{.ID}}">
+                    <input type="number" name="quantity" min="0.01" max="{{.Quantity}}" step="0.01" placeholder="Qty" required>
+                    <input type="number" name="offer_price" min="0.01" step="0.01" placeholder="Your offer ₦" required>
+                    <button type="submit">Negotiate</button>
+                </form>
                 {{end}}
 
             </div>
 
         {{else}}
 
-            <p>
-                No product listed for sale yet.
-            </p>
+            <p>No product listed for sale yet.</p>
 
         {{end}}
 
@@ -242,45 +149,6 @@
     </div>
 
 </main>
-
-<!-- =====================================================
-     MOBILE LEFT-SIDE NAVIGATION (Properly Structured)
-====================================================== -->
-
-<button
-    type="button"
-    class="marketplace-nav-toggle"
-    id="marketplace-nav-toggle"
-    aria-label="Open navigation"
->
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-    </svg>
-</button>
-
-<nav class="marketplace-nav" id="marketplace-nav">
-
-    <button
-        type="button"
-        class="marketplace-nav-close"
-        id="marketplace-nav-close"
-        aria-label="Close navigation"
-    >
-        &times;
-    </button>
-
-    <a href="/dashboard" class="active">Dashboard</a>
-    <a href="/storage">Storage</a>
-    <a href="/marketplace">Marketplace</a>
-    <a href="/negotiations">Negotiations</a>
-    <a href="/cart">Cart</a>
-    <a href="/chat">Chat</a>
-    <a href="/ai-assistant">AI Assistant</a>
-    <a href="/profile">Profile</a>
-    <a href="/notifications">Notifications</a>
-    <a href="/logout">Logout</a>
-
-</nav>
 
 <script src="/static/js/marketplace.js"></script>
 <script src="/static/js/navigation.js"></script>

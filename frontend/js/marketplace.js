@@ -1,5 +1,5 @@
 // ============================================================
-// MARKETPLACE ENHANCEMENTS (Image Fix + Mobile Nav)
+// MARKETPLACE ENHANCEMENTS (Search + Image Fix + Mobile Nav)
 // ============================================================
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -11,7 +11,6 @@ document.addEventListener("DOMContentLoaded", () => {
         search.addEventListener("keyup", function () {
             const keyword = this.value.toLowerCase();
             const cards = grid.querySelectorAll(".product-card");
-
             cards.forEach(card => {
                 const name = card.querySelector("h3")?.textContent.toLowerCase() || "";
                 card.style.display = name.includes(keyword) ? "" : "none";
@@ -19,9 +18,8 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // ---------- 2. IMAGE FIX (Show uploaded product images) ----------
+    // ---------- 2. IMAGE FIX ----------
     const productImages = document.querySelectorAll(".product-image");
-    
     productImages.forEach(img => {
         img.addEventListener("error", () => {
             img.src = "/static/assets/placeholder/product-placeholder.jpg";
@@ -30,9 +28,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // ---------- 3. MOBILE LEFT-SIDE NAV ----------
-    const navToggle = document.getElementById("marketplace-nav-toggle");
-    const nav = document.getElementById("marketplace-nav");
-    const navClose = document.getElementById("marketplace-nav-close");
+    const navToggle = document.querySelector(".marketplace-nav-toggle");
+    const nav = document.querySelector(".marketplace-nav");
+    const navClose = document.querySelector(".marketplace-nav-close");
 
     if (navToggle && nav) {
         navToggle.addEventListener("click", () => {
@@ -48,7 +46,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Close nav when clicking outside
     document.addEventListener("click", (event) => {
         if (nav && nav.classList.contains("open") && !nav.contains(event.target) && event.target !== navToggle) {
             nav.classList.remove("open");
@@ -58,7 +55,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ---------- 4. SELLER AVATAR PLACEHOLDER ----------
     const sellerIdentity = document.querySelectorAll(".seller-identity");
-    
     sellerIdentity.forEach(identity => {
         const avatarPlaceholder = identity.querySelector("span");
         if (avatarPlaceholder && avatarPlaceholder.textContent === "👤") {
