@@ -621,3 +621,107 @@ body {
   color: #17231c !important;
   background: #ffffff !important;
 }
+
+/* ============================================================
+   MOBILE OPTIMIZATION - REGISTER PAGE
+   ============================================================ */
+
+@media (max-width: 600px) {
+    .auth-container {
+        grid-template-columns: 1fr;
+    }
+
+    .auth-left {
+        min-height: 180px;
+        padding: 30px 20px;
+    }
+
+    .auth-left h1 {
+        font-size: 32px;
+        margin-bottom: 10px;
+    }
+
+    .auth-left p {
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    .auth-right {
+        padding: 20px 12px;
+        align-items: flex-start;
+    }
+
+    .auth-form-wrapper {
+        max-width: 100%;
+    }
+
+    .auth-brand {
+        max-width: 150px;
+        margin-bottom: 16px;
+    }
+
+    .auth-right form {
+        padding: 24px 18px;
+        border-radius: 14px;
+    }
+
+    .auth-right form h2 {
+        font-size: 28px;
+        margin-bottom: 20px;
+    }
+
+    .auth-right form .row {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .auth-right form label {
+        margin-top: 16px;
+    }
+
+    .auth-right form input,
+    .auth-right form select {
+        min-height: 46px;
+        font-size: 16px;
+    }
+
+    .auth-right form .role-option {
+        font-size: 14px;
+        line-height: 1.4;
+    }
+
+    .profile-upload input[type="file"] {
+        font-size: 14px;
+    }
+
+    .auth-right form button[type="submit"] {
+        min-height: 48px;
+        margin-top: 24px;
+    }
+}
+
+@media (max-width: 400px) {
+    .auth-left {
+        padding: 20px 15px;
+    }
+
+    .auth-left h1 {
+        font-size: 26px;
+    }
+
+    .auth-left p {
+        font-size: 13px;
+    }
+
+    .auth-right {
+        padding: 16px 10px;
+    }
+
+    .auth-right form {
+        padding: 20px 14px;
+    }
+
+    .auth-brand {
+        max-width: 140px;
+    }
+}

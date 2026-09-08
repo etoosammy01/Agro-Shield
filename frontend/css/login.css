@@ -797,3 +797,106 @@ body {
     }
 
 }
+
+/* ============================================================
+   MOBILE OPTIMIZATION - LOGIN PAGE
+   ============================================================ */
+
+@media (max-width: 600px) {
+    .auth-container {
+        grid-template-columns: 1fr;
+    }
+
+    .auth-left {
+        min-height: 220px;
+        padding: 30px 20px;
+        justify-content: center;
+    }
+
+    .auth-left h1 {
+        font-size: 30px;
+        margin-bottom: 10px;
+    }
+
+    .auth-left p {
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    .auth-right {
+        padding: 25px 16px 40px;
+    }
+
+    .brand-area {
+        height: 180px;
+    }
+
+    .brand-roof {
+        width: 480px;
+        height: 200px;
+    }
+
+    .brand-roof::after {
+        width: 455px;
+        height: 185px;
+    }
+
+    .auth-brand {
+        width: 180px;
+        margin-top: 20px;
+    }
+
+    .auth-right form {
+        padding: 30px 20px;
+        border-radius: 14px;
+    }
+
+    .auth-right form h2 {
+        font-size: 28px;
+        margin-bottom: 20px;
+    }
+
+    .input-wrapper input,
+    .password-wrapper input {
+        height: 52px;
+        font-size: 15px;
+    }
+
+    .auth-right form button {
+        height: 52px;
+        font-size: 16px;
+    }
+}
+
+@media (max-width: 400px) {
+    .auth-left {
+        padding: 20px 15px;
+    }
+
+    .auth-left h1 {
+        font-size: 26px;
+    }
+
+    .auth-left p {
+        font-size: 13px;
+    }
+
+    .brand-roof {
+        width: 420px;
+        height: 180px;
+    }
+
+    .brand-roof::after {
+        width: 400px;
+        height: 165px;
+    }
+
+    .auth-brand {
+        width: 160px;
+    }
+
+    .auth-right form {
+        padding: 24px 15px;
+    }
+}
+
