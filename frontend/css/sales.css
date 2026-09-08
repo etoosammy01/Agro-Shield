@@ -1,1 +1,50 @@
 .sales-page{width:min(1200px,calc(100% - 40px));margin:0 auto;padding:52px 0 80px}.sales-heading{display:flex;justify-content:space-between;align-items:end;gap:24px;margin-bottom:28px}.sales-heading h1{font-size:clamp(2rem,4vw,3rem);margin:0}.sales-heading p:not(.eyebrow){color:#667085;margin-top:10px}.eyebrow{color:#718096;font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase}.back-link{color:#1f7a4d;font-weight:700;text-decoration:none}.sales-summary{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:20px}.sales-summary div,.sales-card{background:#fff;border:1px solid #e6e9e7;border-radius:18px;padding:22px;box-shadow:0 8px 28px rgba(18,38,28,.05)}.sales-summary span,.sales-summary small{display:block;color:#667085}.sales-summary strong{display:block;margin:10px 0 6px;font-size:2rem;color:#17221b}.sales-card h2{margin:0 0 18px}.sales-table{overflow-x:auto}.sales-table table{width:100%;border-collapse:collapse}.sales-table th,.sales-table td{padding:14px;text-align:left;border-bottom:1px solid #edf0ee}.sales-table th{color:#667085;font-size:.78rem}.sale-status{color:#1f7a4d;font-weight:700;text-transform:capitalize}.sales-empty{text-align:center;padding:35px;color:#667085}.sales-empty h3{color:#17221b}.sales-empty a{display:inline-block;margin-top:16px;color:#fff;background:#1f7a4d;padding:11px 16px;border-radius:9px;text-decoration:none;font-weight:700}@media(max-width:700px){.sales-page{width:min(100% - 24px,600px);padding:30px 0 60px}.sales-heading{align-items:flex-start;flex-direction:column}.sales-summary{grid-template-columns:1fr}}
+
+/* ============================================================
+   MOBILE OPTIMIZATION - SALES PAGE
+   ============================================================ */
+
+@media (max-width: 600px) {
+    .sales-page {
+        width: calc(100% - 20px);
+        padding: 25px 0 50px;
+    }
+
+    .sales-heading {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+
+    .sales-heading h1 {
+        font-size: 32px;
+    }
+
+    .back-link {
+        display: inline-block;
+        margin-top: 5px;
+    }
+
+    .sales-summary {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .sales-summary div,
+    .sales-card {
+        padding: 18px;
+    }
+
+    .sales-table {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .sales-table table {
+        min-width: 600px;
+    }
+
+    .sales-card h2 {
+        font-size: 22px;
+    }
+}
