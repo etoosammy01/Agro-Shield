@@ -1,30 +1,43 @@
-const search = document.getElementById("search");
-const grid = document.getElementById("product-grid");
+// ============================================================
+// MARKETPLACE ENHANCEMENTS (Image Fix + Mobile Nav)
+// ============================================================
 
-if (search && grid) {
-    search.addEventListener("keyup", function () {
-        const keyword = this.value.toLowerCase();
-        const cards = grid.querySelectorAll(".product-card");
+document.addEventListener("DOMContentLoaded", () => {
+    // ---------- 1. SEARCH FUNCTIONALITY ----------
+    const search = document.getElementById("search");
+    const grid = document.getElementById("product-grid");
 
-        cards.forEach(card => {
-            const name = card.querySelector("h3")?.textContent.toLowerCase() || "";
-            card.style.display = name.includes(keyword) ? "" : "none";
+    if (search && grid) {
+        search.addEventListener("keyup", function () {
+            const keyword = this.value.toLowerCase();
+            const cards = grid.querySelectorAll(".product-card");
+
+            cards.forEach(card => {
+                const name = card.querySelector("h3")?.textContent.toLowerCase() || "";
+                card.style.display = name.includes(keyword) ? "" : "none";
+            });
+        });
+    }
+
+    // ---------- 2. IMAGE FIX (Show uploaded product images) ----------
+    const productImages = document.querySelectorAll(".product-image");
+    
+    productImages.forEach(img => {
+        img.addEventListener("error", () => {
+            img.src = "/static/assets/placeholder/product-placeholder.jpg";
+            img.style.objectFit = "cover";
         });
     });
-}
-/* ============================================================
-   NEW FEATURES ADDED - Mobile Left-Side Nav Toggle
-   ============================================================ */
 
-(function() {
-    const navToggle = document.querySelector(".marketplace-nav-toggle");
-    const nav = document.querySelector(".marketplace-nav");
-    const navClose = document.querySelector(".marketplace-nav-close");
+    // ---------- 3. MOBILE LEFT-SIDE NAV ----------
+    const navToggle = document.getElementById("marketplace-nav-toggle");
+    const nav = document.getElementById("marketplace-nav");
+    const navClose = document.getElementById("marketplace-nav-close");
 
     if (navToggle && nav) {
         navToggle.addEventListener("click", () => {
             nav.classList.add("open");
-            document.body.style.overflow = "hidden"; // Prevent background scroll
+            document.body.style.overflow = "hidden";
         });
     }
 
@@ -42,19 +55,15 @@ if (search && grid) {
             document.body.style.overflow = "";
         }
     });
-})();
 
-/* ============================================================
-   NEW: IMAGE FIX (Fallback for broken product images)
-   ============================================================ */
-
-document.addEventListener("DOMContentLoaded", () => {
-    const productImages = document.querySelectorAll(".product-image");
+    // ---------- 4. SELLER AVATAR PLACEHOLDER ----------
+    const sellerIdentity = document.querySelectorAll(".seller-identity");
     
-    productImages.forEach(img => {
-        img.addEventListener("error", () => {
-            img.src = "/static/assets/placeholder/product-placeholder.jpg";
-            img.style.objectFit = "cover";
-        });
+    sellerIdentity.forEach(identity => {
+        const avatarPlaceholder = identity.querySelector("span");
+        if (avatarPlaceholder && avatarPlaceholder.textContent === "👤") {
+            avatarPlaceholder.textContent = "👨‍🌾";
+            avatarPlaceholder.style.fontSize = "18px";
+        }
     });
 });
