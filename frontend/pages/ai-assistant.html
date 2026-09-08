@@ -37,12 +37,21 @@
 
 <main class="ai-assistant">
 
-    <h1>🤖 Agro-Shield AI Assistant</h1>
+    <!-- =====================================================
+         UNIQUE AGRO-SHIELD AI HEADER (Not ChatGPT)
+         ===================================================== -->
 
-    <p class="assistant-intro">
-        Ask questions about farming, describe a problem,
-        or provide photo, video, or voice context for analysis.
-    </p>
+    <div class="ai-header-bar">
+        <div class="ai-brand-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div>
+            <h1 class="ai-title">Agro-Shield Farm Assistant</h1>
+            <p class="ai-subtitle">Your AI-powered farming companion — diagnose crops, plan harvests, and grow smarter.</p>
+        </div>
+    </div>
 
 
     {{if .Error}}
@@ -54,9 +63,8 @@
     </div>
     {{end}}
 
-
-    <!-- =====================================================
-         AI FORM
+        <!-- =====================================================
+         AI FORM (Unique Agro-Shield Layout)
          ===================================================== -->
 
     <form
@@ -117,7 +125,7 @@
 
 
         <!-- =================================================
-             AI COMPOSER
+             UNIQUE COMPOSER (Farming Field Style)
              ================================================= -->
 
         <label
@@ -184,7 +192,7 @@
 
             <div class="composer-controls">
 
-                <!-- ATTACHMENT MENU -->
+                                <!-- ATTACHMENT MENU -->
 
                 <div class="attachment-menu-wrap">
 
@@ -253,14 +261,14 @@
                 </button>
 
 
-                <!-- MICROPHONE -->
+                <!-- VOICE INPUT (NEW - Shows text as user speaks) -->
 
                 <button
                     type="button"
-                    id="start-audio"
+                    id="voice-input"
                     class="composer-icon microphone-button"
-                    aria-label="Start voice recording"
-                    title="Record voice"
+                    aria-label="Use voice input"
+                    title="Speak to type"
                 >
                     <svg
                         viewBox="0 0 24 24"
@@ -307,6 +315,16 @@
 
 
         <!-- =================================================
+             VOICE STATUS (Live transcription)
+             ================================================= -->
+
+        <p
+            id="voice-status"
+            class="ai-voice-status"
+            aria-live="polite"
+        ></p>
+
+                <!-- =================================================
              ATTACHMENT / RECORDING FEEDBACK
              ================================================= -->
 
@@ -437,7 +455,7 @@
 
 
     <!-- =====================================================
-         AI RESULT
+         AI RESULT (Unique Agro-Shield Result Card)
          ===================================================== -->
 
     {{if .Result}}
@@ -447,7 +465,14 @@
         aria-live="polite"
     >
 
-        <h2>🤖 AI Result</h2>
+        <div class="ai-result-header">
+            <div class="ai-result-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <h2>AI Diagnosis</h2>
+        </div>
 
         <div class="ai-result-text">
             {{.Result}}
@@ -468,7 +493,7 @@
             class="history-link"
             href="/ai-diagnosis-history"
         >
-            View AI diagnosis history
+            View AI diagnosis history →
         </a>
 
     </p>
