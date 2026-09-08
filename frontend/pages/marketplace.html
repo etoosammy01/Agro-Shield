@@ -196,7 +196,141 @@
 
 </main>
 
+<!-- =====================================================
+     UNIQUE MARKETPLACE FEATURES (Agro-Shield Branded)
+====================================================== -->
+
+<div class="market-features">
+
+    <div class="market-feature-card">
+        <div class="market-feature-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <h3>Fresh from Farm</h3>
+        <p>Directly from local farmers, no middlemen.</p>
+    </div>
+
+    <div class="market-feature-card">
+        <div class="market-feature-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
+                <path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+            </svg>
+        </div>
+        <h3>Fair Pricing</h3>
+        <p>Transparent prices, better for both sides.</p>
+    </div>
+
+    <div class="market-feature-card">
+        <div class="market-feature-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z" stroke="currentColor" stroke-width="2" fill="none"/>
+                <circle cx="12" cy="10" r="2.5" stroke="currentColor" stroke-width="2" fill="none"/>
+            </svg>
+        </div>
+        <h3>Local & Global</h3>
+        <p>Buy from nearby farms or nationwide.</p>
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     MOBILE LEFT-SIDE NAVIGATION
+====================================================== -->
+
+<button
+    type="button"
+    class="marketplace-nav-toggle"
+    id="marketplace-nav-toggle"
+    aria-label="Open navigation"
+>
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+</button>
+
+<nav class="marketplace-nav" id="marketplace-nav">
+
+    <button
+        type="button"
+        class="marketplace-nav-close"
+        id="marketplace-nav-close"
+        aria-label="Close navigation"
+    >
+        &times;
+    </button>
+
+    <a href="/dashboard" class="active">Dashboard</a>
+    <a href="/storage">Storage</a>
+    <a href="/marketplace">Marketplace</a>
+    <a href="/negotiations">Negotiations</a>
+    <a href="/cart">Cart</a>
+    <a href="/chat">Chat</a>
+    <a href="/ai-assistant">AI Assistant</a>
+    <a href="/profile">Profile</a>
+    <a href="/notifications">Notifications</a>
+    <a href="/logout">Logout</a>
+
+</nav>
+
 <script src="/static/js/marketplace.js"></script>
+
+/* ============================================================
+   NEW: MARKETPLACE ENHANCEMENTS (Image Fix + Mobile Nav)
+   ============================================================ */
+
+document.addEventListener("DOMContentLoaded", () => {
+    // ---------- 1. IMAGE FIX (Show uploaded product images) ----------
+    const productImages = document.querySelectorAll(".product-image");
+    
+    productImages.forEach(img => {
+        img.addEventListener("error", () => {
+            img.src = "/static/assets/placeholder/product-placeholder.jpg";
+            img.style.objectFit = "cover";
+        });
+    });
+
+    // ---------- 2. MOBILE LEFT-SIDE NAV ----------
+    const navToggle = document.getElementById("marketplace-nav-toggle");
+    const nav = document.getElementById("marketplace-nav");
+    const navClose = document.getElementById("marketplace-nav-close");
+
+    if (navToggle && nav) {
+        navToggle.addEventListener("click", () => {
+            nav.classList.add("open");
+            document.body.style.overflow = "hidden";
+        });
+    }
+
+    if (navClose && nav) {
+        navClose.addEventListener("click", () => {
+            nav.classList.remove("open");
+            document.body.style.overflow = "";
+        });
+    }
+
+    // Close nav when clicking outside
+    document.addEventListener("click", (event) => {
+        if (nav && nav.classList.contains("open") && !nav.contains(event.target) && event.target !== navToggle) {
+            nav.classList.remove("open");
+            document.body.style.overflow = "";
+        }
+    });
+
+    // ---------- 3. SELLER AVATAR PLACEHOLDER ----------
+    const sellerIdentity = document.querySelectorAll(".seller-identity");
+    
+    sellerIdentity.forEach(identity => {
+        const avatarPlaceholder = identity.querySelector("span");
+        if (avatarPlaceholder && avatarPlaceholder.textContent === "👤") {
+            avatarPlaceholder.textContent = "👨‍🌾";
+            avatarPlaceholder.style.fontSize = "18px";
+        }
+    });
+});
 
 <script src="/static/js/navigation.js"></script>
 </body>
