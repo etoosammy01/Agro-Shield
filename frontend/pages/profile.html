@@ -38,9 +38,9 @@
     <div class="profile-header">
 
         {{if .PhotoURL}}
-        <img src="{{.PhotoURL}}" alt="Profile Photo">
+        <img src="{{.PhotoURL}}" alt="Profile Photo" onerror="this.onerror=null; this.src='/static/assets/placeholder/avatar-placeholder.jpg';">
         {{else}}
-        <div class="profile-photo-placeholder">👤</div>
+        <div class="profile-photo-placeholder">👨‍🌾</div>
         {{end}}
 
         <div>
@@ -241,3 +241,4 @@
 <script src="/static/js/navigation.js"></script>
 </body>
 </html>
+
