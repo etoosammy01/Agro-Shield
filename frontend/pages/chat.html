@@ -112,7 +112,7 @@
                 <div class="people-list">
                     {{range .Users}}
                         <div class="person-row" data-user-id="{{.ID}}">
-                            <a class="person-identity" href="/profile?id={{.ID}}">{{if .PhotoURL}}<img class="person-avatar" src="{{.PhotoURL}}" alt="{{.FullName}} profile picture">{{else}}<span class="person-avatar">👤</span>{{end}}<span><strong>{{.FullName}}</strong><small>{{.Role}} · {{.Location}}</small><span class="presence-status"><i></i><span>Offline</span></span></span></a>
+                            <a class="person-identity" href="/profile?id={{.ID}}">{{if .PhotoURL}}<img class="person-avatar" src="{{.PhotoURL}}" alt="{{.FullName}} profile picture" onerror="this.onerror=null; this.src='/static/assets/placeholder/avatar-placeholder.jpg';">{{else}}<span class="person-avatar">👨‍🌾</span>{{end}}<span><strong>{{.FullName}}</strong><small>{{.Role}} · {{.Location}}</small><span class="presence-status"><i></i><span>Offline</span></span></span></a>
                             <form action="/chat/private" method="POST"><input type="hidden" name="user_id" value="{{.ID}}"><button type="submit">Chat</button></form>
                         </div>
                     {{end}}
@@ -121,8 +121,7 @@
             </div>
         </details>
 
-
-        <!-- =================================================
+                <!-- =================================================
              MY CONVERSATIONS
              ================================================= -->
 
@@ -157,9 +156,9 @@
                                     <span class="group-avatar">👥</span>
                                 {{else}}
                                     {{if .OtherPhotoURL}}
-                                        <img src="{{.OtherPhotoURL}}" alt="{{.OtherName}} profile picture">
+                                        <img src="{{.OtherPhotoURL}}" alt="{{.OtherName}} profile picture" onerror="this.onerror=null; this.src='/static/assets/placeholder/avatar-placeholder.jpg';">
                                     {{else}}
-                                        <span class="group-avatar">👤</span>
+                                        <span class="group-avatar">👨‍🌾</span>
                                     {{end}}
                                 {{end}}
 
@@ -247,3 +246,4 @@
 <script src="/static/js/chat.js" defer></script>
 </body>
 </html>
+
