@@ -98,6 +98,7 @@
                             src="{{.ImageURL}}"
                             alt="{{$.Crop.Name}}"
                             loading="lazy"
+                            onerror="this.onerror=null; this.src='/static/assets/placeholder/product-placeholder.jpg';"
                         >
 
                     </div>
@@ -114,6 +115,7 @@
                             class="product-image"
                             src="{{.Crop.ImageURL}}"
                             alt="{{.Crop.Name}}"
+                            onerror="this.onerror=null; this.src='/static/assets/placeholder/product-placeholder.jpg';"
                         >
 
                     </div>
@@ -134,8 +136,7 @@
 
         </div>
 
-
-        <!-- =====================================================
+                <!-- =====================================================
              PRODUCT PRICE
              ===================================================== -->
 
@@ -227,12 +228,13 @@
                             src="{{.Crop.SellerPhotoURL}}"
                             alt="{{.Crop.SellerName}}"
                             class="seller-product-photo"
+                            onerror="this.onerror=null; this.src='/static/assets/placeholder/avatar-placeholder.jpg';"
                         >
 
                     {{else}}
 
                         <span class="seller-placeholder">
-                            👤
+                            👨‍🌾
                         </span>
 
                     {{end}}
@@ -251,8 +253,7 @@
 
         </div>
 
-
-        <!-- =====================================================
+                <!-- =====================================================
              PRODUCT STATUS
              ===================================================== -->
 
@@ -301,3 +302,4 @@
 </body>
 
 </html>
+
