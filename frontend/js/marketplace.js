@@ -11,6 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
         search.addEventListener("keyup", function () {
             const keyword = this.value.toLowerCase();
             const cards = grid.querySelectorAll(".product-card");
+
             cards.forEach(card => {
                 const name = card.querySelector("h3")?.textContent.toLowerCase() || "";
                 card.style.display = name.includes(keyword) ? "" : "none";
@@ -18,8 +19,9 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // ---------- 2. IMAGE FIX ----------
+    // ---------- 2. IMAGE FIX (Fallback for broken images) ----------
     const productImages = document.querySelectorAll(".product-image");
+
     productImages.forEach(img => {
         img.addEventListener("error", () => {
             img.src = "/static/assets/placeholder/product-placeholder.jpg";
@@ -46,6 +48,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // Close nav when clicking outside
     document.addEventListener("click", (event) => {
         if (nav && nav.classList.contains("open") && !nav.contains(event.target) && event.target !== navToggle) {
             nav.classList.remove("open");
@@ -55,6 +58,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ---------- 4. SELLER AVATAR PLACEHOLDER ----------
     const sellerIdentity = document.querySelectorAll(".seller-identity");
+
     sellerIdentity.forEach(identity => {
         const avatarPlaceholder = identity.querySelector("span");
         if (avatarPlaceholder && avatarPlaceholder.textContent === "👤") {
