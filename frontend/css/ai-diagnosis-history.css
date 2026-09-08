@@ -921,3 +921,40 @@
     }
 
 }
+
+@media (max-width: 600px) {
+    .diagnosis-history {
+        padding: 20px 12px 40px;
+    }
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    .page-header h1 {
+        font-size: 28px;
+    }
+    .history-controls {
+        flex-direction: column;
+        gap: 12px;
+    }
+    .filter-wrapper {
+        width: 100%;
+    }
+    .diagnosis-card {
+        padding: 15px;
+    }
+    .diagnosis-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .diagnosis-card-footer {
+        flex-direction: column;
+        gap: 10px;
+    }
+    .modal-content {
+        max-height: 90vh;
+        padding: 15px;
+    }
+}
