@@ -831,3 +831,90 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 });
+
+/* ============================================================
+   NEW: VOICE INPUT (Speech-to-Text with Live Transcription)
+   ============================================================ */
+
+document.addEventListener("DOMContentLoaded", () => {
+    const voiceInputButton = document.getElementById("voice-input");
+    const voiceStatus = document.getElementById("voice-status");
+    const textArea = document.getElementById("description");
+
+    if (!voiceInputButton || !textArea) return;
+
+    let recognition = null;
+    let isRecording = false;
+
+    // Check if browser supports speech recognition
+    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
+        voiceStatus.textContent = "Speech recognition is not supported in this browser. Please type instead.";
+        voiceInputButton.disabled = true;
+        return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;  // Shows text while speaking (interim results)
+    recognition.lang = "en-US";
+
+    // When speech recognition starts
+    recognition.onstart = () => {
+        isRecording = true;
+        voiceStatus.textContent = "Listening... Speak now.";
+        voiceInputButton.classList.add("recording");
+        voiceInputButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18L18 6M6 6l12 12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
+    };
+
+    // When speech is recognized (live transcription)
+    recognition.onresult = (event) => {
+        let finalText = "";
+        let interimText = "";
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+                finalText += transcript;
+            } else {
+                interimText += transcript;
+            }
+        }
+
+        // Combine final + interim text and show in textarea
+        textArea.value = finalText + interimText;
+
+        // Show live status
+        if (interimText) {
+            voiceStatus.textContent = "Heard: " + interimText;
+        } else {
+            voiceStatus.textContent = "Listening... Speak now.";
+        }
+    };
+
+    // When speech recognition ends
+    recognition.onerror = (event) => {
+        voiceStatus.textContent = "Error: " + event.error;
+    };
+
+    recognition.onend = () => {
+        isRecording = false;
+        voiceStatus.textContent = "";
+        voiceInputButton.classList.remove("recording");
+        voiceInputButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a4 4 0 0 0 4-4V6a4 4 0 1 0-8 0v5a4 4 0 0 0 4 4Zm-7-4a7 7 0 0 0 14 0M12 18v3m-3 0h6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
+    };
+
+    // Click voice button to start/stop
+    voiceInputButton.addEventListener("click", () => {
+        if (isRecording) {
+            recognition.stop();
+        } else {
+            try {
+                recognition.start();
+            } catch (error) {
+                console.error("Speech recognition error:", error);
+                voiceStatus.textContent = "Could not start voice input. Please try again.";
+            }
+        }
+    });
+});
