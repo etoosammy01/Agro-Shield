@@ -23,7 +23,7 @@ func (r *FarmerRepository) Create(farmer *models.Farmer) error {
 	VALUES ($1, $2, $3, $4, $5, $5, 'Benue', 'Nigeria', $6, $7, $8, $9, $10)
 	RETURNING id
 	`
-	_, err := r.db.Exec(
+	return r.db.QueryRow(
 		query,
 		farmer.FullName,
 		farmer.Phone,
@@ -35,8 +35,7 @@ func (r *FarmerRepository) Create(farmer *models.Farmer) error {
 		farmer.BankName,
 		farmer.AccountName,
 		farmer.AccountNumber,
-	)
-	return err
+	).Scan(&farmer.ID)
 }
 
 func (r *FarmerRepository) GetByPhone(phone string) (*models.Farmer, error) {
@@ -160,6 +159,17 @@ func (r *FarmerRepository) UpdatePhoto(id int, photoURL string) error {
 		`UPDATE farmers SET photo_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
 		photoURL,
 		id,
+	)
+	return err
+}
+
+// UpdateBankDetails sets a farmer's payout bank details. Any field may be
+// blank — payout details are optional and can be added or edited later from
+// the profile page.
+func (r *FarmerRepository) UpdateBankDetails(id int, bankName, accountName, accountNumber string) error {
+	_, err := r.db.Exec(
+		`UPDATE farmers SET bank_name = $1, account_name = $2, account_number = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4`,
+		bankName, accountName, accountNumber, id,
 	)
 	return err
 }

@@ -1,0 +1,183 @@
+/* ============================================================
+   AGRO-SHIELD COMPLETE PROFILE PAGE
+   ============================================================ */
+
+/* This page has no left marketing panel — override the
+   .auth-container split-screen grid to a single centered column. */
+
+.complete-profile-container {
+      grid-template-columns: 1fr;
+}
+
+.complete-profile-panel {
+      min-height: 100vh;
+}
+
+/* ============================================================
+       SUBTITLE
+       ============================================================ */
+
+.complete-profile-subtitle {
+      margin-top: -8px;
+      margin-bottom: 20px;
+
+      color: var(--color-muted, #66756c);
+
+      font-size: 14px;
+      line-height: 1.5;
+}
+
+/* ============================================================
+       PHOTO UPLOAD BLOCK
+       ============================================================ */
+
+.photo-upload-block {
+      text-align: center;
+
+      margin-bottom: 8px;
+}
+
+.photo-preview {
+      width: 96px;
+      height: 96px;
+
+      margin: 0 auto 14px;
+
+      border: 1px dashed var(--color-border, #dbe7dc);
+      border-radius: 50%;
+
+      background-color: var(--color-page, #f5f7f6);
+      background-size: cover;
+      background-position: center;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      color: #8a968f;
+      font-size: 26px;
+}
+
+.photo-preview.has-photo {
+      border-style: solid;
+      border-color: var(--color-brand, #1f7a4d);
+      color: transparent;
+}
+
+.photo-upload-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+
+      min-height: 40px;
+
+      padding: 0 18px;
+
+      border: 1px solid var(--color-brand, #1f7a4d);
+      border-radius: 10px;
+
+      background: var(--color-brand-soft, #eaf7ea);
+
+      color: var(--color-brand, #1f7a4d);
+
+      font-size: 14px;
+      font-weight: 700;
+
+      cursor: pointer;
+
+      transition:
+            background-color 0.2s ease,
+            transform 0.2s ease;
+}
+
+.photo-upload-button:hover {
+      background: #dff1e3;
+}
+
+#profile-picture {
+      position: absolute;
+
+      width: 1px;
+      height: 1px;
+
+      overflow: hidden;
+
+      clip: rect(0, 0, 0, 0);
+
+      white-space: nowrap;
+}
+
+.photo-required-hint {
+      margin-top: 8px;
+
+      color: #8a968f;
+
+      font-size: 12px;
+}
+
+/* ============================================================
+       PAYOUT DETAILS (farmers only, optional)
+       ============================================================ */
+
+.payout-section {
+      margin-top: 16px;
+      padding-top: 18px;
+
+      border-top: 1px solid var(--color-border, #dbe7dc);
+}
+
+.payout-heading {
+      display: flex;
+      align-items: center;
+
+      gap: 8px;
+
+      margin-bottom: 4px;
+
+      color: var(--color-ink, #17231c);
+
+      font-size: 14px;
+      font-weight: 700;
+}
+
+.payout-heading i {
+      color: #66756c;
+
+      font-size: 15px;
+}
+
+.optional-badge {
+      padding: 1px 8px;
+
+      border-radius: 8px;
+
+      background: var(--color-page, #f5f7f6);
+
+      color: #8a968f;
+
+      font-size: 11px;
+      font-weight: 700;
+}
+
+.payout-hint {
+      margin-bottom: 14px;
+
+      color: #8a968f;
+
+      font-size: 12px;
+      line-height: 1.5;
+}
+
+/* ============================================================
+       MOBILE
+       ============================================================ */
+
+@media (max-width: 600px) {
+      .complete-profile-panel {
+            padding: 32px 20px;
+      }
+
+      .photo-preview {
+            width: 84px;
+            height: 84px;
+      }   }

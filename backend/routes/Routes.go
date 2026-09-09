@@ -90,6 +90,20 @@ func RegisterRoutes(container *app.Container) {
 		),
 	)
 
+	completeProfileHandler := handlers.NewCompleteProfileHandler(
+		container.Auth,
+	)
+
+	http.HandleFunc(
+		"/complete-profile",
+		middleware.OnlyPath(
+			"/complete-profile",
+			middleware.RequireAuth(
+				container.FarmerRepo,
+				completeProfileHandler.Handler,
+			),
+		),
+	)
 	// ========================================================
 	// DASHBOARD
 	// ========================================================

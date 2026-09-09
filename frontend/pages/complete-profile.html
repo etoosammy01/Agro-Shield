@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+      <title>Complete Your Profile | Agro-Shield</title>
+
+      <link rel="stylesheet" href="/static/css/style.css">
+      <link rel="stylesheet" href="/static/css/register.css">
+      <link rel="stylesheet" href="/static/css/register-extra.css">
+      <link rel="stylesheet" href="/static/css/complete-profile.css">
+
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+
+<body>
+
+      <main class="auth-container complete-profile-container">
+
+            <section class="auth-right complete-profile-panel">
+
+                  <div class="auth-form-wrapper">
+
+                        <img class="auth-brand" src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield">
+
+                        <form id="complete-profile-form" action="/complete-profile" method="POST"
+                              enctype="multipart/form-data">
+
+                              <h2>Complete your profile</h2>
+
+                              <p class="complete-profile-subtitle">
+                                    {{if .IsBuyer}}
+                                    A photo is required so farmers know who they're dealing with.
+                                    {{else}}
+                                    A photo is required so buyers know who they're dealing with.
+                                    {{end}}
+                              </p>
+
+                              {{if .Error}}
+                              <p class="message">{{.Error}}</p>
+                              {{end}}
+
+
+                              <!-- PROFILE PICTURE -->
+                              <div class="photo-upload-block">
+
+                                    <div class="photo-preview" id="photo-preview">
+                                          <i class="fa-solid fa-camera"></i>
+                                    </div>
+
+                                    <label class="photo-upload-button" for="profile-picture">
+                                          Upload photo
+                                    </label>
+
+                                    <input id="profile-picture" name="profile_picture" type="file" accept="image/*"
+                                          required>
+
+                                    <p class="photo-required-hint">Required to continue</p>
+
+                              </div>
+
+
+                              {{if not .IsBuyer}}
+
+                              <!-- PAYOUT DETAILS (farmers only, optional) -->
+                              <div class="payout-section">
+
+                                    <div class="payout-heading">
+                                          <i class="fa-solid fa-building-columns"></i>
+                                          <span>Payout details</span>
+                                          <span class="optional-badge">Optional</span>
+                                    </div>
+
+                                    <p class="payout-hint">
+                                          Used only to send you payment when a buyer completes an
+                                          order. You can add this later from your profile.
+                                    </p>
+
+                                    <div class="form-group">
+                                          <label for="bank-name">Bank name</label>
+                                          <select name="bank-name" id="bank-name">
+                                                <option value="" selected>Select your bank</option>
+                                                <option value="Access Bank">Access Bank</option>
+                                                <option value="First Bank">First Bank</option>
+                                                <option value="GTBank">GTBank</option>
+                                                <option value="UBA">UBA</option>
+                                                <option value="Zenith Bank">Zenith Bank</option>
+                                                <option value="Opay">Opay</option>
+                                                <option value="Palmpay">Palmpay</option>
+                                                <option value="Moniepoint">Moniepoint</option>
+                                          </select>
+                                    </div>
+
+                                    <div class="form-group">
+                                          <label for="account-name">Account name</label>
+                                          <input type="text" name="account-name" id="account-name"
+                                                placeholder="Name on the account">
+                                    </div>
+
+                                    <div class="form-group">
+                                          <label for="account-number">Account number</label>
+                                          <input type="text" name="account-number" id="account-number"
+                                                placeholder="10-digit NUBAN number" inputmode="numeric" maxlength="10"
+                                                pattern="[0-9]{10}">
+                                    </div>
+
+                              </div>
+
+                              {{end}}
+
+
+                              <button type="submit" id="continue-button" disabled>
+                                    Continue
+                              </button>
+
+                        </form>
+
+                  </div>
+
+            </section>
+
+      </main>
+
+
+      <script src="/static/js/complete-profile.js"></script>
+
+</body>
+
+</html>

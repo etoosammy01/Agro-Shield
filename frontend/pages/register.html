@@ -12,10 +12,7 @@
     <link rel="stylesheet" href="/static/css/register-extra.css">
 
     <!-- Font Awesome -->
-    <link
-        rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
-    >
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 </head>
 
 <body>
@@ -42,19 +39,10 @@
             <div class="auth-form-wrapper">
 
                 <!-- LOGO -->
-                <img
-                    class="auth-brand"
-                    src="/static/assets/logo/Agro-Shield_logo.png"
-                    alt="Agro-Shield"
-                >
+                <img class="auth-brand" src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield">
 
                 <!-- REGISTRATION FORM -->
-                <form
-                    id="register-form"
-                    action="/register"
-                    method="POST"
-                    enctype="multipart/form-data"
-                >
+                <form id="register-form" action="/register" method="POST">
 
                     <h2>Create Account</h2>
 
@@ -65,12 +53,7 @@
                     <div class="row role-select">
 
                         <label class="role-option">
-                            <input
-                                type="radio"
-                                name="role"
-                                value="farmer"
-                                checked
-                            >
+                            <input type="radio" name="role" value="farmer" checked>
 
                             <span>
                                 🌾 Farmer
@@ -78,11 +61,7 @@
                         </label>
 
                         <label class="role-option">
-                            <input
-                                type="radio"
-                                name="role"
-                                value="buyer"
-                            >
+                            <input type="radio" name="role" value="buyer">
 
                             <span>
                                 🛒 Buyer
@@ -101,14 +80,8 @@
                                 First Name
                             </label>
 
-                            <input
-                                name="first-name"
-                                type="text"
-                                id="first-name"
-                                placeholder="First Name"
-                                autocomplete="given-name"
-                                required
-                            >
+                            <input name="first-name" type="text" id="first-name" placeholder="First Name"
+                                autocomplete="given-name" required>
 
                         </div>
 
@@ -118,14 +91,8 @@
                                 Last Name
                             </label>
 
-                            <input
-                                name="last-name"
-                                type="text"
-                                id="last-name"
-                                placeholder="Last Name"
-                                autocomplete="family-name"
-                                required
-                            >
+                            <input name="last-name" type="text" id="last-name" placeholder="Last Name"
+                                autocomplete="family-name" required>
 
                         </div>
 
@@ -139,14 +106,8 @@
                             Email Address
                         </label>
 
-                        <input
-                            name="email"
-                            type="email"
-                            id="email"
-                            placeholder="Enter your email"
-                            autocomplete="email"
-                            required
-                        >
+                        <input name="email" type="email" id="email" placeholder="Enter your email" autocomplete="email"
+                            required>
 
                     </div>
 
@@ -158,14 +119,8 @@
                             Phone Number
                         </label>
 
-                        <input
-                            name="phone"
-                            type="tel"
-                            id="phone"
-                            placeholder="Enter your phone number"
-                            autocomplete="tel"
-                            required
-                        >
+                        <input name="phone" type="tel" id="phone" placeholder="Enter your phone number"
+                            autocomplete="tel" required>
 
                     </div>
 
@@ -177,11 +132,7 @@
                             Location (LGA)
                         </label>
 
-                        <select
-                            name="location"
-                            id="location"
-                            required
-                        >
+                        <select name="location" id="location" required>
 
                             <option value="" disabled selected>
                                 Select your LGA
@@ -225,22 +176,11 @@
 
                         <div class="password-wrapper">
 
-                            <input
-                                name="password"
-                                type="password"
-                                id="password"
-                                placeholder="Create password"
-                                autocomplete="new-password"
-                                required
-                            >
+                            <input name="password" type="password" id="password" placeholder="Create password"
+                                autocomplete="new-password" required>
 
-                            <i
-                                class="fa-solid fa-eye toggle-password"
-                                id="toggle-password"
-                                aria-label="Show password"
-                                role="button"
-                                tabindex="0"
-                            ></i>
+                            <i class="fa-solid fa-eye toggle-password" id="toggle-password" aria-label="Show password"
+                                role="button" tabindex="0"></i>
 
                         </div>
 
@@ -256,42 +196,13 @@
 
                         <div class="password-wrapper">
 
-                            <input
-                                name="confirm-password"
-                                type="password"
-                                id="confirm-password"
-                                placeholder="Confirm password"
-                                autocomplete="new-password"
-                                required
-                            >
+                            <input name="confirm-password" type="password" id="confirm-password"
+                                placeholder="Confirm password" autocomplete="new-password" required>
 
-                            <i
-                                class="fa-solid fa-eye toggle-password"
-                                id="toggle-confirm-password"
-                                aria-label="Show confirm password"
-                                role="button"
-                                tabindex="0"
-                            ></i>
+                            <i class="fa-solid fa-eye toggle-password" id="toggle-confirm-password"
+                                aria-label="Show confirm password" role="button" tabindex="0"></i>
 
                         </div>
-
-                    </div>
-
-
-                    <!-- PROFILE PICTURE -->
-                    <div class="form-group profile-upload">
-
-                        <label for="profile-picture">
-                            Profile Picture
-                        </label>
-
-                        <input
-                            id="profile-picture"
-                            name="profile_picture"
-                            type="file"
-                            accept="image/*"
-                            required
-                        >
 
                     </div>
 
