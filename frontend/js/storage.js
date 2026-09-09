@@ -12,12 +12,9 @@ const imageHelp = document.getElementById("image-help");
 const captureLocation = document.getElementById("capture-location");
 const locationStatus = document.getElementById("location-status");
 
-// ---------- CLOUDINARY CONFIG (Replace with your own) ----------
-const CLOUDINARY_CLOUD_NAME = "nirybrdh";
-const CLOUDINARY_UPLOAD_PRESET = "agro_shield_uploads";
-
 // ---------- FILE VALIDATION ----------
-const VALID_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+// Keep this list in sync with backend/handlers/uploads.go.
+const VALID_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 
 function validateImageFile(file) {
@@ -32,25 +29,6 @@ function validateImageFile(file) {
     }
 
     return { valid: true };
-}
-
-// ---------- CLOUDINARY UPLOAD ----------
-async function uploadToCloudinary(file) {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-
-    const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
-        { method: "POST", body: formData }
-    );
-
-    if (!response.ok) {
-        throw new Error("Image upload failed.");
-    }
-
-    const data = await response.json();
-    return data.secure_url;
 }
 
 // ---------- GPS CAPTURE ----------
@@ -72,14 +50,14 @@ function captureGPS() {
 
 if (captureLocation) captureLocation.addEventListener("click", captureGPS);
 
-if (form) form.addEventListener("submit", async event => {
+if (form) form.addEventListener("submit", event => {
     if (!document.getElementById("latitude").value || !document.getElementById("longitude").value) {
         event.preventDefault();
         captureGPS();
         return;
     }
 
-    // Handle image upload
+    // The multipart form is uploaded and saved by the Agro-Shield backend.
     const imageFile = imageInput.files[0];
 
     if (imageFile) {
@@ -90,18 +68,7 @@ if (form) form.addEventListener("submit", async event => {
             return;
         }
 
-        // Show uploading status
-        imageHelp.textContent = "Uploading image to Cloudinary...";
-
-        try {
-            const uploadedUrl = await uploadToCloudinary(imageFile);
-            imageURL.value = uploadedUrl;
-            imageHelp.textContent = "✅ Image uploaded successfully.";
-        } catch (error) {
-            event.preventDefault();
-            imageHelp.textContent = "Image upload failed. Please try again.";
-            console.error(error);
-        }
+        imageHelp.textContent = "Saving product image...";
     }
 });
 
@@ -220,13 +187,6 @@ if (imageInput) {
     });
 }
 
-/* ============================================================
-   NEW: CLOUDINARY UPLOAD SUCCESS INDICATOR
-   ============================================================ */
-
-// This code runs after the existing form submit handler.
-// It ensures the user sees the upload status clearly.
-
 const imageUploadStatus = document.createElement("p");
 imageUploadStatus.id = "image-upload-status";
 imageUploadStatus.style.marginTop = "8px";
@@ -256,19 +216,4 @@ if (imageInput) {
         }
     });
 }
-
-// Success message after Cloudinary upload
-async function updateUploadStatusAfterSubmit() {
-    // This is a helper that runs after the main submit handler.
-    // It checks if the image URL has been set to a Cloudinary URL.
-    const interval = setInterval(() => {
-        if (imageURL.value.includes("cloudinary.com")) {
-            showUploadStatus("✅ Image uploaded to Cloudinary successfully.", "green");
-            clearInterval(interval);
-        }
-    }, 500);
-}
-
-// Call this on page load
-updateUploadStatusAfterSubmit();
 

@@ -126,9 +126,12 @@ func saveOneUploadedFile(
 	// Create upload directory
 	// --------------------------------------------------------
 
+	// Routes exposes ../frontend at /static/.  Store uploads beneath that
+	// same directory so a returned /static/uploads/... URL resolves to the
+	// file that was just saved.
 	uploadDir := filepath.Join(
+		"..",
 		"frontend",
-		"static",
 		"uploads",
 		subdir,
 	)
