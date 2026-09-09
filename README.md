@@ -12,12 +12,12 @@ Built for the **Idoma Centenary Plus Hackathon 2026**, the platform addresses on
 
 Benue State is one of Nigeria's largest producers of agricultural products, yet many farmers continue to experience:
 
-- High post-harvest losses
-- Poor access to verified buyers
-- Unstable market prices
-- Limited storage management
-- Lack of modern digital farming tools
-- Poor access to agricultural information
+* High post-harvest losses
+* Poor access to verified buyers
+* Unstable market prices
+* Limited storage management
+* Lack of modern digital farming tools
+* Poor access to agricultural information
 
 Many smallholder farmers are forced to sell immediately after harvest at very low prices because they lack information and access to larger markets.
 
@@ -29,12 +29,13 @@ Many smallholder farmers are forced to sell immediately after harvest at very lo
 
 Agro-Shield provides farmers with one platform where they can:
 
-- Register as farmers or buyers
-- Manage stored produce
-- Connect directly with buyers
-- Access an online agricultural marketplace
-- Receive AI-powered farming assistance
-- Track farming activities through a personalized dashboard
+* Register as farmers or buyers
+* Manage stored produce
+* Connect directly with buyers
+* Access an online agricultural marketplace
+* Receive AI-powered farming assistance
+* Track farming activities through a personalized dashboard
+* Manage their farmer profile and account details
 
 The platform is designed with rural accessibility and future low-connectivity support in mind.
 
@@ -44,10 +45,10 @@ The platform is designed with rural accessibility and future low-connectivity su
 
 ## ✅ Landing Page
 
-- Modern responsive homepage
-- Project introduction
-- Easy navigation
-- Farmer-focused branding
+* Modern responsive homepage
+* Project introduction
+* Easy navigation
+* Farmer-focused branding
 
 ---
 
@@ -55,17 +56,17 @@ The platform is designed with rural accessibility and future low-connectivity su
 
 Farmers can register by providing:
 
-- Full Name
-- Phone Number
-- Password
-- Location
+* Full Name
+* Phone Number
+* Password
+* Location
 
 Backend validation includes:
 
-- Required-field validation
-- Duplicate phone-number detection
-- Password hashing using bcrypt
-- Persistent database storage
+* Required-field validation
+* Duplicate phone-number detection
+* Password hashing using bcrypt
+* Persistent database storage
 
 ---
 
@@ -73,9 +74,9 @@ Backend validation includes:
 
 Secure login interface with:
 
-- Phone number authentication
-- Password verification
-- Responsive design
+* Phone number authentication
+* Password verification
+* Responsive design
 
 ---
 
@@ -83,25 +84,44 @@ Secure login interface with:
 
 The dashboard currently includes:
 
-- Welcome screen
-- Product overview
-- Marketplace overview
-- Revenue overview
-- AI diagnoses
-- Navigation system
-- Quick-action cards including storage, marketplace, and AI assistant
+* Welcome screen
+* Product overview
+* Marketplace overview
+* Revenue overview
+* AI diagnoses
+* Navigation system
+* Quick-action cards including storage, marketplace, and AI assistant
 
-### 🤖 AI Farming Assistant
+---
+
+## ✅ Farmer Profile & Account Details
+
+Registered farmers can complete and manage their account profiles.
+
+Farmers can:
+
+* Upload and manage a profile picture for identification
+* Add and manage their account/payment details
+* Manage their personal profile information
+* Update their profile information when necessary
+
+The profile picture helps with farmer identification and improves trust between farmers, buyers, and other platform users.
+
+Account details provide the foundation for payment and transaction functionality within the Agro-Shield marketplace.
+
+---
+
+## 🤖 AI Farming Assistant
 
 The AI assistant is currently available as part of the Agro-Shield platform.
 
 It provides farmers with AI-powered agricultural assistance, including:
 
-- Answers to crop-related questions
-- Agricultural guidance
-- Crop disease assistance
-- Treatment recommendations
-- Preventive farming advice
+* Answers to crop-related questions
+* Agricultural guidance
+* Crop disease assistance
+* Treatment recommendations
+* Preventive farming advice
 
 The AI assistant will continue to be improved with more localized agricultural knowledge, crop-specific recommendations, and image-based disease detection.
 
@@ -111,9 +131,9 @@ The AI assistant will continue to be improved with more localized agricultural k
 
 Buyers have a dedicated dashboard for:
 
-- Marketplace access
-- Purchase history
-- Profile management
+* Marketplace access
+* Purchase history
+* Profile management
 
 ---
 
@@ -127,13 +147,13 @@ The project has now been successfully migrated to **PostgreSQL** to provide a st
 
 PostgreSQL provides Agro-Shield with:
 
-- Better support for concurrent users
-- Strong transactional capabilities
-- Improved data integrity
-- Better scalability
-- Production and cloud deployment readiness
-- A stronger foundation for marketplace transactions
-- Support for larger farmer, buyer, and transaction datasets
+* Better support for concurrent users
+* Strong transactional capabilities
+* Improved data integrity
+* Better scalability
+* Production and cloud deployment readiness
+* A stronger foundation for marketplace transactions
+* Support for larger farmer, buyer, and transaction datasets
 
 ### Database Evolution
 
@@ -174,7 +194,7 @@ The repository pattern allows the database layer to evolve without requiring maj
 
 ### PostgreSQL Migration Plan
 
-The migration is being implemented in stages:
+The migration was implemented in stages:
 
 1. Set up the PostgreSQL development database.
 2. Create PostgreSQL-compatible migrations.
@@ -184,7 +204,7 @@ The migration is being implemented in stages:
 6. Test registration and authentication flows.
 7. Test marketplace and future transaction workflows.
 8. Configure production database deployment.
-9. Remove the SQLite dependency after PostgreSQL integration has been fully validated.
+9. Remove the SQLite dependency after PostgreSQL integration was fully validated.
 
 > **Current Status:** PostgreSQL migration is complete. SQLite remains part of the project's initial MVP development history.
 
@@ -226,8 +246,10 @@ Current backend components include:
 * Cart management
 * Notifications
 * Conversations and messaging
+* Farmer profile management
+* Farmer account/payment details
 
-For historical details about the database migration, see Database Migration (docs/database-migration.md).
+For historical details about the database migration, see [Database Migration](docs/database-migration.md).
 
 ---
 
@@ -235,16 +257,16 @@ For historical details about the database migration, see Database Migration (doc
 
 ### Backend
 
-- Go (Golang)
-- `net/http`
-- PostgreSQL
-- bcrypt
-- Go HTML Templates
-- Google Gemini API
+* Go (Golang)
+* `net/http`
+* PostgreSQL
+* bcrypt
+* Go HTML Templates
+* Google Gemini API
 
 ### Previous MVP Technology
 
-- SQLite
+* SQLite
 
 ### Frontend
 
@@ -282,10 +304,10 @@ Agro-Shield/
 │   └── go.sum
 │
 ├── frontend/
-│   ├── assets
-│   ├── css
-│   ├── js
-│   └── pages
+│   ├── assets/
+│   ├── css/
+│   ├── js/
+│   └── pages/
 │
 ├── docs/
 │
@@ -321,13 +343,15 @@ Our solution focuses on:
 
 # 🔮 Future Roadmap
 
-The current version includes the core platform foundation, user authentication, farmer and buyer dashboards, and working AI-powered agricultural assistance.
+The current version includes the core platform foundation, user authentication, farmer and buyer dashboards, farmer profile management, account/payment details, and working AI-powered agricultural assistance.
 
 Future releases will introduce the following features.
 
 ---
 
 ## 🌾 Smart Marketplace
+
+Future improvements will include:
 
 * Direct farmer-to-buyer trading
 * Verified buyer accounts
@@ -444,6 +468,8 @@ Agro-Shield combines:
 * Digital Marketplace
 * Smart Storage Management
 * AI Farming Assistant
+* Farmer Profile & Identification
+* Account/Payment Management
 * Future Price Prediction
 * Farmer-Centered Design
 * Low-connectivity accessibility
@@ -473,21 +499,20 @@ Built for the **Idoma Centenary Plus Hackathon 2026**.
 
 Together, we believe technology can transform agriculture and empower every farmer.
 
-Agro-Shield is built by a multidisciplinary team working together to develop
-technology that empowers farmers and reduces post-harvest losses.
+Agro-Shield is built by a multidisciplinary team working together to develop technology that empowers farmers and reduces post-harvest losses.
 
-| Team Member | Role |
-|---|---|
-| Akilozi Samuel | Team Lead |
+| Team Member          | Role              |
+| -------------------- | ----------------- |
+| Akilozi Samuel       | Team Lead         |
 | Otete Benjamin Agogo | Frontend Engineer |
-| Adewa James | Backend Engineer |
-| Emmanuel Elaigwu | Backend Engineer |
-| Agene Okoh | Frontend Engineer |
-| Alex Ugwu | Backend Engineer |
-| Ogaba Gabriel Eko | Backend Engineer |
-
+| Adewa James          | Backend Engineer  |
+| Emmanuel Elaigwu     | Backend Engineer  |
+| Agene Okoh           | Frontend Engineer |
+| Alex Ugwu            | Backend Engineer  |
+| Ogaba Gabriel Eko    | Backend Engineer  |
 
 For detailed team profiles, see [`docs/team/`](docs/team/).
+
 ---
 
 # 📖 Vision
