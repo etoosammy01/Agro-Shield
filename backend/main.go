@@ -97,6 +97,11 @@ func main() {
 	// ------------------------------------------------------------
 	paymentRepo := repository.NewPaymentRepository(db)
 
+	// ------------------------------------------------------------
+	// FEEDBACK REPOSITORY
+	// ------------------------------------------------------------
+	feedbackRepo := repository.NewFeedbackRepository(db)
+
 	// ============================================================
 	// 4. CREATE AI PROVIDER
 	// ============================================================
@@ -152,6 +157,7 @@ func main() {
 		// Payments          ← added
 		paymentRepo,
 		flutterwaveClient,
+		feedbackRepo,
 	)
 
 	// ============================================================

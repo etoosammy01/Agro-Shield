@@ -34,6 +34,7 @@ type Container struct {
 	Notification *services.NotificationService
 	Chat         *services.ChatService
 	Payment      *services.PaymentService // ← added
+	Feedback *services.FeedbackService
 	MarketEvents *repository.MarketEventRepository
 
 	// Used by authentication middleware.
@@ -72,6 +73,7 @@ func NewContainer(
 
 	paymentRepo *repository.PaymentRepository,
 	flutterwaveClient *services.FlutterwaveClient,
+	feedbackRepo *repository.FeedbackRepository,
 ) *Container {
 
 	// ========================================================
@@ -139,6 +141,10 @@ func NewContainer(
 		paymentRepo,
 		flutterwaveClient,
 	)
+
+	feedbackService := services.NewFeedbackService(
+	feedbackRepo,
+)
 
 	// ========================================================
 	// 7. RETURN APPLICATION CONTAINER
@@ -218,6 +224,7 @@ func NewContainer(
 		// ----------------------------------------------------
 
 		Payment: paymentService,
+		Feedback: feedbackService,
 
 		// ----------------------------------------------------
 		// FARMER REPOSITORY

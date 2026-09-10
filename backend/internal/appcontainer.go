@@ -72,6 +72,7 @@ func NewContainer(
 
 	paymentRepo *repository.PaymentRepository,
 	flutterwaveClient *services.FlutterwaveClient,
+	feedbackRepo *repository.FeedbackRepository,
 ) *Container {
 
 	// ========================================================
