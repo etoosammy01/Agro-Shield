@@ -34,6 +34,7 @@ type Container struct {
 	Notification *services.NotificationService
 	Chat         *services.ChatService
 	Payment      *services.PaymentService // ← added
+	Feedback *services.FeedbackService
 	MarketEvents *repository.MarketEventRepository
 
 	// Used by authentication middleware.

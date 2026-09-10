@@ -3,6 +3,7 @@ package handlers
 import (
 	"backend/internal/models"
 	"backend/internal/services"
+	"backend/middleware"
 	"encoding/json"
 	"net/http"
 )
@@ -29,6 +30,14 @@ func (h *FeedbackHandler) CreateFeedback(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "Invalid feedback", http.StatusBadRequest)
 		return
 	}
+
+	farmer, ok := middleware.FarmerFromContext(r)
+	if !ok || farmer == nil {
+		http.Error(w, "user not found", http.StatusUnauthorized)
+		return
+	}
+
+	feedback.UserID = farmer.ID
 
 	if err := h.service.CreateFeedback(&feedback); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

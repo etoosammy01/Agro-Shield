@@ -221,6 +221,25 @@ func RegisterRoutes(container *app.Container) {
 	)
 
 	// ========================================================
+	// FEEDBACK
+	// ========================================================
+
+	feedbackHandler := handlers.NewFeedbackHandler(
+		container.Feedback,
+	)
+
+	http.HandleFunc(
+		"/feedback",
+		middleware.OnlyPath(
+			"/feedback",
+			middleware.RequireAuth(
+				container.FarmerRepo,
+				feedbackHandler.CreateFeedback,
+			),
+		),
+	)
+
+	// ========================================================
 	// PRODUCT DETAILS
 	// ========================================================
 
