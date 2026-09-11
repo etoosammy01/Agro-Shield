@@ -277,22 +277,12 @@ func (h *Storage) createCrop(
 		longitude,
 		accuracy,
 	); err != nil {
-
-		h.render(
-			w,
-			farmerID,
-			fullName,
-			err.Error(),
-		)
+		log.Println("CREATE CROP FAILED:", err)
+		h.render(w, farmerID, fullName, err.Error())
 		return
 	}
 
-	http.Redirect(
-		w,
-		r,
-		"/storage",
-		http.StatusSeeOther,
-	)
+	http.Redirect(w, r, "/storage", http.StatusSeeOther)
 }
 
 // updateCrop handles editing an existing product.
