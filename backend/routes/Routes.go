@@ -234,10 +234,32 @@ func RegisterRoutes(container *app.Container) {
 			"/feedback",
 			middleware.RequireAuth(
 				container.FarmerRepo,
-				feedbackHandler.CreateFeedback,
+				func(w http.ResponseWriter, r *http.Request) {
+					switch r.Method {
+					case http.MethodPost:
+						feedbackHandler.CreateFeedback(w, r)
+
+					case http.MethodGet:
+						feedbackHandler.GetFeedbackByFarmer(w, r)
+
+					default:
+						http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+					}
+				},
 			),
 		),
 	)
+
+	http.HandleFunc(
+	"/feedback/rating",
+	middleware.OnlyPath(
+		"/feedback/rating",
+		middleware.RequireAuth(
+			container.FarmerRepo,
+			feedbackHandler.GetFarmerRating,
+		),
+	),
+)
 
 	// ========================================================
 	// PRODUCT DETAILS

@@ -6,6 +6,7 @@ import (
 	"backend/middleware"
 	"encoding/json"
 	"net/http"
+	"strconv"
 )
 
 type FeedbackHandler struct {
@@ -47,5 +48,54 @@ func (h *FeedbackHandler) CreateFeedback(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "Feedback submitted successfully",
+	})
+}
+
+func (h *FeedbackHandler) GetFeedbackByFarmer(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	farmerID, err := strconv.Atoi(r.URL.Query().Get("farmer_id"))
+	if err != nil || farmerID == 0 {
+		http.Error(w, "invalid farmer_id", http.StatusBadRequest)
+		return
+	}
+
+	feedbacks, err := h.service.GetFeedbackByFarmer(farmerID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(feedbacks)
+}
+
+func (h *FeedbackHandler) GetFarmerRating(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	farmerID, err := strconv.Atoi(r.URL.Query().Get("farmer_id"))
+	if err != nil || farmerID == 0 {
+		http.Error(w, "invalid farmer_id", http.StatusBadRequest)
+		return
+	}
+
+	average, total, err := h.service.GetFarmerRating(farmerID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"farmer_id":     farmerID,
+		"average_rating": average,
+		"total_reviews": total,
 	})
 }

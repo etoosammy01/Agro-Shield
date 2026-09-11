@@ -35,3 +35,20 @@ func (s *FeedbackService) CreateFeedback(feedback *models.Feedback) error {
 
 	return s.repo.Create(feedback)
 }
+
+func (s *FeedbackService) GetFeedbackByFarmer(farmerID int) ([]models.Feedback, error) {
+
+	if farmerID == 0 {
+		return nil, errors.New("farmer is required")
+	}
+
+	return s.repo.GetByFarmerID(farmerID)
+}
+
+func (s *FeedbackService) GetFarmerRating(farmerID int) (float64, int, error) {
+	if farmerID == 0 {
+		return 0, 0, errors.New("farmer is required")
+	}
+
+	return s.repo.GetFarmerRating(farmerID)
+}
