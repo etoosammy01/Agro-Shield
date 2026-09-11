@@ -1,1 +1,0 @@
-ALTER TABLE farmers ADD COLUMN email TEXT;
