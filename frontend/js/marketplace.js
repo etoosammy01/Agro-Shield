@@ -3,6 +3,7 @@
 // ============================================================
 
 document.addEventListener("DOMContentLoaded", () => {
+
     // ---------- 1. SEARCH FUNCTIONALITY ----------
     const search = document.getElementById("search");
     const grid = document.getElementById("product-grid");
@@ -19,14 +20,35 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // ---------- 2. IMAGE FIX (Fallback for broken images) ----------
+    // ---------- 2. IMAGE FIX (fallback for broken AND stalled images) ----------
+    const IMAGE_TIMEOUT_MS = 6000;
+    const PLACEHOLDER_SRC = "/static/assets/placeholder/product-placeholder.jpg";
+
     const productImages = document.querySelectorAll(".product-image");
 
     productImages.forEach(img => {
-        img.addEventListener("error", () => {
-            img.src = "/static/assets/placeholder/product-placeholder.jpg";
-            img.style.objectFit = "cover";
-        });
+        const fallback = () => {
+            if (img.src.indexOf(PLACEHOLDER_SRC) === -1) {
+                img.src = PLACEHOLDER_SRC;
+            }
+        };
+
+        img.addEventListener("error", fallback);
+
+        // If the request just hangs (slow/unreliable connection) rather than
+        // failing outright, onerror never fires and the browser keeps the
+        // page's loading indicator active. Force a fallback after a timeout
+        // so a stalled image never blocks the page from finishing load.
+        if (!img.complete) {
+            const timer = setTimeout(() => {
+                if (!img.complete) {
+                    fallback();
+                }
+            }, IMAGE_TIMEOUT_MS);
+
+            img.addEventListener("load", () => clearTimeout(timer));
+            img.addEventListener("error", () => clearTimeout(timer));
+        }
     });
 
     // ---------- 3. MOBILE LEFT-SIDE NAV ----------
@@ -48,7 +70,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Close nav when clicking outside
     document.addEventListener("click", (event) => {
         if (nav && nav.classList.contains("open") && !nav.contains(event.target) && event.target !== navToggle) {
             nav.classList.remove("open");
@@ -56,14 +77,4 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // ---------- 4. SELLER AVATAR PLACEHOLDER ----------
-    const sellerIdentity = document.querySelectorAll(".seller-identity");
-
-    sellerIdentity.forEach(identity => {
-        const avatarPlaceholder = identity.querySelector("span");
-        if (avatarPlaceholder && avatarPlaceholder.textContent === "👤") {
-            avatarPlaceholder.textContent = "👨‍🌾";
-            avatarPlaceholder.style.fontSize = "18px";
-        }
-    });
 });

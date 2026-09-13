@@ -202,6 +202,23 @@
     border: 1px solid var(--color-border);
 }
 
+.seller-avatar-placeholder {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--color-brand-soft, #eaf7ea);
+    color: var(--color-brand, #1f7a4d);
+    flex-shrink: 0;
+}
+
+.seller-avatar-placeholder svg {
+    width: 18px;
+    height: 18px;
+}
+
 /* ============================================================
    VIEW PRODUCT
    ============================================================ */
@@ -301,6 +318,61 @@
 
 .negotiate-form button:hover {
     background: var(--color-brand-dark);
+}
+
+/* ============================================================
+   MARKETPLACE FEATURES (Fresh from Farm / Fair Pricing / etc.)
+   ============================================================ */
+
+.market-features {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-top: 60px;
+    padding-top: 40px;
+    border-top: 1px solid var(--color-border);
+}
+
+.market-feature-card {
+    text-align: center;
+    padding: 24px;
+}
+
+.market-feature-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    background: var(--color-brand-soft, #eaf7ea);
+    color: var(--color-brand, #1f7a4d);
+}
+
+.market-feature-icon svg {
+    width: 26px;
+    height: 26px;
+}
+
+.market-feature-card h3 {
+    margin: 0 0 8px;
+    color: var(--color-ink);
+    font-size: 18px;
+}
+
+.market-feature-card p {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+    .market-features {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
 }
 
 /* ============================================================
@@ -494,3 +566,558 @@
         color: #1f7a4d;
     }
 }
+
+/* ============================================================
+   AGRO-SHIELD MARKETPLACE
+   ============================================================ */
+
+/* .marketplace {
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 50px 60px 80px;
+} */
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+/* 
+.market-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 28px;
+}
+
+.market-header h1 {
+    margin: 0;
+    font-size: 40px;
+    line-height: 1.2;
+    color: var(--color-ink);
+}
+
+.market-header p {
+    margin: 8px 0 0;
+    color: var(--color-muted);
+    line-height: 1.6;
+}
+
+/* ============================================================
+   SEARCH
+   ============================================================ */
+
+/* .marketplace-search-form {
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+    width: 100%;
+    max-width: 700px;
+    margin: 0 0 40px; */
+/* }
+
+.search-box {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+    min-height: 48px;
+    padding: 0 16px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-size: 16px;
+    margin: 0;
+}
+
+.search-box:focus {
+    outline: none;
+    border-color: var(--color-brand);
+    box-shadow: 0 0 0 3px rgba(31, 122, 77, .12);
+} */
+/* 
+.marketplace-search-form button {
+    flex: 0 0 auto;
+    min-width: 110px;
+    min-height: 48px;
+    padding: 0 20px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: var(--color-brand);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .2s ease, transform .2s ease;
+}
+
+.marketplace-search-form button:hover {
+    background: var(--color-brand-dark);
+    transform: translateY(-1px);
+}
+
+.marketplace-search-form button:active {
+    transform: translateY(0);
+}  */ 
+
+/* ============================================================
+   MESSAGES
+   ============================================================ */
+
+/* .message {
+    margin: 0 0 20px;
+    font-weight: 700;
+} */
+
+/* ============================================================
+   PRODUCT GRID
+   ============================================================ */
+
+/* .product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 28px;
+    align-items: stretch;
+} */
+
+/* ============================================================
+   PRODUCT CARD
+   ============================================================ */
+
+/* .product-card {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    overflow: hidden;
+    padding: 18px;
+    box-shadow: 0 6px 20px rgba(23, 35, 28, .08);
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.product-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 28px rgba(23, 35, 28, .12);
+} */
+
+/* ============================================================
+   PRODUCT IMAGE
+   ============================================================ */
+/* 
+.product-image {
+    display: block;
+    width: 100%;
+    height: 190px;
+    object-fit: cover;
+    border-radius: 12px;
+    margin: 0 0 14px;
+} */
+
+/* ============================================================
+   PRODUCT INFORMATION
+   ============================================================ */
+
+/* .product-card h3 {
+    margin: 4px 0 6px;
+    color: var(--color-brand-dark);
+    font-size: 20px;
+    line-height: 1.3;
+} */
+
+/* .product-card p {
+    margin: 7px 0;
+    line-height: 1.5;
+}
+
+.product-card .price {
+    margin: 4px 0 10px;
+    color: var(--color-ink);
+    font-size: 19px;
+    font-weight: 800;
+}
+
+.product-location {
+    color: var(--color-muted);
+    font-size: .92rem;
+}
+
+.product-location a {
+    color: var(--color-brand-dark);
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.product-location a:hover {
+    text-decoration: underline;
+} */
+
+/* ============================================================
+   SELLER
+   ============================================================ */
+
+/* .seller-identity,
+.negotiation-person {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.seller-identity img,
+.negotiation-person img {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid var(--color-border);
+} */
+
+/* ============================================================
+   VIEW PRODUCT
+   ============================================================ */
+
+/* .view-product {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 44px;
+    margin: 14px 0 8px;
+    padding: 0 16px;
+    border-radius: 8px;
+    background: var(--color-brand);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .2s ease, transform .2s ease;
+}
+
+.view-product:hover,
+.view-product:focus-visible {
+    background: var(--color-brand-dark);
+    color: #fff;
+    transform: translateY(-1px);
+} */
+
+/* ============================================================
+   BUY FORM
+   ============================================================ */
+/* 
+.buy-form {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    width: 100%;
+    margin-top: 12px;
+}
+
+.buy-form input {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+}
+
+.buy-form button {
+    flex: 0 0 auto;
+    min-height: 44px;
+    padding: 0 18px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--color-brand);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.buy-form button:hover {
+    background: var(--color-brand-dark);
+} */
+
+/* ============================================================
+   NEGOTIATION FORM
+   ============================================================ */
+
+/* .negotiate-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 8px;
+    width: 100%;
+    margin-top: 10px;
+}
+
+.negotiate-form input {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 0 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+}
+
+.negotiate-form button {
+    min-height: 44px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--color-brand);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.negotiate-form button:hover {
+    background: var(--color-brand-dark);
+}
+
+
+/* ============================================================
+   MARKETPLACE FEATURES (Fresh from Farm / Fair Pricing / etc.)
+   ============================================================ */
+/* 
+.market-features {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-top: 60px;
+    padding-top: 40px;
+    border-top: 1px solid var(--color-border);
+}
+
+.market-feature-card {
+    text-align: center;
+    padding: 24px;
+}
+
+.market-feature-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    background: var(--color-brand-soft, #eaf7ea);
+    color: var(--color-brand, #1f7a4d);
+}
+
+.market-feature-icon svg {
+    width: 26px;
+    height: 26px;
+}
+
+.market-feature-card h3 {
+    margin: 0 0 8px;
+    color: var(--color-ink);
+    font-size: 18px;
+}
+
+.market-feature-card p {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+    .market-features {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+} */
+
+
+
+/* ============================================================
+   TABLET
+   ============================================================ */
+/* 
+@media (max-width: 900px) {
+
+    .marketplace {
+        padding: 40px 28px 60px;
+    }
+
+    .market-header h1 {
+        font-size: 34px;
+    }
+
+    .product-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px;
+    }
+
+} */
+
+/* ============================================================
+   PHONE
+   ============================================================ */
+
+/* @media (max-width: 600px) {
+
+    .marketplace {
+        padding: 28px 16px 50px;
+    }
+
+    .market-header {
+        margin-bottom: 22px;
+    }
+
+    .market-header h1 {
+        font-size: 30px;
+    }
+
+    .market-header p {
+        font-size: 15px;
+    } */
+
+    /* Search button stays visible and never gets covered */
+    /* .marketplace-search-form {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+        max-width: none;
+        margin-bottom: 30px;
+    }
+
+    .search-box {
+        width: 100%;
+        min-height: 48px;
+    }
+
+    .marketplace-search-form button {
+        width: 100%;
+        min-height: 48px;
+    } */
+
+    /* Products become one clean column */
+    /* .product-grid {
+        grid-template-columns: 1fr;
+        gap: 18px;
+    }
+
+    .product-card {
+        padding: 15px;
+        border-radius: 14px;
+    }
+
+    .product-image {
+        height: 200px;
+    } */
+
+    /* Buy form */
+    /* .buy-form {
+        display: grid;
+        grid-template-columns: 1fr auto;
+    }
+
+    .buy-form input,
+    .buy-form button {
+        width: 100%;
+    } */
+
+    /* Negotiation form */
+    /* .negotiate-form {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .negotiate-form input {
+        width: 100%;
+    }
+
+    .negotiate-form button {
+        grid-column: 1 / -1;
+        width: 100%;
+    } */
+
+/* } */ 
+
+/* ============================================================
+   VERY SMALL PHONES
+   ============================================================ */
+
+/* @media (max-width: 380px) {
+
+    .marketplace {
+        padding: 24px 12px 40px;
+    }
+
+    .market-header h1 {
+        font-size: 27px;
+    }
+
+    .product-card {
+        padding: 13px;
+    }
+
+    .product-image {
+        height: 175px;
+    }
+
+    .buy-form {
+        grid-template-columns: 1fr;
+    }
+
+    .negotiate-form {
+        grid-template-columns: 1fr;
+    }
+
+    .negotiate-form button {
+        grid-column: auto;
+    }
+
+} */
+
+/* ============================================================
+   TEAMMATE CORRECTIONS - MARKETPLACE
+   ============================================================ */
+
+/* Mobile left-side navigation */
+/* @media (max-width: 600px) {
+    .marketplace-nav {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 260px;
+        background: #ffffff;
+        box-shadow: 2px 0 12px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+        z-index: 1000;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        overflow-y: auto;
+    }
+
+    .marketplace-nav.open {
+        transform: translateX(0);
+    }
+
+    .marketplace-nav-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        color: #17231c;
+        cursor: pointer;
+        margin-bottom: 20px;
+    }
+
+    .marketplace-nav a {
+        display: block;
+        padding: 12px 16px;
+        border-radius: 8px;
+        text-decoration: none;
+        color: #17231c;
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+
+    .marketplace-nav a:hover,
+    .marketplace-nav a.active {
+        background: #eaf7ea;
+        color: #1f7a4d;
+    }
+} */

@@ -1,4 +1,3 @@
-
 /* Primary dashboard brand */
 .dashboard-logo{width:280px;height:88px;overflow:visible;}
 .dashboard-logo img{transform:scale(1.35);transform-origin:left center;}
@@ -1706,11 +1705,12 @@
 .notification-nav-link.notification-icon svg {
    transform: none
 }
-
+/* 
 .notification-nav-link.notification-icon{
     position: relative;
     top: -8px;
-}
+} */
+
 /* =========================================================
    25. LEARN FARMING MODAL
 ========================================================= */
