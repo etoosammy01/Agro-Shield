@@ -652,6 +652,17 @@
     font-size: 1rem;
 }
 
+/* .diagnosis-content p {
+    display: -webkit-box;
+    overflow: hidden;
+    margin: 6px 0 0;
+    color: #667085;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    -webkit-box-orient: vertical;
+    /* -webkit-line-clamp: 3; */
+/* }  */
+
 .diagnosis-content p {
     display: -webkit-box;
     overflow: hidden;
@@ -661,7 +672,10 @@
     line-height: 1.5;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
+    line-clamp: 3;
+    
 }
+
 
 .diagnosis-full-link {
     display: inline-block;
