@@ -1706,8 +1706,8 @@
 .notification-nav-link.notification-icon svg {
    transform: none
 }
-
+/* 
 .notification-nav-link.notification-icon{
     position: relative;
     top: -8px;
-}
+} */

@@ -70,6 +70,7 @@ body{
 nav{
     display:flex;
     gap:30px;
+    align-items: center;
     flex-wrap:nowrap;
     white-space:nowrap;
     overflow-x:auto;
