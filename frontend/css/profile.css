@@ -1,160 +1,326 @@
-.profile{
-    padding:50px 80px;
+.profile {
+    padding: 50px 80px;
 }
 
-.profile-header{
-    display:flex;
-    align-items:center;
-    gap:40px;
-    background:white;
-    padding:40px;
-    border-radius:12px;
-    box-shadow:0 4px 12px lightgray;
-    margin-bottom:40px;
+.profile-header {
+    display: flex;
+    align-items: center;
+    gap: 40px;
+    background: var(--color-surface, #fff);
+    padding: 40px;
+    border-radius: 16px;
+    box-shadow: 0 6px 20px rgba(23, 35, 28, .08);
+    margin-bottom: 40px;
+    border: 1px solid var(--color-border, #dbe7dc);
+    border-top: 4px solid var(--color-brand, #1f7a4d);
 }
 
-.profile-header img{
-    width:160px;
-    height:160px;
-    border-radius:50%;
-    object-fit:cover;
+.profile-header img {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--color-brand-soft, #eaf7ea);
 }
 
-.profile-photo-placeholder{
-    width:160px;
-    height:160px;
-    border-radius:50%;
-    background:whitesmoke;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-size:60px;
-    flex-shrink:0;
+.profile-photo-placeholder {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    background: var(--color-brand-soft, #eaf7ea);
+    color: var(--color-brand, #1f7a4d);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
 }
 
-.profile-header h1{
-    font-size:40px;
-    margin-bottom:10px;
+.profile-photo-placeholder svg {
+    width: 64px;
+    height: 64px;
 }
 
-.profile-header p{
-    color:gray;
-    margin-bottom:20px;
+.profile-header h1 {
+    font-size: 40px;
+    margin-bottom: 10px;
+    color: var(--color-ink, #17231c);
 }
 
-.profile-grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
-    gap:30px;
+.profile-header p {
+    color: var(--color-muted, #66756c);
+    margin-bottom: 20px;
 }
 
-.card{
-    background:white;
-    padding:30px;
-    border-radius:12px;
-    box-shadow:0 4px 12px lightgray;
+.profile-header button {
+    min-height: 44px;
+    padding: 0 22px;
+    border: 1px solid var(--color-brand, #1f7a4d);
+    border-radius: 10px;
+    background: var(--color-brand, #1f7a4d);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(31, 122, 77, .16);
+    transition: background-color .2s ease, transform .2s ease, box-shadow .2s ease;
 }
 
-.card h2{
-    margin-bottom:20px;
-    color:green;
+.profile-header button:hover {
+    background: var(--color-brand-dark, #14532d);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(31, 122, 77, .22);
 }
 
-.card p{
-    margin-bottom:15px;
+.profile-header button:active {
+    transform: translateY(0);
 }
 
-.card button{
-    width:100%;
-    margin-bottom:15px;
+.profile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 30px;
 }
 
-.card table{
-    width:100%;
-    border-collapse:collapse;
+.card {
+    background: var(--color-surface, #fff);
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 6px 20px rgba(23, 35, 28, .06);
+    border: 1px solid var(--color-border, #dbe7dc);
+    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+
+.card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 30px rgba(23, 35, 28, .1);
+    border-color: #bcd9c8;
+}
+
+.card h2 {
+    margin-bottom: 20px;
+    color: var(--color-brand-dark, #14532d);
+    font-size: 20px;
+}
+
+.card p {
+    margin-bottom: 15px;
+    color: var(--color-ink, #17231c);
+}
+
+.card button {
+    width: 100%;
+    min-height: 44px;
+    margin-bottom: 15px;
+    border: 1px solid var(--color-brand, #1f7a4d);
+    border-radius: 10px;
+    background: var(--color-brand-soft, #eaf7ea);
+    color: var(--color-brand, #1f7a4d);
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color .2s ease, transform .2s ease;
+}
+
+.card button:hover {
+    background: #dff1e3;
+    transform: translateY(-1px);
+}
+
+.card table {
+    width: 100%;
+    border-collapse: collapse;
 }
 
 .card th,
-.card td{
-    text-align:left;
-    padding:10px;
-    border-bottom:1px solid whitesmoke;
-    font-size:14px;
+.card td {
+    text-align: left;
+    padding: 12px 10px;
+    border-bottom: 1px solid var(--color-border, #edf0ee);
+    font-size: 14px;
 }
 
-.card th{
-    color:gray;
-    font-weight:normal;
+.card th {
+    color: var(--color-muted, #66756c);
+    font-weight: 600;
 }
 
-/* Edit Profile modal (this was missing before — the button had nowhere to open) */
-.modal{
-    display:none;
-    position:fixed;
-    top:0;
-    left:0;
-    width:100%;
-    height:100%;
-    background:rgba(0,0,0,0.5);
-    justify-content:center;
-    align-items:center;
-    z-index:100;
+.card tbody tr {
+    transition: background-color .15s ease;
 }
 
-.modal form{
-    background:white;
-    padding:40px;
-    border-radius:12px;
-    width:100%;
-    max-width:440px;
-    display:flex;
-    flex-direction:column;
-    gap:14px;
+.card tbody tr:hover {
+    background: var(--color-page, #f5f7f6);
 }
 
-.modal form h2{
-    margin-bottom:10px;
-    color:green;
+/* ============================================================
+   DANGER ZONE
+   ============================================================ */
+
+.card-danger {
+    border-color: #f0c9c9;
+    background: linear-gradient(135deg, #fffafa, #fff5f5);
 }
 
-.modal form label{
-    font-weight:bold;
-    font-size:14px;
+.card-danger:hover {
+    border-color: #e5a3a3;
+    box-shadow: 0 14px 30px rgba(180, 71, 71, .1);
+}
+
+.card-danger h2 {
+    color: #b42318;
+}
+
+.danger-copy {
+    color: #8a4444;
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 18px !important;
+}
+
+.danger-button {
+    width: 100%;
+    min-height: 46px;
+    border: 1px solid #d64545 !important;
+    border-radius: 10px;
+    background: #d64545 !important;
+    color: #fff !important;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color .2s ease, transform .2s ease;
+}
+
+.danger-button:hover {
+    background: #b53636 !important;
+    transform: translateY(-1px);
+}
+
+.danger-button:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.danger-heading {
+    color: #b42318 !important;
+}
+
+/* ============================================================
+   MODALS (Edit Profile + Delete Account)
+   ============================================================ */
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.modal form {
+    background: var(--color-surface, #fff);
+    padding: 40px;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 440px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin: auto;
+}
+
+.modal form h2 {
+    margin-bottom: 10px;
+    color: var(--color-brand-dark, #14532d);
+}
+
+.modal form label {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--color-ink, #17231c);
 }
 
 .modal form input[type="text"],
 .modal form input[type="email"],
 .modal form input[type="tel"],
-.modal form input[type="file"]{
-    padding:12px;
-    border:1px solid lightgray;
-    border-radius:8px;
-    width:100%;
+.modal form input[type="password"],
+.modal form input[type="file"] {
+    padding: 12px 14px;
+    border: 1px solid var(--color-border, #dbe7dc);
+    border-radius: 10px;
+    width: 100%;
+    font-size: 15px;
+    transition: border-color .2s ease, box-shadow .2s ease;
 }
 
-.modal-actions{
-    display:flex;
-    gap:14px;
-    margin-top:10px;
+.modal form input:focus {
+    outline: none;
+    border-color: var(--color-brand, #1f7a4d);
+    box-shadow: 0 0 0 3px rgba(31, 122, 77, .1);
 }
 
-.modal-actions button{
-    flex:1;
-    padding:14px;
-    border-radius:8px;
-    border:none;
-    font-weight:bold;
-    cursor:pointer;
-    width:auto;
-    margin-bottom:0;
+#delete-modal form input:focus {
+    border-color: #d64545;
+    box-shadow: 0 0 0 3px rgba(214, 69, 69, .12);
 }
 
-.modal-actions button[type="submit"]{
-    background:green;
-    color:white;
+.modal-actions {
+    display: flex;
+    gap: 14px;
+    margin-top: 10px;
 }
 
-.modal-actions button[type="button"]{
-    background:whitesmoke;
-    color:black;
+.modal-actions button {
+    flex: 1;
+    padding: 14px;
+    border-radius: 10px;
+    border: none;
+    font-weight: 700;
+    cursor: pointer;
+    width: auto;
+    margin-bottom: 0;
+    transition: background-color .2s ease, transform .2s ease;
+}
+
+.modal-actions button[type="submit"] {
+    background: var(--color-brand, #1f7a4d);
+    color: #fff;
+}
+
+.modal-actions button[type="submit"]:hover {
+    background: var(--color-brand-dark, #14532d);
+}
+
+.modal-actions button[type="button"] {
+    background: var(--color-page, #f5f7f6);
+    color: var(--color-ink, #17231c);
+    border: 1px solid var(--color-border, #dbe7dc) !important;
+}
+
+.modal-actions button[type="button"]:hover {
+    background: #e9ece9;
+}
+
+/* ============================================================
+   MOBILE
+   ============================================================ */
+
+@media (max-width: 900px) {
+    .profile {
+        padding: 30px 20px;
+    }
+
+    .profile-header {
+        flex-direction: column;
+        text-align: center;
+        padding: 28px 20px;
+    }
+
+    .profile-grid {
+        grid-template-columns: 1fr;
+    }
 }

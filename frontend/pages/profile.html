@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -18,234 +19,286 @@
 
 <body>
 
-<header class="navbar">
+    <header class="navbar">
 
-    <a class="logo" href="/dashboard"><img src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield"></a>
+        <a class="logo" href="/dashboard"><img src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield"></a>
 
-    <nav aria-label="Main navigation">
-        <a href="/dashboard">Dashboard</a>
-        {{if not .IsBuyer}}
-        <a href="/storage">Storage</a>
-        {{end}}
-        <a href="/marketplace">Marketplace</a>
-        <a href="/chat">Chat</a>
-        {{if not .IsBuyer}}
-        <a href="/ai-assistant">AI Assistant</a>
-        {{end}}
-        <a href="/cart">Cart</a>
-        <a href="/notifications">Notifications</a>
-        <a href="/profile" aria-current="page">Profile</a>
-        <a href="/logout">Logout</a>
-    </nav>
+        <nav aria-label="Main navigation">
+            <a href="/dashboard">Dashboard</a>
+            {{if not .IsBuyer}}
+            <a href="/storage">Storage</a>
+            {{end}}
+            <a href="/marketplace">Marketplace</a>
+            <a href="/chat">Chat</a>
+            {{if not .IsBuyer}}
+            <a href="/ai-assistant">AI Assistant</a>
+            {{end}}
+            <a href="/cart">Cart</a>
+            <a href="/notifications">Notifications</a>
+            <a href="/profile" aria-current="page">Profile</a>
+            <a href="/logout">Logout</a>
+        </nav>
 
-</header>
+    </header>
 
-<main class="profile">
+    <main class="profile">
 
-    <div class="profile-header">
+        <div class="profile-header">
 
-        {{if .PhotoURL}}
-        <img src="{{.PhotoURL}}" alt="Profile Photo" onerror="this.onerror=null; this.src='/static/assets/placeholder/avatar-placeholder.jpg';">
-        {{else}}
-        <div class="profile-photo-placeholder">👨‍🌾</div>
-        {{end}}
-
-        <div>
-
-            <h1>{{.FullName}}</h1>
-
-            <p>{{if .IsBuyer}}Buyer{{else}}Farmer{{end}} • {{.Location}}</p>
-
-            {{if .IsOwner}}<button type="button" id="edit-profile-btn">Edit Profile</button>{{end}}
-
-        </div>
-
-    </div>
-
-    <section class="profile-grid">
-
-        <div class="card">
-
-            <h2>Personal Information</h2>
-
-            <p><strong>Full Name:</strong> {{.FullName}}</p>
-            <p><strong>Phone:</strong> {{.Phone}}</p>
-            <p><strong>Email:</strong> {{.Email}}</p>
-            <p><strong>Location:</strong> {{.Location}}</p>
-            <p><strong>Account Type:</strong> {{if .IsBuyer}}Buyer{{else}}Farmer{{end}}</p>
-            <p><strong>Member Since:</strong> {{.CreatedAt.Format "January 2006"}}</p>
-        </div>
-
-        {{if .IsOwner}}{{if .IsBuyer}}
-
-        <div class="card">
-
-            <h2>Purchase History</h2>
-
-            {{if .Purchases}}
-            <table>
-                <thead>
-                    <tr>
-                        <th>Crop</th>
-                        <th>Seller</th>
-                        <th>Qty</th>
-                        <th>Total</th>
-                        <th>Date</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {{range .Purchases}}
-                    <tr>
-                        <td>{{.CropName}}</td>
-                        <td>{{.SellerName}}</td>
-                        <td>{{.Quantity}}</td>
-                        <td>₦{{money .TotalPrice}}</td>
-                        <td>{{.CreatedAt.Format "02 Jan 2006"}}</td>
-                    </tr>
-                    {{end}}
-                </tbody>
-            </table>
+            {{if .PhotoURL}}
+            <img src="{{.PhotoURL}}" alt="Profile Photo"
+                onerror="this.onerror=null; this.src='/static/assets/placeholder/avatar-placeholder.jpg';">
             {{else}}
-            <p>No purchases yet. <a href="/marketplace">Browse the marketplace</a></p>
+            <div class="profile-photo-placeholder" aria-hidden="true">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none">
+                    <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.6" />
+                    <path d="M4 20c0-4 3.5-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.6"
+                        stroke-linecap="round" />
+                </svg>
+            </div>
             {{end}}
 
+            <div>
+
+                <h1>{{.FullName}}</h1>
+
+                <p>{{if .IsBuyer}}Buyer{{else}}Farmer{{end}} • {{.Location}}</p>
+
+                {{if .IsOwner}}<button type="button" id="edit-profile-btn">Edit Profile</button>{{end}}
+
+            </div>
+
         </div>
 
-        {{else}}
+        <section class="profile-grid">
 
-        <div class="card">
+            <div class="card">
 
-            <h2>My Product</h2>
+                <h2>Personal Information</h2>
 
-            {{if .Crops}}
-            <table>
-                <thead>
-                    <tr>
-                        <th>Crop</th>
-                        <th>Quantity</th>
-                        <th>Listed for Sale</th>
-                        <th>Price/Unit</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {{range .Crops}}
-                    <tr>
-                        <td>{{.Name}}</td>
-                        <td>{{.Quantity}} {{.Unit}}</td>
-                        <td>{{if .ListedForSale}}Yes{{else}}No{{end}}</td>
-                        <td>₦{{money .PricePerUnit}}</td>
-                    </tr>
-                    {{end}}
-                </tbody>
-            </table>
+                <p><strong>Full Name:</strong> {{.FullName}}</p>
+                <p><strong>Phone:</strong> {{.Phone}}</p>
+                <p><strong>Email:</strong> {{.Email}}</p>
+                <p><strong>Location:</strong> {{.Location}}</p>
+                <p><strong>Account Type:</strong> {{if .IsBuyer}}Buyer{{else}}Farmer{{end}}</p>
+                <p><strong>Member Since:</strong> {{.CreatedAt.Format "January 2006"}}</p>
+            </div>
+
+            {{if .IsOwner}}{{if .IsBuyer}}
+
+            <div class="card">
+
+                <h2>Purchase History</h2>
+
+                {{if .Purchases}}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Crop</th>
+                            <th>Seller</th>
+                            <th>Qty</th>
+                            <th>Total</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Purchases}}
+                        <tr>
+                            <td>{{.CropName}}</td>
+                            <td>{{.SellerName}}</td>
+                            <td>{{.Quantity}}</td>
+                            <td>₦{{money .TotalPrice}}</td>
+                            <td>{{.CreatedAt.Format "02 Jan 2006"}}</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+                {{else}}
+                <p>No purchases yet. <a href="/marketplace">Browse the marketplace</a></p>
+                {{end}}
+
+            </div>
+
             {{else}}
-            <p>No product added yet. <a href="/storage">Register your first crop</a></p>
-            {{end}}
 
-        </div>
+            <div class="card">
 
-        <div class="card">
+                <h2>My Product</h2>
 
-            <h2>Recent Sales</h2>
+                {{if .Crops}}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Crop</th>
+                            <th>Quantity</th>
+                            <th>Listed for Sale</th>
+                            <th>Price/Unit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Crops}}
+                        <tr>
+                            <td>{{.Name}}</td>
+                            <td>{{.Quantity}} {{.Unit}}</td>
+                            <td>{{if .ListedForSale}}Yes{{else}}No{{end}}</td>
+                            <td>₦{{money .PricePerUnit}}</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+                {{else}}
+                <p>No product added yet. <a href="/storage">Register your first crop</a></p>
+                {{end}}
 
-            {{if .Sales}}
-            <table>
-                <thead>
-                    <tr>
-                        <th>Crop</th>
-                        <th>Buyer</th>
-                        <th>Qty</th>
-                        <th>Total</th>
-                        <th>Date</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {{range .Sales}}
-                    <tr>
-                        <td>{{.CropName}}</td>
-                        <td>{{.BuyerName}}</td>
-                        <td>{{.Quantity}}</td>
-                        <td>₦{{money .TotalPrice}}</td>
-                        <td>{{.CreatedAt.Format "02 Jan 2006"}}</td>
-                    </tr>
-                    {{end}}
-                </tbody>
-            </table>
-            {{else}}
-            <p>No sales yet.</p>
-            {{end}}
+            </div>
 
-        </div>
+            <div class="card">
 
-        {{end}}{{end}}
+                <h2>Recent Sales</h2>
 
-        {{if .IsOwner}}<div class="card">
+                {{if .Sales}}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Crop</th>
+                            <th>Buyer</th>
+                            <th>Qty</th>
+                            <th>Total</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Sales}}
+                        <tr>
+                            <td>{{.CropName}}</td>
+                            <td>{{.BuyerName}}</td>
+                            <td>{{.Quantity}}</td>
+                            <td>₦{{money .TotalPrice}}</td>
+                            <td>{{.CreatedAt.Format "02 Jan 2006"}}</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+                {{else}}
+                <p>No sales yet.</p>
+                {{end}}
 
-            <h2>Security</h2>
+            </div>
 
-            <a href="/forgot-password"><button type="button">Change Password</button></a>
+            {{end}}{{end}}
 
-        </div>{{end}}
+            {{if .IsOwner}}<div class="card">
 
-    </section>
+                <h2>Security</h2>
 
-</main>
+                <a href="/forgot-password"><button type="button">Change Password</button></a>
 
-{{if .IsOwner}}<div id="edit-modal" class="modal">
-    <form method="POST" action="/profile/edit" enctype="multipart/form-data">
-        <h2>Edit Profile</h2>
+            </div>{{end}}
 
-        <label>Full Name</label>
-        <input type="text" name="full_name" value="{{.FullName}}" required>
+            {{if .IsOwner}}<div class="card card-danger">
 
-        <label>Phone</label>
-        <input type="tel" name="phone" value="{{.Phone}}" required>
+                <h2>Danger Zone</h2>
 
-        <label>E-mail</label>
-        <input type="email" name="email" value="{{.Email}}" required>
+                <p class="danger-copy">
+                    Permanently delete your account and all associated data.
+                    This cannot be undone.
+                </p>
 
-        <label for="profile-location">Location (LGA)</label>
-        <select id="profile-location" name="location" required>
-            <option value="" disabled>Select your LGA</option>
-            <option value="Ado" {{if eq .Location "Ado"}}selected{{end}}>Ado</option>
-            <option value="Agatu" {{if eq .Location "Agatu"}}selected{{end}}>Agatu</option>
-            <option value="Apa" {{if eq .Location "Apa"}}selected{{end}}>Apa</option>
-            <option value="Buruku" {{if eq .Location "Buruku"}}selected{{end}}>Buruku</option>
-            <option value="Gboko" {{if eq .Location "Gboko"}}selected{{end}}>Gboko</option>
-            <option value="Guma" {{if eq .Location "Guma"}}selected{{end}}>Guma</option>
-            <option value="Gwer East" {{if eq .Location "Gwer East"}}selected{{end}}>Gwer East</option>
-            <option value="Gwer West" {{if eq .Location "Gwer West"}}selected{{end}}>Gwer West</option>
-            <option value="Katsina-Ala" {{if eq .Location "Katsina-Ala"}}selected{{end}}>Katsina-Ala</option>
-            <option value="Konshisha" {{if eq .Location "Konshisha"}}selected{{end}}>Konshisha</option>
-            <option value="Kwande" {{if eq .Location "Kwande"}}selected{{end}}>Kwande</option>
-            <option value="Logo" {{if eq .Location "Logo"}}selected{{end}}>Logo</option>
-            <option value="Makurdi" {{if eq .Location "Makurdi"}}selected{{end}}>Makurdi</option>
-            <option value="Obi" {{if eq .Location "Obi"}}selected{{end}}>Obi</option>
-            <option value="Ogbadibo" {{if eq .Location "Ogbadibo"}}selected{{end}}>Ogbadibo</option>
-            <option value="Ohimini" {{if eq .Location "Ohimini"}}selected{{end}}>Ohimini</option>
-            <option value="Oju" {{if eq .Location "Oju"}}selected{{end}}>Oju</option>
-            <option value="Okpokwu" {{if eq .Location "Okpokwu"}}selected{{end}}>Okpokwu</option>
-            <option value="Otukpo" {{if eq .Location "Otukpo"}}selected{{end}}>Otukpo</option>
-            <option value="Tarka" {{if eq .Location "Tarka"}}selected{{end}}>Tarka</option>
-            <option value="Ukum" {{if eq .Location "Ukum"}}selected{{end}}>Ukum</option>
-            <option value="Ushongo" {{if eq .Location "Ushongo"}}selected{{end}}>Ushongo</option>
-            <option value="Vandeikya" {{if eq .Location "Vandeikya"}}selected{{end}}>Vandeikya</option>
-        </select>
+                <button type="button" id="delete-account-btn" class="danger-button">
+                    Delete Account
+                </button>
 
-        <label>Passport Photograph</label>
-        <input type="file" name="passport" accept="image/*">
-        <small>Leave empty to keep your current photograph.</small>
+            </div>{{end}}
 
-        <div class="modal-actions">
-            <button type="submit">Save</button>
-            <button type="button" id="cancel-edit-btn">Cancel</button>
-        </div>
-    </form>
-</div>{{end}}
+        </section>
 
-{{if .IsOwner}}<script src="/static/js/profile.js"></script>{{end}}
+    </main>
 
-<script src="/static/js/navigation.js"></script>
+    {{if .IsOwner}}<div id="edit-modal" class="modal">
+        <form method="POST" action="/profile/edit" enctype="multipart/form-data">
+            <h2>Edit Profile</h2>
+
+            <label>Full Name</label>
+            <input type="text" name="full_name" value="{{.FullName}}" required>
+
+            <label>Phone</label>
+            <input type="tel" name="phone" value="{{.Phone}}" required>
+
+            <label>E-mail</label>
+            <input type="email" name="email" value="{{.Email}}" required>
+
+            <label for="profile-location">Location (LGA)</label>
+            <select id="profile-location" name="location" required>
+                <option value="" disabled>Select your LGA</option>
+                <option value="Ado" {{if eq .Location "Ado" }}selected{{end}}>Ado</option>
+                <option value="Agatu" {{if eq .Location "Agatu" }}selected{{end}}>Agatu</option>
+                <option value="Apa" {{if eq .Location "Apa" }}selected{{end}}>Apa</option>
+                <option value="Buruku" {{if eq .Location "Buruku" }}selected{{end}}>Buruku</option>
+                <option value="Gboko" {{if eq .Location "Gboko" }}selected{{end}}>Gboko</option>
+                <option value="Guma" {{if eq .Location "Guma" }}selected{{end}}>Guma</option>
+                <option value="Gwer East" {{if eq .Location "Gwer East" }}selected{{end}}>Gwer East</option>
+                <option value="Gwer West" {{if eq .Location "Gwer West" }}selected{{end}}>Gwer West</option>
+                <option value="Katsina-Ala" {{if eq .Location "Katsina-Ala" }}selected{{end}}>Katsina-Ala</option>
+                <option value="Konshisha" {{if eq .Location "Konshisha" }}selected{{end}}>Konshisha</option>
+                <option value="Kwande" {{if eq .Location "Kwande" }}selected{{end}}>Kwande</option>
+                <option value="Logo" {{if eq .Location "Logo" }}selected{{end}}>Logo</option>
+                <option value="Makurdi" {{if eq .Location "Makurdi" }}selected{{end}}>Makurdi</option>
+                <option value="Obi" {{if eq .Location "Obi" }}selected{{end}}>Obi</option>
+                <option value="Ogbadibo" {{if eq .Location "Ogbadibo" }}selected{{end}}>Ogbadibo</option>
+                <option value="Ohimini" {{if eq .Location "Ohimini" }}selected{{end}}>Ohimini</option>
+                <option value="Oju" {{if eq .Location "Oju" }}selected{{end}}>Oju</option>
+                <option value="Okpokwu" {{if eq .Location "Okpokwu" }}selected{{end}}>Okpokwu</option>
+                <option value="Otukpo" {{if eq .Location "Otukpo" }}selected{{end}}>Otukpo</option>
+                <option value="Tarka" {{if eq .Location "Tarka" }}selected{{end}}>Tarka</option>
+                <option value="Ukum" {{if eq .Location "Ukum" }}selected{{end}}>Ukum</option>
+                <option value="Ushongo" {{if eq .Location "Ushongo" }}selected{{end}}>Ushongo</option>
+                <option value="Vandeikya" {{if eq .Location "Vandeikya" }}selected{{end}}>Vandeikya</option>
+            </select>
+
+            <label>Passport Photograph</label>
+            <input type="file" name="passport" accept="image/*">
+            <small>Leave empty to keep your current photograph.</small>
+
+            <div class="modal-actions">
+                <button type="submit">Save</button>
+                <button type="button" id="cancel-edit-btn">Cancel</button>
+            </div>
+        </form>
+    </div>{{end}}
+
+    {{if .IsOwner}}<div id="delete-modal" class="modal">
+        <form method="POST" action="/profile/delete" id="delete-account-form">
+            <h2 class="danger-heading">Delete your account</h2>
+
+            <p class="danger-copy">
+                This permanently deletes your account, your listed produce,
+                and your chat messages. Orders and sales history are kept
+                for record-keeping. <strong>This cannot be undone.</strong>
+            </p>
+
+            <label for="delete-confirm-phone">
+                Type your phone number (<span id="delete-confirm-target">{{.Phone}}</span>) to confirm
+            </label>
+            <input type="text" id="delete-confirm-phone" name="confirm_phone" data-expected="{{.Phone}}"
+                autocomplete="off" required>
+
+            <label for="delete-confirm-password">Enter your password</label>
+            <input type="password" id="delete-confirm-password" name="password" autocomplete="current-password"
+                required>
+
+            <div class="modal-actions">
+                <button type="submit" id="confirm-delete-btn" class="danger-button" disabled>
+                    Permanently Delete Account
+                </button>
+                <button type="button" id="cancel-delete-btn">Cancel</button>
+            </div>
+        </form>
+    </div>{{end}}
+
+    {{if .IsOwner}}
+    <script src="/static/js/profile.js"></script>{{end}}
+
+    <script src="/static/js/navigation.js"></script>
 </body>
-</html>
 
+</html>
