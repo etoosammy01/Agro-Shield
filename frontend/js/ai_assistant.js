@@ -1,5 +1,18 @@
 document.addEventListener("DOMContentLoaded", () => {
     /* ============================================================
+       VOICE INPUT (SPEECH TO TEXT)
+
+       The microphone button transcribes speech into the textarea.
+       It never records an audio file and never submits the form.
+
+       Started before the early-exit below so that the voice
+       controller still runs on pages that have no AI form.
+       ============================================================ */
+
+    setupVoiceInput();
+
+
+    /* ============================================================
        ELEMENTS
        ============================================================ */
 
@@ -253,7 +266,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     /* ============================================================
-       AUDIO RECORDER
+       AUDIO RECORDER (VOICE RECORDING ATTACHMENT)
+
+       This is a separate feature from the microphone button above.
+       It records an audio FILE that the farmer can review and then
+       attach to the form.
+
+       It only runs when its own start/stop controls exist in the
+       page. The AI assistant page currently has no such controls,
+       so nothing happens there.
        ============================================================ */
 
     setupAudioRecorder();
@@ -735,186 +756,289 @@ function setupAudioRecorder() {
         }
     );
 }
-/* ============================================================
-   NEW FEATURES ADDED (Voice Input + File Validation)
-   ============================================================ */
 
-document.addEventListener("DOMContentLoaded", () => {
-    // Voice Input (Speech-to-Text)
-    const voiceInputButton = document.getElementById("voice-input");
-    const voiceStatus = document.getElementById("voice-status");
-    const textArea = document.querySelector(".assistant-composer textarea");
 
-    let recognition = null;
-    let isRecording = false;
+/* ================================================================
+   VOICE INPUT — SPEECH TO TEXT
 
-    function initSpeechRecognition() {
-        if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
-            if (voiceStatus) voiceStatus.textContent = "Speech recognition not supported in this browser.";
-            return;
-        }
+   The microphone button types for the farmer:
 
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        recognition = new SpeechRecognition();
-        recognition.continuous = false;
-        recognition.interimResults = true;
-        recognition.lang = "en-US";
+       speak -> transcribe -> textarea -> farmer review -> Send
 
-        recognition.onstart = () => {
-            isRecording = true;
-            if (voiceStatus) voiceStatus.textContent = "Listening...";
-            if (voiceInputButton) voiceInputButton.classList.add("recording");
-        };
+   The transcript is written into the normal description textarea,
+   so what reaches the backend is plain text. No audio blob is ever
+   created and the form is never submitted automatically.
 
-        recognition.onresult = (event) => {
-            let transcript = "";
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                transcript += event.results[i][0].transcript;
-            }
-            if (textArea) textArea.value = transcript;
-        };
+   Audio FILE attachments are a different feature and are handled by
+   the recorder above, which only runs when its own start/stop
+   controls exist in the page.
 
-        recognition.onerror = (event) => {
-            if (voiceStatus) voiceStatus.textContent = "Error: " + event.error;
-        };
+   There is exactly ONE controller for #voice-input. Do not add a
+   second listener for that button.
+   ================================================================ */
 
-        recognition.onend = () => {
-            isRecording = false;
-            if (voiceStatus) voiceStatus.textContent = "";
-            if (voiceInputButton) voiceInputButton.classList.remove("recording");
-        };
-    }
+function setupVoiceInput() {
+    const button = document.getElementById("voice-input");
+    const status = document.getElementById("voice-status");
 
-    if (voiceInputButton && textArea) {
-        initSpeechRecognition();
-        voiceInputButton.addEventListener("click", () => {
-            if (isRecording) {
-                recognition.stop();
-            } else {
-                try {
-                    recognition.start();
-                } catch (error) {
-                    console.error("Speech recognition error:", error);
-                }
-            }
-        });
-    }
-
-    // File Validation for Image Upload
-    const VALID_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-    const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
-
-    function validateImageFile(file) {
-        if (!file) return { valid: false, error: "No file selected." };
-        if (!VALID_IMAGE_TYPES.includes(file.type)) {
-            return { valid: false, error: "Invalid image type. Please upload JPG, PNG, WEBP, or GIF." };
-        }
-        if (file.size > MAX_IMAGE_SIZE) {
-            return { valid: false, error: "Image too large. Maximum size is 5MB." };
-        }
-        return { valid: true };
-    }
-
-    const imageInput = document.getElementById("image");
-    const imageStatus = document.getElementById("image-status");
-
-    if (imageInput) {
-        imageInput.addEventListener("change", () => {
-            const file = imageInput.files[0];
-            const validation = validateImageFile(file);
-            if (!validation.valid) {
-                imageInput.value = "";
-                if (imageStatus) imageStatus.textContent = validation.error;
-            } else {
-                if (imageStatus) imageStatus.textContent = file.name + " attached";
-            }
-        });
-    }
-});
-
-/* ============================================================
-   NEW: VOICE INPUT (Speech-to-Text with Live Transcription)
-   ============================================================ */
-
-document.addEventListener("DOMContentLoaded", () => {
-    const voiceInputButton = document.getElementById("voice-input");
-    const voiceStatus = document.getElementById("voice-status");
-    const textArea = document.getElementById("description");
-
-    if (!voiceInputButton || !textArea) return;
-
-    let recognition = null;
-    let isRecording = false;
-
-    // Check if browser supports speech recognition
-    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
-        voiceStatus.textContent = "Speech recognition is not supported in this browser. Please type instead.";
-        voiceInputButton.disabled = true;
+    if (!button) {
         return;
     }
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = true;  // Shows text while speaking (interim results)
-    recognition.lang = "en-US";
+    /* The transcript belongs in the composer textarea. */
+    const textarea = document.getElementById("description");
 
-    // When speech recognition starts
-    recognition.onstart = () => {
-        isRecording = true;
-        voiceStatus.textContent = "Listening... Speak now.";
-        voiceInputButton.classList.add("recording");
-        voiceInputButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18L18 6M6 6l12 12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
-    };
+    const MIC_ICON =
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a4 4 0 0 0 4-4V6a4 4 0 1 0-8 0v5a4 4 0 0 0 4 4Zm-7-4a7 7 0 0 0 14 0M12 18v3m-3 0h6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
 
-    // When speech is recognized (live transcription)
-    recognition.onresult = (event) => {
-        let finalText = "";
-        let interimText = "";
+    const STOP_ICON =
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18L18 6M6 6l12 12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
 
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-                finalText += transcript;
+    const SpeechRecognition =
+        window.SpeechRecognition ||
+        window.webkitSpeechRecognition;
+
+    let recognition = null;
+    let listening = false;
+
+    /* Text already in the textarea before dictation began. */
+    let baseText = "";
+
+    /* Exactly what this controller last wrote into the textarea, so we
+       can tell a farmer's manual edit apart from our own writing. */
+    let written = "";
+
+    /* Set when the browser reports an error, so onend does not claim
+       success on top of the error message. */
+    let failed = false;
+
+    function setStatus(message) {
+        if (status) {
+            status.textContent = message;
+        }
+    }
+
+    function renderListening(isListening) {
+        listening = isListening;
+
+        button.classList.toggle("recording", isListening);
+        button.setAttribute("aria-pressed", String(isListening));
+        button.setAttribute(
+            "aria-label",
+            isListening ? "Stop voice input" : "Use voice input"
+        );
+        button.title = isListening ? "Stop listening" : "Speak to type";
+        button.innerHTML = isListening ? STOP_ICON : MIC_ICON;
+    }
+
+    /* Voice input needs both a recognizer and a place to put the text.
+       When either is missing, say so and leave typing untouched. */
+    if (typeof SpeechRecognition !== "function" || !textarea) {
+        button.disabled = true;
+        button.title = "Voice input is not supported in this browser";
+        setStatus(
+            "Voice input is not available in this browser. Please type your question instead."
+        );
+        return;
+    }
+
+    function buildRecognition() {
+        const instance = new SpeechRecognition();
+
+        /* One spoken phrase per tap. Each tap appends to whatever the
+           textarea already holds, so nothing the farmer typed is lost. */
+        instance.continuous = false;
+        instance.interimResults = true;
+        instance.lang = document.documentElement.lang || "en-US";
+        instance.maxAlternatives = 1;
+
+        instance.onstart = () => {
+            renderListening(true);
+            setStatus("🔴 Listening… speak now.");
+        };
+
+        instance.onresult = (event) => {
+            let finalText = "";
+            let interimText = "";
+
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const result = event.results[i];
+                const alternative = result[0];
+
+                if (!alternative) {
+                    continue;
+                }
+
+                if (result.isFinal) {
+                    finalText += alternative.transcript;
+                } else {
+                    interimText += alternative.transcript;
+                }
+            }
+
+            /* The farmer may have edited the box while still speaking.
+               Take their text as the new base for dictation, minus any
+               interim words we had written, so their edit is kept and
+               the stale words are not repeated back. */
+            if (written && textarea.value !== written) {
+                baseText = dropTrailingInterim(
+                    textarea.value,
+                    interimText
+                );
+            }
+
+            if (finalText) {
+                baseText = joinTranscript(baseText, finalText);
+            }
+
+            /* Interim words are shown live but are not committed yet, so
+               they simply disappear if recognition is cancelled. */
+            written = joinTranscript(baseText, interimText);
+            textarea.value = written;
+
+            if (interimText.trim()) {
+                setStatus("🔴 Listening… " + interimText.trim());
             } else {
-                interimText += transcript;
+                setStatus("🔴 Listening… speak now.");
             }
-        }
+        };
 
-        // Combine final + interim text and show in textarea
-        textArea.value = finalText + interimText;
+        instance.onerror = (event) => {
+            if (!event) {
+                return;
+            }
 
-        // Show live status
-        if (interimText) {
-            voiceStatus.textContent = "Heard: " + interimText;
-        } else {
-            voiceStatus.textContent = "Listening... Speak now.";
-        }
-    };
+            switch (event.error) {
+                case "not-allowed":
+                case "service-not-allowed":
+                    failed = true;
+                    setStatus(
+                        "Microphone permission was blocked. Allow microphone access in your browser settings, or type instead."
+                    );
+                    break;
+                case "audio-capture":
+                    failed = true;
+                    setStatus(
+                        "No microphone was found. Check that a microphone is connected, or type instead."
+                    );
+                    break;
+                case "network":
+                    failed = true;
+                    setStatus(
+                        "Voice input needs an internet connection. Please check your network or type instead."
+                    );
+                    break;
+                case "no-speech":
+                    failed = true;
+                    setStatus(
+                        "We did not hear anything. Tap the microphone and try again."
+                    );
+                    break;
+                case "aborted":
+                    /* The farmer stopped it on purpose. onend resets the UI. */
+                    break;
+                default:
+                    failed = true;
+                    setStatus(
+                        "Voice input stopped unexpectedly. Please try again or type instead."
+                    );
+            }
+        };
 
-    // When speech recognition ends
-    recognition.onerror = (event) => {
-        voiceStatus.textContent = "Error: " + event.error;
-    };
+        instance.onend = () => {
+            /* The browser also ends the session by itself after a pause.
+               Always reset the button so the farmer can tap it again.
+               Nothing is sent to the server here. */
+            textarea.value = textarea.value.replace(/\s+$/, "");
 
-    recognition.onend = () => {
-        isRecording = false;
-        voiceStatus.textContent = "";
-        voiceInputButton.classList.remove("recording");
-        voiceInputButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a4 4 0 0 0 4-4V6a4 4 0 1 0-8 0v5a4 4 0 0 0 4 4Zm-7-4a7 7 0 0 0 14 0M12 18v3m-3 0h6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
-    };
+            if (written) {
+                textarea.dispatchEvent(
+                    new Event("input", { bubbles: true })
+                );
+            }
 
-    // Click voice button to start/stop
-    voiceInputButton.addEventListener("click", () => {
-        if (isRecording) {
-            recognition.stop();
-        } else {
+            written = "";
+            renderListening(false);
+
+            if (failed) {
+                return;
+            }
+
+            if (textarea.value.trim()) {
+                setStatus("Transcript added. Review it, then press Send.");
+            } else {
+                setStatus("Nothing was transcribed. Tap the microphone and try again.");
+            }
+        };
+
+        return instance;
+    }
+
+    button.addEventListener("click", () => {
+        /* Second tap stops the session and keeps the current transcript. */
+        if (listening && recognition) {
+            setStatus("Stopping…");
+
             try {
-                recognition.start();
+                recognition.stop();
             } catch (error) {
-                console.error("Speech recognition error:", error);
-                voiceStatus.textContent = "Could not start voice input. Please try again.";
+                console.error("Could not stop speech recognition:", error);
+                renderListening(false);
             }
+
+            return;
+        }
+
+        /* A fresh recognizer per session: reusing one instance after it
+           has ended is not reliable across browsers. */
+        recognition = buildRecognition();
+
+        baseText = textarea.value.replace(/\s+$/, "");
+        written = textarea.value;
+        failed = false;
+
+        try {
+            recognition.start();
+        } catch (error) {
+            console.error("Speech recognition error:", error);
+
+            /* InvalidStateError normally means a session is still open. */
+            renderListening(false);
+            setStatus(
+                "Voice input is already starting. Please wait a moment and try again."
+            );
         }
     });
-});
+
+    renderListening(false);
+    setStatus("");
+}
+
+/* Join dictated pieces with a single space. */
+function joinTranscript(base, addition) {
+    const left = (base || "").replace(/\s+$/, "");
+    const right = (addition || "").replace(/^\s+/, "");
+
+    if (!left) {
+        return right;
+    }
+
+    if (!right) {
+        return left;
+    }
+
+    return left + " " + right;
+}
+
+/* Remove the interim words this controller last wrote, so a farmer's
+   edit during dictation is not followed by the stale interim text. */
+function dropTrailingInterim(value, interimText) {
+    const text = (value || "").replace(/\s+$/, "");
+    const interim = (interimText || "").trim();
+
+    if (interim && text.endsWith(interim)) {
+        return text.slice(0, text.length - interim.length).replace(/\s+$/, "");
+    }
+
+    return text;
+}

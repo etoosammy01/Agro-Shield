@@ -55,7 +55,7 @@ func NewGeminiProvider(apiKey string) (*GeminiProvider, error) {
 	}, nil
 }
 
-// ============================================================
+// ======================terseerterese4@gmail.com======================================
 // 3. ANALYZE FARMER REQUEST
 // This function sends the farmer's information to Gemini.
 //

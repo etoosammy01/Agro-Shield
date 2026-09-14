@@ -65,12 +65,13 @@ func readAIUpload(r *http.Request, field string, maxSize int64, allowedPrefix st
 
 	mime := detectedMIME
 	valid := strings.HasPrefix(detectedMIME, allowedPrefix+"/")
-	// Browser-recorded audio often uses WebM or MP4 containers. Go detects
-	// those containers as video or generic binary even when they contain only
-	// an audio track, so retain the browser's audio MIME after validating it.
+	// Browser-recorded audio often uses WebM, MP4 or Ogg containers. Go detects
+	// those containers as video, Ogg or generic binary even when they contain
+	// only an audio track, so retain the browser's audio MIME after validating it.
 	if field == "audio" && strings.HasPrefix(declaredMIME, "audio/") {
 		validContainer := strings.HasPrefix(detectedMIME, "audio/") ||
 			detectedMIME == "video/webm" || detectedMIME == "video/mp4" ||
+			detectedMIME == "application/ogg" ||
 			detectedMIME == "application/octet-stream"
 		if validContainer {
 			valid = true
