@@ -40,6 +40,22 @@ func RegisterRoutes(container *app.Container) {
 		),
 	)
 
+	learningHandler := handlers.NewLearningHandler(container.AI)
+	http.HandleFunc(
+		"/learning",
+		middleware.OnlyPath(
+			"/learning",
+			middleware.OnlyGet(learningHandler.Page),
+		),
+	)
+	http.HandleFunc(
+		"/learning/chat",
+		middleware.OnlyPath(
+			"/learning/chat",
+			learningHandler.Chat,
+		),
+	)
+
 	// ========================================================
 	// AUTHENTICATION
 	// ========================================================

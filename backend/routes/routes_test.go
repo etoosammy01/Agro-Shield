@@ -12,7 +12,7 @@ func TestDashboardLinksHaveRegisteredRoutes(t *testing.T) {
 		t.Fatal(err)
 	}
 	page := string(content)
-	for _, href := range []string{"/dashboard", "/storage", "/marketplace", "/market-insights", "/cart", "/ai-assistant", "/ai-diagnosis-history", "/profile", "/logout"} {
+	for _, href := range []string{"/dashboard", "/storage", "/marketplace", "/market-insights", "/cart", "/ai-assistant", "/ai-diagnosis-history", "/profile", "/logout", "/learning"} {
 		if !strings.Contains(page, `href="`+href+`"`) {
 			t.Errorf("dashboard does not contain expected link %s", href)
 		}

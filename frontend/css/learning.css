@@ -1,0 +1,249 @@
+.learning-page {
+    width: min(100% - 2rem, 960px);
+    margin: 0 auto;
+    padding: 3.5rem 0 4rem;
+}
+
+.learning-intro {
+    max-width: 760px;
+    margin: 0 auto 2rem;
+    text-align: center;
+}
+
+.learning-eyebrow {
+    color: #378447;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.learning-intro h1 {
+    margin: 0.5rem 0 0.75rem;
+    color: #183b25;
+    font-size: clamp(2rem, 5vw, 3rem);
+}
+
+.learning-intro > p:last-child {
+    max-width: 680px;
+    margin: 0 auto;
+    color: #53615a;
+    line-height: 1.65;
+}
+
+.learning-chat {
+    overflow: hidden;
+    border: 1px solid #dce7de;
+    border-radius: 18px;
+    background: #fff;
+    box-shadow: 0 14px 40px rgb(25 60 35 / 9%);
+}
+
+.learning-chat-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid #e6eee8;
+}
+
+.learning-chat-heading h2 {
+    margin: 0 0 0.25rem;
+    color: #183b25;
+    font-size: 1.15rem;
+}
+
+.learning-chat-heading p {
+    margin: 0;
+    color: #66736b;
+    font-size: 0.9rem;
+}
+
+.learning-reset {
+    flex: 0 0 auto;
+    padding: 0.55rem 0.8rem;
+    border: 1px solid #cbd9ce;
+    border-radius: 8px;
+    background: #fff;
+    color: #245d34;
+    cursor: pointer;
+}
+
+.learning-messages {
+    display: flex;
+    min-height: 310px;
+    max-height: 52vh;
+    flex-direction: column;
+    gap: 0.8rem;
+    overflow-y: auto;
+    padding: 1.25rem 1.5rem;
+    background: #f8fbf8;
+}
+
+.learning-message {
+    max-width: min(82%, 680px);
+    padding: 0.85rem 1rem;
+    border-radius: 14px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.learning-message p {
+    margin: 0;
+}
+
+.learning-message-assistant {
+    align-self: flex-start;
+    border: 1px solid #e2ebe4;
+    border-bottom-left-radius: 4px;
+    background: #fff;
+    color: #27382d;
+}
+
+.learning-message-user {
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+    background: #276b3b;
+    color: #fff;
+}
+
+.learning-message-error {
+    border-color: #f0c6c1;
+    color: #8b2d22;
+}
+
+.learning-starters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    padding: 0.9rem 1.5rem 0;
+}
+
+.learning-starters button {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d4e3d7;
+    border-radius: 999px;
+    background: #f5faf6;
+    color: #285d37;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.learning-starters button:hover,
+.learning-reset:hover {
+    background: #eaf4ec;
+}
+
+.learning-form {
+    padding: 1rem 1.5rem 1.25rem;
+}
+
+.learning-form label {
+    display: block;
+    margin-bottom: 0.45rem;
+    color: #27382d;
+    font-weight: 700;
+}
+
+.learning-compose {
+    display: flex;
+    align-items: stretch;
+    gap: 0.65rem;
+}
+
+.learning-compose textarea {
+    width: 100%;
+    min-height: 58px;
+    resize: vertical;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid #cbd9ce;
+    border-radius: 10px;
+    color: #24382a;
+    font: inherit;
+}
+
+.learning-compose textarea:focus {
+    outline: 3px solid rgb(55 132 71 / 18%);
+    border-color: #378447;
+}
+
+.learning-compose button {
+    min-width: 100px;
+    padding: 0.7rem 1rem;
+    border: 0;
+    border-radius: 10px;
+    background: #276b3b;
+    color: #fff;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 700;
+}
+
+.learning-compose button:disabled {
+    cursor: wait;
+    opacity: 0.65;
+}
+
+.learning-note,
+.learning-signup {
+    color: #647168;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.learning-note {
+    margin: 0.65rem 0 0;
+}
+
+.learning-signup {
+    margin: 1.25rem 0 0;
+    text-align: center;
+}
+
+.learning-signup a {
+    color: #276b3b;
+    font-weight: 700;
+}
+
+.learning-nav-active {
+    font-weight: 700;
+}
+
+@media (max-width: 620px) {
+    .learning-page {
+        width: min(100% - 1rem, 960px);
+        padding-top: 2rem;
+    }
+
+    .learning-chat-heading {
+        align-items: flex-start;
+        padding: 1rem;
+    }
+
+    .learning-messages {
+        min-height: 280px;
+        padding: 1rem;
+    }
+
+    .learning-starters {
+        padding-inline: 1rem;
+    }
+
+    .learning-form {
+        padding-inline: 1rem;
+    }
+
+    .learning-message {
+        max-width: 92%;
+    }
+
+    .learning-compose {
+        flex-direction: column;
+    }
+
+    .learning-compose button {
+        min-height: 46px;
+    }
+}

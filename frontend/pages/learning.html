@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Learn with Agro-Shield AI</title>
+    <link rel="icon" href="/static/assets/favicon_io/favicon.ico">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/learning.css">
+</head>
+<body>
+    <header class="navbar">
+        <a class="logo" href="/" aria-label="Agro-Shield home">
+            <img src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield">
+        </a>
+        <nav aria-label="Main navigation">
+            <a href="/">Home</a>
+            <a class="learning-nav-active" href="/learning" aria-current="page">Learn with AI</a>
+            <a href="/login">Login</a>
+            <a href="/register">Register</a>
+        </nav>
+    </header>
+
+    <main class="learning-page">
+        <section class="learning-intro" aria-labelledby="learning-title">
+            <p class="learning-eyebrow">Your farming questions welcome</p>
+            <h1 id="learning-title">Learn farming with Agro-Shield AI</h1>
+            <p>Ask about crops, livestock, poultry, fish farming, soil, or starting a farm. You can learn at your own pace, whether or not you are ready to buy or sell.</p>
+        </section>
+
+        <section class="learning-chat" aria-label="Farming learning chat">
+            <div class="learning-chat-heading">
+                <div>
+                    <h2>Ask a farming question</h2>
+                    <p>Agro-Shield AI will explain things in clear, practical steps.</p>
+                </div>
+                <button class="learning-reset" id="clear-chat" type="button">New chat</button>
+            </div>
+
+            <div class="learning-messages" id="chat-messages" role="log" aria-live="polite" aria-relevant="additions">
+                <div class="learning-message learning-message-assistant">
+                    <p>Hello! What would you like to learn about farming today?</p>
+                </div>
+            </div>
+
+            <div class="learning-starters" aria-label="Example questions">
+                <button type="button" data-question="How do I start growing vegetables in a small space?">Growing vegetables in a small space</button>
+                <button type="button" data-question="What should I consider before starting poultry farming?">Starting poultry farming</button>
+                <button type="button" data-question="How can I improve the soil on my farm?">Improving farm soil</button>
+            </div>
+
+            <form id="learning-form" class="learning-form">
+                <label for="learning-question">Your question</label>
+                <div class="learning-compose">
+                    <textarea id="learning-question" name="question" maxlength="1200" rows="2" placeholder="Ask anything about farming..." required></textarea>
+                    <button id="send-question" type="submit">Ask AI</button>
+                </div>
+                <p class="learning-note" id="learning-status">This chat is for learning. For urgent crop or animal health problems, contact a local extension worker or veterinarian.</p>
+            </form>
+        </section>
+
+        <p class="learning-signup">Want to buy or sell later? <a href="/register">Create an Agro-Shield account</a> whenever you are ready.</p>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-brand">
+                <img class="footer-brand-logo" src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield">
+                <p>Empowering farmers through technology, learning, and digital agricultural commerce.</p>
+            </div>
+            <div class="footer-links">
+                <h3>Quick Links</h3>
+                <a href="/">Home</a>
+                <a href="/learning">Learn with AI</a>
+                <a href="/login">Login</a>
+                <a href="/register">Register</a>
+            </div>
+            <div class="footer-contact">
+                <h3>Contact</h3>
+                <p>Email: support@agroshield.com</p>
+                <p>Phone: +234 9060561633</p>
+            </div>
+        </div>
+        <hr>
+        <p class="copyright">© 2026 Agro-Shield. All rights reserved.</p>
+    </footer>
+
+    <script src="/static/js/navigation.js"></script>
+    <script src="/static/js/learning.js"></script>
+</body>
+</html>

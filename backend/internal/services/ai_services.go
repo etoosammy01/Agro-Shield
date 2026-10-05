@@ -3,12 +3,17 @@ package services
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"backend/internal/models"
 	"backend/internal/repository"
 )
+
+var ErrInvalidLearningChat = errors.New("invalid learning chat")
 
 type AIService struct {
 	repo      *repository.DiagnosisRepository
@@ -87,6 +92,27 @@ func (s *AIService) Diagnose(
 	}
 
 	return diagnosis, nil
+}
+
+func (s *AIService) Learn(messages []AIChatMessage) (string, error) {
+	if len(messages) == 0 || len(messages) > 12 {
+		return "", fmt.Errorf("%w: send between 1 and 12 chat messages", ErrInvalidLearningChat)
+	}
+
+	for index, message := range messages {
+		expectedRole := "user"
+		if index%2 == 1 {
+			expectedRole = "assistant"
+		}
+		if message.Role != expectedRole {
+			return "", fmt.Errorf("%w: chat messages must alternate between user and assistant", ErrInvalidLearningChat)
+		}
+		if strings.TrimSpace(message.Content) == "" || utf8.RuneCountInString(message.Content) > 1200 {
+			return "", fmt.Errorf("%w: chat messages must be between 1 and 1200 characters", ErrInvalidLearningChat)
+		}
+	}
+
+	return s.provider.Learn(messages)
 }
 
 func (s *AIService) History(farmerID int) ([]models.Diagnosis, error) {

@@ -240,6 +240,23 @@ body {
     box-shadow 0.2s ease;
 }
 
+.auth-right form a.role-option {
+  color: inherit;
+  text-decoration: none;
+}
+
+.auth-right form .learning-role-option span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.auth-right form .learning-role-option small {
+  color: #5d6d62;
+  font-size: 0.85em;
+  font-weight: 400;
+}
+
 .auth-right form .role-option:hover {
   border-color: var(--color-brand, #1f7a4d);
 

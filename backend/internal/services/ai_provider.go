@@ -15,10 +15,16 @@ type AIRequest struct {
 	VideoType string
 }
 
+type AIChatMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
 type DiagnosisResult struct {
 	Result string
 }
 
 type AIProvider interface {
 	Analyze(request AIRequest) (*DiagnosisResult, error)
+	Learn(messages []AIChatMessage) (string, error)
 }

@@ -325,6 +325,59 @@ Keep the complete answer below 250 words.`
 	return nil, errors.New("gemini returned no diagnosis text")
 }
 
+func (p *GeminiProvider) Learn(messages []AIChatMessage) (string, error) {
+	contents := make([]*genai.Content, 0, len(messages))
+	for _, message := range messages {
+		role := "user"
+		if message.Role == "assistant" {
+			role = "model"
+		}
+		contents = append(contents, &genai.Content{
+			Role:  role,
+			Parts: []*genai.Part{{Text: message.Content}},
+		})
+	}
+
+	instructions := `You are Agro-Shield Learning Assistant, a friendly farming teacher for anyone in Nigeria, including beginners who are only exploring farming.
+Answer open-ended questions about crops, livestock, poultry, fish farming, soil, farm planning, and other agriculture topics. Use simple, clear English and practical examples suited to the user's context. Do not assume the user already farms or is ready to buy or sell.
+Respond conversationally and directly to the latest question, using earlier messages only as context. Ask a short follow-up question when important details are missing. Be honest about uncertainty and distinguish general learning from professional veterinary or agricultural advice. For dangerous pesticide, animal-health, or food-safety situations, encourage the user to contact a qualified local extension worker or veterinarian.
+Do not force answers into a diagnosis template. Use plain text instead of Markdown formatting. Keep answers focused and under 250 words.`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	result, err := p.client.Models.GenerateContent(ctx, p.model, contents, &genai.GenerateContentConfig{
+		SystemInstruction: &genai.Content{
+			Parts: []*genai.Part{{Text: instructions}},
+		},
+		MaxOutputTokens: 400,
+	})
+	if err != nil {
+		log.Printf("Gemini learning chat failed: %v", err)
+		if isTemporaryGeminiError(err) {
+			return "", errors.New("the AI service is busy right now. Please wait a moment and try again")
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			return "", errors.New("the AI service took too long to respond. Please try again")
+		}
+		return "", errors.New("the AI service could not complete the answer. Please try again")
+	}
+	if result == nil {
+		return "", errors.New("gemini returned no learning response")
+	}
+	for _, candidate := range result.Candidates {
+		if candidate.Content == nil {
+			continue
+		}
+		for _, part := range candidate.Content.Parts {
+			if strings.TrimSpace(part.Text) != "" {
+				return part.Text, nil
+			}
+		}
+	}
+	return "", errors.New("gemini returned no learning response")
+}
+
 func isTemporaryGeminiError(err error) bool {
 	if err == nil {
 		return false
