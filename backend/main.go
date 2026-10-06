@@ -6,6 +6,7 @@ import (
 	"os"
 
 	app "backend/internal"
+	"backend/internal/config"
 	"backend/internal/database"
 	"backend/internal/repository"
 	"backend/internal/services"
@@ -170,14 +171,11 @@ func main() {
 	// 7. START HTTP SERVER
 	// ============================================================
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "9000"
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
 	}
-
-	log.Println("Server starting on port:", port)
-
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
-		log.Println(err)
+	if err = http.ListenAndServe(":"+cfg.Port, http.DefaultServeMux); err != nil {
+		log.Fatal(err)
 	}
 }

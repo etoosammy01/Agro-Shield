@@ -1,25 +1,22 @@
 package database
 
 import (
+	"backend/internal/config"
 	"database/sql"
 	"fmt"
 	"log"
-	"os"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/joho/godotenv"
 )
 
 // ConnectDB opens the PostgreSQL database configured by DATABASE_URL.
 func ConnectDB() (*sql.DB, error) {
-	_ = godotenv.Load()
-
-	databaseURL := os.Getenv("DATABASE_URL")
-	if databaseURL == "" {
-		return nil, fmt.Errorf("DATABASE_URL is not set")
+	data, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	db, err := sql.Open("pgx", databaseURL)
+	db, err := sql.Open("pgx", data.DatabaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("open PostgreSQL: %w", err)
 	}

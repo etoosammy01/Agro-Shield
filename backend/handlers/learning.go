@@ -20,7 +20,8 @@ func NewLearningHandler(ai *services.AIService) *Learning {
 }
 
 type learningChatRequest struct {
-	Messages []services.AIChatMessage `json:"messages"`
+	FarmingType string                   `json:"farmingType"`
+	Messages    []services.AIChatMessage `json:"messages"`
 }
 
 func (h *Learning) Page(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +59,7 @@ func (h *Learning) Chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	answer, err := h.ai.Learn(request.Messages)
+	answer, err := h.ai.Learn(request.FarmingType, request.Messages)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidLearningChat) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
