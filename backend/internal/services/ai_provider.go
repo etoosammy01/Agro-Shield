@@ -24,8 +24,10 @@ type DiagnosisResult struct {
 	Result string
 }
 
-// backend/internal/services/ai_provider.go
-type AIProvider interface {
-    Analyze(request AIRequest) (*DiagnosisResult, error)
-    Learn(farmingType string, messages []AIChatMessage) (string, error)
+type DiagnosisProvider interface {
+	Analyze(request AIRequest) (*DiagnosisResult, error)
+}
+
+type LearningProvider interface {
+	Learn(farmingType string, messages []AIChatMessage) (string, error)
 }

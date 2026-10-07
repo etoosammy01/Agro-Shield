@@ -65,8 +65,8 @@ func NewContainer(
 	conversationRepo *repository.ConversationRepository,
 	memberRepo *repository.ConversationMemberRepository,
 	chatMessageRepo *repository.ChatMessageRepository,
-
-	aiProvider services.AIProvider,
+	diagnosisProvider services.DiagnosisProvider,
+	learningProvider services.LearningProvider,
 
 	// ========================================================
 	// PAYMENTS          ← added
@@ -197,7 +197,8 @@ func NewContainer(
 
 		AI: services.NewAIService(
 			diagnosisRepo,
-			aiProvider,
+			diagnosisProvider,
+			learningProvider,
 			marketEventRepo,
 		),
 

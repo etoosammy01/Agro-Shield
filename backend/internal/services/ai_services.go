@@ -25,9 +25,10 @@ var learningFarmingTypes = []string{
 }
 
 type AIService struct {
-	repo      *repository.DiagnosisRepository
-	provider  AIProvider
-	eventRepo *repository.MarketEventRepository
+	repo              *repository.DiagnosisRepository
+	diagnosisProvider DiagnosisProvider
+	learningProvider  LearningProvider
+	eventRepo         *repository.MarketEventRepository
 }
 
 func (s *AIService) DeleteDiagnosis(farmerID, diagnosisID int) error {
@@ -36,13 +37,15 @@ func (s *AIService) DeleteDiagnosis(farmerID, diagnosisID int) error {
 
 func NewAIService(
 	repo *repository.DiagnosisRepository,
-	provider AIProvider,
+	diagnosisProvider DiagnosisProvider,
+	learningProvider LearningProvider,
 	eventRepo *repository.MarketEventRepository,
 ) *AIService {
 	return &AIService{
-		repo:      repo,
-		provider:  provider,
-		eventRepo: eventRepo,
+		repo:              repo,
+		diagnosisProvider: diagnosisProvider,
+		learningProvider:  learningProvider,
+		eventRepo:         eventRepo,
 	}
 }
 
@@ -62,7 +65,7 @@ func (s *AIService) Diagnose(
 	aiStart := time.Now()
 	log.Println("⏱️ AI analysis started")
 
-	aiResult, err := s.provider.Analyze(request)
+	aiResult, err := s.diagnosisProvider.Analyze(request)
 
 	log.Printf("⏱️ AI analysis took: %v", time.Since(aiStart))
 
@@ -126,7 +129,7 @@ func (s *AIService) Learn(farmingType string, messages []AIChatMessage) (string,
 		}
 	}
 
-	return s.provider.Learn(farmingType, messages)
+	return s.learningProvider.Learn(farmingType, messages)
 }
 
 func (s *AIService) LearningCategories() []string {

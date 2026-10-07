@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -26,8 +27,32 @@ import (
 // The selected farming type is then used to guide the AI.
 // ============================================================
 
+type GeminiLearningProvider struct {
+	client *genai.Client
+	model  string
+}
+
+func NewGeminiLearningProvider(apiKey string) (*GeminiLearningProvider, error) {
+	client, err := newGeminiClient(apiKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return &GeminiLearningProvider{
+		client: client,
+		model:  getEnvOrDefault("GEMINI_LEARNING_MODEL", "gemini-3.5-flash"),
+	}, nil
+}
+
+func getEnvOrDefault(key, fallback string) string {
+	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+		return value
+	}
+	return fallback
+}
+
 // Learn handles the learning conversation.
-func (p *GeminiProvider) Learn(
+func (p *GeminiLearningProvider) Learn(
 	farmingType string,
 	messages []AIChatMessage,
 ) (string, error) {
@@ -223,7 +248,7 @@ Keep the response under 400 words.
 				},
 			},
 		},
-		MaxOutputTokens: 350,
+		MaxOutputTokens: 500,
 	}
 
 	// ========================================================
@@ -232,7 +257,7 @@ Keep the response under 400 words.
 
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
-		35*time.Second,
+		60*time.Second,
 	)
 	defer cancel()
 
@@ -240,14 +265,9 @@ Keep the response under 400 words.
 	// 7. ASK GEMINI
 	// ========================================================
 
-	modelName := strings.TrimSpace(p.learningModel)
-	if modelName == "" {
-		modelName = strings.TrimSpace(p.model)
-	}
-
 	result, err := p.client.Models.GenerateContent(
 		ctx,
-		modelName,
+		p.model,
 		contents,
 		config,
 	)

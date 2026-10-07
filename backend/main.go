@@ -105,10 +105,15 @@ func main() {
 	feedbackRepo := repository.NewFeedbackRepository(db)
 
 	// ============================================================
-	// 4. CREATE AI PROVIDER
+	// 4. CREATE AI PROVIDERS
 	// ============================================================
 
-	aiProvider, err := services.NewGeminiProvider(os.Getenv("GEMINI_API_KEY"))
+	diagnosisProvider, err := services.NewGeminiDiagnosisProvider(os.Getenv("GEMINI_API_KEY"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	learningProvider, err := services.NewGeminiLearningProvider(os.Getenv("GEMINI_API_KEY"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -157,8 +162,9 @@ func main() {
 		conversationMemberRepo,
 		chatMessageRepo,
 
-		// AI provider
-		aiProvider,
+		// AI providers
+		diagnosisProvider,
+		learningProvider,
 
 		// Payments          ← added
 		paymentRepo,

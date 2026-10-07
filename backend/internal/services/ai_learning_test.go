@@ -20,7 +20,7 @@ func (p *learningProviderStub) Learn(farmingType string, _ []AIChatMessage) (str
 
 func TestLearnPassesSelectedFarmingType(t *testing.T) {
 	provider := &learningProviderStub{}
-	service := NewAIService(nil, provider, nil)
+	service := NewAIService(nil, nil, provider, nil)
 	answer, err := service.Learn("  Poultry farming  ", []AIChatMessage{
 		{Role: "user", Content: "How should I prepare a coop?"},
 	})
@@ -36,7 +36,7 @@ func TestLearnPassesSelectedFarmingType(t *testing.T) {
 }
 
 func TestLearnRequiresFarmingType(t *testing.T) {
-	service := NewAIService(nil, &learningProviderStub{}, nil)
+	service := NewAIService(nil, nil, &learningProviderStub{}, nil)
 	_, err := service.Learn(" ", []AIChatMessage{{Role: "user", Content: "Question?"}})
 	if !errors.Is(err, ErrInvalidLearningChat) {
 		t.Fatalf("Learn error = %v, want ErrInvalidLearningChat", err)

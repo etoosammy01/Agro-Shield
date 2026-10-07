@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log"
-	"os"
 	"strings"
 	"time"
 
@@ -16,55 +15,36 @@ import (
 // This struct holds the Gemini client and the model we want to use.
 // ============================================================
 
-type GeminiProvider struct {
-	client        *genai.Client
-	model         string
-	learningModel string
-	learningFallbackModel string
+type GeminiDiagnosisProvider struct {
+	client *genai.Client
+	model  string
 }
 
 // ============================================================
-// 2. CREATE GEMINI PROVIDER
-// This function connects Agro-Shield to Gemini.
+// 2. CREATE GEMINI PROVIDERS
+// These functions connect Agro-Shield to Gemini with separate responsibilities.
 // ============================================================
 
-func NewGeminiProvider(apiKey string) (*GeminiProvider, error) {
-
-	// Check that the Gemini API key was provided.
-
-	// Create the Gemini client.
-	client, err := genai.NewClient(
+func newGeminiClient(apiKey string) (*genai.Client, error) {
+	return genai.NewClient(
 		context.Background(),
 		&genai.ClientConfig{
 			APIKey:  apiKey,
 			Backend: genai.BackendGeminiAPI,
 		},
 	)
+}
 
-	// If Gemini client creation fails, return the error.
+func NewGeminiDiagnosisProvider(apiKey string) (*GeminiDiagnosisProvider, error) {
+	client, err := newGeminiClient(apiKey)
 	if err != nil {
 		return nil, err
 	}
 
-	// Return the Gemini provider Agro-Shield will use.
-	return &GeminiProvider{
+	return &GeminiDiagnosisProvider{
 		client: client,
-
-		// Diagnosis uses a stronger model for multimodal reasoning.
-		model: "gemini-3.8-flash",
-
-		// Learning uses a lighter model, and the learning implementation lives in
-		// gemini_learning_provider.go.
-		learningModel: getEnvOrDefault("GEMINI_LEARNING_MODEL", "gemini-3.8-flash"),
-		learningFallbackModel: getEnvOrDefault("GEMINI_LEARNING_FALLBACK_MODEL", "gemini-2.5-flash"),
+		model:  "gemini-3.5-flash",
 	}, nil
-}
-
-func getEnvOrDefault(key, fallback string) string {
-	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
-		return value
-	}
-	return fallback
 }
 
 // ======================terseerterese4@gmail.com======================================
@@ -78,7 +58,7 @@ func getEnvOrDefault(key, fallback string) string {
 // - Video
 // ============================================================
 
-func (p *GeminiProvider) Analyze(
+func (p *GeminiDiagnosisProvider) Analyze(
 	request AIRequest,
 ) (*DiagnosisResult, error) {
 
