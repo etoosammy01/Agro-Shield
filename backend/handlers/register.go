@@ -51,7 +51,10 @@ func (h *Register) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Bad Request", http.StatusBadRequest)
 			return
 		}
-		location := r.FormValue("location")
+		community := r.FormValue("community")
+		lga := r.FormValue("lga")
+		state := r.FormValue("state")
+		country := r.FormValue("country")
 
 		// Profile photo and bank details are collected on the mandatory
 		// Complete Your Profile step immediately after this, not here —
@@ -62,7 +65,10 @@ func (h *Register) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 			user.Phone,
 			user.Email,
 			user.Password,
-			location,
+			community,
+			lga,
+			state,
+			country,
 			user.Role,
 			"",
 			"", "", "",

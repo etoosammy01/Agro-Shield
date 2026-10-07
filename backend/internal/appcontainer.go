@@ -34,6 +34,7 @@ type Container struct {
 	Notification *services.NotificationService
 	Chat         *services.ChatService
 	Payment      *services.PaymentService // ← added
+	Wallet       *services.WalletService
 	Feedback     *services.FeedbackService
 	MarketEvents *repository.MarketEventRepository
 
@@ -72,8 +73,10 @@ func NewContainer(
 	// ========================================================
 
 	paymentRepo *repository.PaymentRepository,
+	walletRepo *repository.WalletRepository,
 	flutterwaveClient *services.FlutterwaveClient,
 	feedbackRepo *repository.FeedbackRepository,
+	walletAdminIDs []int,
 ) *Container {
 
 	// ========================================================
@@ -137,10 +140,8 @@ func NewContainer(
 	// Flutterwave API.
 	// ========================================================
 
-	paymentService := services.NewPaymentService(
-		paymentRepo,
-		flutterwaveClient,
-	)
+	walletService := services.NewWalletService(walletRepo, farmerRepo, flutterwaveClient, walletAdminIDs)
+	paymentService := services.NewPaymentService(paymentRepo, flutterwaveClient, walletService)
 
 	feedbackService := services.NewFeedbackService(
 		feedbackRepo,
@@ -224,6 +225,7 @@ func NewContainer(
 		// ----------------------------------------------------
 
 		Payment: paymentService,
+		Wallet:  walletService,
 
 		// ----------------------------------------------------
 		// FARMER REPOSITORY

@@ -97,6 +97,7 @@ func main() {
 	// Handles payment and webhook-delivery database operations.
 	// ------------------------------------------------------------
 	paymentRepo := repository.NewPaymentRepository(db)
+	walletRepo := repository.NewWalletRepository(db)
 
 	// ------------------------------------------------------------
 	// FEEDBACK REPOSITORY
@@ -130,6 +131,10 @@ func main() {
 		os.Getenv("FLUTTERWAVE_SECRET_HASH"),
 		os.Getenv("PAYMENT_REDIRECT_URL"),
 	)
+	walletAdminIDs, err := services.ParseWalletAdminIDs(os.Getenv("WALLET_ADMIN_USER_IDS"))
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// ============================================================
 	// 5. CREATE APPLICATION CONTAINER
@@ -157,8 +162,10 @@ func main() {
 
 		// Payments          ← added
 		paymentRepo,
+		walletRepo,
 		flutterwaveClient,
 		feedbackRepo,
+		walletAdminIDs,
 	)
 
 	// ============================================================

@@ -16,20 +16,24 @@ type Profile struct {
 	crop    *services.CropService
 	order   *services.OrderService
 	farmers *repository.FarmerRepository
+	wallet  *services.WalletService
 }
 
-func NewProfileHandler(crop *services.CropService, order *services.OrderService, farmers *repository.FarmerRepository) *Profile {
-	return &Profile{crop: crop, order: order, farmers: farmers}
+func NewProfileHandler(crop *services.CropService, order *services.OrderService, farmers *repository.FarmerRepository, wallet *services.WalletService) *Profile {
+	return &Profile{crop: crop, order: order, farmers: farmers, wallet: wallet}
 }
 
 // ProfilePageData embeds the farmer/buyer so the template can use .FullName,
 // .Phone, .Location, .Role, .CreatedAt directly, plus role-specific data.
 type ProfilePageData struct {
 	*models.Farmer
-	IsOwner   bool
-	Crops     []models.Crop
-	Purchases []models.Order
-	Sales     []models.Order
+	IsOwner       bool
+	IsWalletAdmin bool
+	Error         string
+	Success       string
+	Crops         []models.Crop
+	Purchases     []models.Order
+	Sales         []models.Order
 }
 
 func (h *Profile) ProfileHandler(w http.ResponseWriter, r *http.Request) {
@@ -54,7 +58,11 @@ func (h *Profile) ProfileHandler(w http.ResponseWriter, r *http.Request) {
 		farmer = profile
 	}
 
-	data := ProfilePageData{Farmer: farmer, IsOwner: r.URL.Query().Get("id") == ""}
+	data := ProfilePageData{
+		Farmer: farmer, IsOwner: r.URL.Query().Get("id") == "",
+		Error: r.URL.Query().Get("error"), Success: r.URL.Query().Get("success"),
+	}
+	data.IsWalletAdmin = h.wallet.IsAdmin(farmer.ID)
 
 	if !data.IsOwner {
 		// Public profile: contact details only.

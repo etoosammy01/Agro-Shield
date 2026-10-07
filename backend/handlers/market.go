@@ -15,12 +15,12 @@ import (
 
 type Marketplace struct {
 	crop   *services.CropService
-	order  *services.OrderService
+	wallet *services.WalletService
 	events *repository.MarketEventRepository
 }
 
-func NewMarketplaceHandler(crop *services.CropService, order *services.OrderService, events *repository.MarketEventRepository) *Marketplace {
-	return &Marketplace{crop: crop, order: order, events: events}
+func NewMarketplaceHandler(crop *services.CropService, wallet *services.WalletService, events *repository.MarketEventRepository) *Marketplace {
+	return &Marketplace{crop: crop, wallet: wallet, events: events}
 }
 
 type MarketplacePageData struct {
@@ -58,7 +58,7 @@ func (h *Marketplace) MarketplaceHandler(w http.ResponseWriter, r *http.Request)
 		}
 		cropID, _ := strconv.Atoi(r.FormValue("crop_id"))
 		quantity, _ := strconv.ParseFloat(r.FormValue("quantity"), 64)
-		if err := h.order.PlaceOrder(farmer.ID, cropID, quantity); err != nil {
+		if _, err := h.wallet.PayForOrder(r.Context(), farmer.ID, cropID, quantity); err != nil {
 			h.render(w, farmer.IsBuyer(), farmer.ID, "", err.Error())
 			return
 		}

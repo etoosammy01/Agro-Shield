@@ -17,25 +17,43 @@ func NewFarmerRepository(db *sql.DB) *FarmerRepository {
 }
 
 func (r *FarmerRepository) Create(farmer *models.Farmer) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
 	query := `
 	INSERT INTO farmers
-	(full_name, phone, email, password_hash, location, lga, state, country, role, photo_url, bank_name, account_name, account_number)
-	VALUES ($1, $2, $3, $4, $5, $5, 'Benue', 'Nigeria', $6, $7, $8, $9, $10)
+	(full_name, phone, email, password_hash, location, lga, state, country, role, photo_url, bank_name, bank_code, account_name, account_number)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 	RETURNING id
 	`
-	return r.db.QueryRow(
+	err = tx.QueryRow(
 		query,
 		farmer.FullName,
 		farmer.Phone,
 		farmer.Email,
 		farmer.PasswordHash,
 		farmer.Location,
+		farmer.LGA,
+		farmer.State,
+		farmer.Country,
 		farmer.Role,
 		farmer.PhotoURL,
 		farmer.BankName,
+		farmer.BankCode,
 		farmer.AccountName,
 		farmer.AccountNumber,
 	).Scan(&farmer.ID)
+	if err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(`INSERT INTO wallets (farmer_id) VALUES ($1)`, farmer.ID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (r *FarmerRepository) GetByPhone(phone string) (*models.Farmer, error) {
@@ -47,9 +65,10 @@ func (r *FarmerRepository) GetByPhone(phone string) (*models.Farmer, error) {
 		COALESCE(email, '') AS email,
 		password_hash,
 		location,
-		COALESCE(lga, location), COALESCE(state, ''), COALESCE(country, 'Nigeria'),
+		COALESCE(lga, location), COALESCE(state, ''), COALESCE(country, ''),
 		role,
 		COALESCE(photo_url, '') AS photo_url,
+		COALESCE(bank_name, ''), COALESCE(bank_code, ''), COALESCE(account_name, ''), COALESCE(account_number, ''),
 		created_at,
 		updated_at
 	FROM farmers
@@ -66,6 +85,7 @@ func (r *FarmerRepository) GetByPhone(phone string) (*models.Farmer, error) {
 		&farmer.LGA, &farmer.State, &farmer.Country,
 		&farmer.Role,
 		&farmer.PhotoURL,
+		&farmer.BankName, &farmer.BankCode, &farmer.AccountName, &farmer.AccountNumber,
 		&farmer.CreatedAt,
 		&farmer.UpdatedAt,
 	)
@@ -87,9 +107,10 @@ func (r *FarmerRepository) GetByID(id int) (*models.Farmer, error) {
 		COALESCE(email, '') AS email,
 		password_hash,
 		location,
-		COALESCE(lga, location), COALESCE(state, ''), COALESCE(country, 'Nigeria'),
+		COALESCE(lga, location), COALESCE(state, ''), COALESCE(country, ''),
 		role,
 		COALESCE(photo_url, '') AS photo_url,
+		COALESCE(bank_name, ''), COALESCE(bank_code, ''), COALESCE(account_name, ''), COALESCE(account_number, ''),
 		created_at,
 		updated_at
 	FROM farmers
@@ -106,6 +127,7 @@ func (r *FarmerRepository) GetByID(id int) (*models.Farmer, error) {
 		&farmer.LGA, &farmer.State, &farmer.Country,
 		&farmer.Role,
 		&farmer.PhotoURL,
+		&farmer.BankName, &farmer.BankCode, &farmer.AccountName, &farmer.AccountNumber,
 		&farmer.CreatedAt,
 		&farmer.UpdatedAt,
 	)
@@ -122,8 +144,9 @@ func (r *FarmerRepository) GetByID(id int) (*models.Farmer, error) {
 func (r *FarmerRepository) ListForChat(excludeID int, search string) ([]models.Farmer, error) {
 	rows, err := r.db.Query(`
 		SELECT id, full_name, phone, COALESCE(email, ''), password_hash,
-			location, COALESCE(lga, location), COALESCE(state, ''), COALESCE(country, 'Nigeria'),
-			role, COALESCE(photo_url, ''), created_at, updated_at
+			location, COALESCE(lga, location), COALESCE(state, ''), COALESCE(country, ''),
+			role, COALESCE(photo_url, ''), COALESCE(bank_name, ''), COALESCE(bank_code, ''),
+			COALESCE(account_name, ''), COALESCE(account_number, ''), created_at, updated_at
 		FROM farmers
 		WHERE id <> $1 AND ($2 = '' OR full_name ILIKE '%' || $2 || '%' OR role ILIKE '%' || $2 || '%' OR location ILIKE '%' || $2 || '%')
 		ORDER BY full_name ASC`, excludeID, strings.TrimSpace(search))
@@ -134,7 +157,7 @@ func (r *FarmerRepository) ListForChat(excludeID int, search string) ([]models.F
 	var users []models.Farmer
 	for rows.Next() {
 		var user models.Farmer
-		if err := rows.Scan(&user.ID, &user.FullName, &user.Phone, &user.Email, &user.PasswordHash, &user.Location, &user.LGA, &user.State, &user.Country, &user.Role, &user.PhotoURL, &user.CreatedAt, &user.UpdatedAt); err != nil {
+		if err := rows.Scan(&user.ID, &user.FullName, &user.Phone, &user.Email, &user.PasswordHash, &user.Location, &user.LGA, &user.State, &user.Country, &user.Role, &user.PhotoURL, &user.BankName, &user.BankCode, &user.AccountName, &user.AccountNumber, &user.CreatedAt, &user.UpdatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, user)
@@ -143,13 +166,13 @@ func (r *FarmerRepository) ListForChat(excludeID int, search string) ([]models.F
 }
 
 // UpdateProfile updates the editable personal details.
-func (r *FarmerRepository) UpdateProfile(id int, fullName, phone, email, location string) error {
+func (r *FarmerRepository) UpdateProfile(id int, fullName, phone, email, community, lga, state, country string) error {
 	query := `
 	UPDATE farmers
-	SET full_name = $1, phone = $2, email = $3, location = $4, updated_at = CURRENT_TIMESTAMP
-	WHERE id = $5
+	SET full_name = $1, phone = $2, email = $3, location = $4, lga = $5, state = $6, country = $7, updated_at = CURRENT_TIMESTAMP
+	WHERE id = $8
 	`
-	_, err := r.db.Exec(query, fullName, phone, email, location, id)
+	_, err := r.db.Exec(query, fullName, phone, email, community, lga, state, country, id)
 	return err
 }
 
@@ -166,10 +189,10 @@ func (r *FarmerRepository) UpdatePhoto(id int, photoURL string) error {
 // UpdateBankDetails sets a farmer's payout bank details. Any field may be
 // blank — payout details are optional and can be added or edited later from
 // the profile page.
-func (r *FarmerRepository) UpdateBankDetails(id int, bankName, accountName, accountNumber string) error {
+func (r *FarmerRepository) UpdateBankDetails(id int, bankName, bankCode, accountName, accountNumber string) error {
 	_, err := r.db.Exec(
-		`UPDATE farmers SET bank_name = $1, account_name = $2, account_number = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4`,
-		bankName, accountName, accountNumber, id,
+		`UPDATE farmers SET bank_name = $1, bank_code = $2, account_name = $3, account_number = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5`,
+		bankName, bankCode, accountName, accountNumber, id,
 	)
 	return err
 }

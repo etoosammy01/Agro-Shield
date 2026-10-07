@@ -37,6 +37,9 @@ func (s *CropService) AddCrop(
 	name string,
 	unit string,
 	location string,
+	lga string,
+	state string,
+	country string,
 	quantity float64,
 	price float64,
 	listForSale bool,
@@ -105,6 +108,9 @@ func (s *CropService) AddCrop(
 		Quantity:         quantity,
 		Unit:             unit,
 		Location:         location,
+		LGA:              strings.TrimSpace(lga),
+		State:            strings.TrimSpace(state),
+		Country:          strings.TrimSpace(country),
 		PricePerUnit:     price,
 		ListedForSale:    listForSale,
 		ImageURL:         validImages[0],
@@ -178,6 +184,9 @@ func (s *CropService) UpdateCrop(
 	name string,
 	unit string,
 	location string,
+	lga string,
+	state string,
+	country string,
 	quantity float64,
 	price float64,
 	listForSale bool,
@@ -246,6 +255,9 @@ func (s *CropService) UpdateCrop(
 	crop.Name = name
 	crop.Unit = unit
 	crop.Location = location
+	crop.LGA = strings.TrimSpace(lga)
+	crop.State = strings.TrimSpace(state)
+	crop.Country = strings.TrimSpace(country)
 	crop.Quantity = quantity
 	crop.PricePerUnit = price
 	crop.ListedForSale = listForSale

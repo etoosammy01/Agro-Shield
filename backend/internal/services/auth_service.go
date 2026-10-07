@@ -34,7 +34,7 @@ func NewAuthService(repo *repository.FarmerRepository) *AuthService {
 // they're collected on the mandatory Complete Your Profile step that
 // follows registration. If no photo is supplied, the account is created
 // with DefaultPhotoURL until a real one is uploaded.
-func (s *AuthService) Register(firstName, lastName, phone, email, password, location, role, photoURL, bankName, accountName, accountNumber string) (*models.Farmer, error) {
+func (s *AuthService) Register(firstName, lastName, phone, email, password, community, lga, state, country, role, photoURL, bankName, accountName, accountNumber string) (*models.Farmer, error) {
 
 	if firstName == "" || lastName == "" {
 		return nil, errors.New("name is required")
@@ -44,6 +44,9 @@ func (s *AuthService) Register(firstName, lastName, phone, email, password, loca
 	}
 	if password == "" {
 		return nil, errors.New("password is required")
+	}
+	if strings.TrimSpace(community) == "" || strings.TrimSpace(lga) == "" || strings.TrimSpace(state) == "" || strings.TrimSpace(country) == "" {
+		return nil, errors.New("community, LGA, state, and country are required")
 	}
 	if len(password) < 8 {
 		return nil, errors.New("password must be at least 8 characters")
@@ -74,7 +77,10 @@ func (s *AuthService) Register(firstName, lastName, phone, email, password, loca
 		Phone:        phone,
 		Email:        email,
 		PasswordHash: string(hash),
-		Location:     location,
+		Location:     strings.TrimSpace(community),
+		LGA:          strings.TrimSpace(lga),
+		State:        strings.TrimSpace(state),
+		Country:      strings.TrimSpace(country),
 		Role:         role,
 		PhotoURL:     photoURL,
 
@@ -128,21 +134,24 @@ func (s *AuthService) GetFarmerByID(id int) (*models.Farmer, error) {
 }
 
 // UpdateProfile edits a user's name, phone and location.
-func (s *AuthService) UpdateProfile(id int, fullName, phone, email, location string) error {
+func (s *AuthService) UpdateProfile(id int, fullName, phone, email, community, lga, state, country string) error {
 	fullName = strings.TrimSpace(fullName)
 	phone = strings.TrimSpace(phone)
 	email = strings.TrimSpace(email)
-	location = strings.TrimSpace(location)
+	community = strings.TrimSpace(community)
+	lga = strings.TrimSpace(lga)
+	state = strings.TrimSpace(state)
+	country = strings.TrimSpace(country)
 	if fullName == "" {
 		return errors.New("full name is required")
 	}
 	if phone == "" {
 		return errors.New("phone is required")
 	}
-	if location == "" {
-		return errors.New("location is required")
+	if community == "" || lga == "" || state == "" || country == "" {
+		return errors.New("community, LGA, state, and country are required")
 	}
-	return s.repo.UpdateProfile(id, fullName, phone, email, location)
+	return s.repo.UpdateProfile(id, fullName, phone, email, community, lga, state, country)
 }
 
 // UpdatePhoto sets the user's passport photograph.
@@ -157,8 +166,20 @@ func (s *AuthService) UpdatePhoto(id int, photoURL string) error {
 // UpdateBankDetails sets a farmer's payout bank details. Any field may be
 // blank — payout details are optional and can be completed later from the
 // profile page.
-func (s *AuthService) UpdateBankDetails(id int, bankName, accountName, accountNumber string) error {
-	return s.repo.UpdateBankDetails(id, bankName, accountName, accountNumber)
+func (s *AuthService) UpdateBankDetails(id int, bankName, bankCode, accountName, accountNumber string) error {
+	bankName = strings.TrimSpace(bankName)
+	bankCode = strings.TrimSpace(bankCode)
+	accountName = strings.TrimSpace(accountName)
+	accountNumber = strings.TrimSpace(accountNumber)
+	if bankName == "" || bankCode == "" || accountName == "" || len(accountNumber) != 10 {
+		return errors.New("complete Nigerian bank payout details are required")
+	}
+	for _, value := range bankCode + accountNumber {
+		if value < '0' || value > '9' {
+			return errors.New("bank code and account number must contain digits only")
+		}
+	}
+	return s.repo.UpdateBankDetails(id, bankName, bankCode, accountName, accountNumber)
 }
 
 // ResetPassword changes a user's password.

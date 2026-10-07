@@ -1,0 +1,70 @@
+{{define "wallet-admin.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Wallet Withdrawal Approvals — Agro-Shield</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/wallet.css">
+</head>
+<body class="wallet-body">
+    <header class="navbar">
+        <a class="logo" href="/dashboard"><img src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield"></a>
+        <nav aria-label="Main navigation">
+            <a href="/wallet">Wallet</a>
+            <a href="/admin/wallet-withdrawals" aria-current="page">Withdrawal approvals</a>
+            <a href="/profile">Profile</a>
+            <a href="/logout">Logout</a>
+        </nav>
+    </header>
+    <main class="wallet-admin-page">
+        <h1>Wallet withdrawal approvals</h1>
+        {{if .Error}}<p role="alert">{{.Error}}</p>{{end}}
+        {{if .Success}}<p role="status">{{.Success}}</p>{{end}}
+        {{if .Withdrawals}}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>User</th><th>Amount</th><th>Bank account</th><th>Reference</th><th>Status</th><th>Action</th></tr>
+                </thead>
+                <tbody>
+                    {{range .Withdrawals}}
+                    <tr>
+                        <td>{{.FullName}} (#{{.FarmerID}})</td>
+                        <td>{{.Amount}} {{.Currency}}</td>
+                        <td>{{.BankName}} ({{.BankCode}})<br>{{.AccountName}}<br>{{.MaskedAccountNumber}}</td>
+                        <td>{{.Reference}}</td>
+                        <td>{{.Status}}</td>
+                        <td>
+                            {{if eq .Status "pending"}}
+                            <form method="POST" action="/admin/wallet-withdrawals/approve">
+                                <input type="hidden" name="withdrawal_id" value="{{.ID}}">
+                                <button type="submit">Approve &amp; pay</button>
+                            </form>
+                            <form method="POST" action="/admin/wallet-withdrawals/reject">
+                                <input type="hidden" name="withdrawal_id" value="{{.ID}}">
+                                <button type="submit">Reject &amp; refund</button>
+                            </form>
+                            {{else if and (eq .Status "processing") .TransferID.Valid}}
+                            <form method="POST" action="/admin/wallet-withdrawals/reconcile">
+                                <input type="hidden" name="withdrawal_id" value="{{.ID}}">
+                                <button type="submit">Check provider status</button>
+                            </form>
+                            Funds remain reserved until the provider confirms success or failure.
+                            {{else if eq .Status "processing"}}
+                            Check Flutterwave using the reference above. Do not approve again; funds remain reserved.
+                            {{else}}
+                            No action available.
+                            {{end}}
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        {{else}}<p>No withdrawal requests need review.</p>{{end}}
+    </main>
+</body>
+</html>
+{{end}}

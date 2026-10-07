@@ -54,10 +54,6 @@ func (s *DeliveryService) CreateFromOrder(
 		return nil, errors.New("delivery quantity cannot exceed the ordered quantity")
 	}
 
-	if country == "" {
-		country = "Nigeria"
-	}
-
 	delivery := &models.Delivery{
 		OrderID:         orderID,
 		BuyerID:         order.BuyerID,

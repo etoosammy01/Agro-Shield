@@ -1,0 +1,168 @@
+{{define "wallet.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>My Wallet — Agro-Shield</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/wallet.css">
+</head>
+<body class="wallet-body">
+    <header class="navbar">
+        <a class="logo" href="/dashboard"><img src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield"></a>
+        <nav aria-label="Main navigation">
+            <a href="/dashboard">Dashboard</a>
+            <a href="/marketplace">Marketplace</a>
+            <a href="/wallet" aria-current="page">Wallet</a>
+            {{if .IsAdmin}}<a href="/admin/wallet-withdrawals">Withdrawal approvals</a>{{end}}
+            <a href="/profile">Profile</a>
+            <a href="/logout">Logout</a>
+        </nav>
+    </header>
+
+    <main class="wallet-page">
+        <section class="wallet-hero">
+            <div class="wallet-hero-copy">
+                <p class="wallet-eyebrow">Your money, growing with your farm</p>
+                <h1>Your wallet</h1>
+                <p>One simple place to add funds, pay for produce, and manage payouts.</p>
+                <div class="wallet-balance">
+                    <span>Available balance</span>
+                    <strong><span class="wallet-currency">₦</span>{{.Wallet.Balance}}</strong>
+                    <small>{{.Wallet.Currency}} · ready to use</small>
+                </div>
+            </div>
+            <div class="wallet-hero-art" aria-hidden="true">
+                <span class="wallet-art-sparkle">✦</span>
+                <span class="wallet-art-leaf">✿</span>
+                <div class="wallet-art-card"><span>AGRO-SHIELD</span><strong>₦ {{.Wallet.Balance}}</strong><small>WALLET · {{.Wallet.Currency}}</small></div>
+                <span class="wallet-art-dot"></span>
+            </div>
+        </section>
+
+        {{if .Error}}<p class="wallet-alert wallet-alert-error" role="alert"><span aria-hidden="true">!</span>{{.Error}}</p>{{end}}
+        {{if .Success}}<p class="wallet-alert wallet-alert-success" role="status"><span aria-hidden="true">✓</span>{{.Success}}</p>{{end}}
+        <p class="wallet-alert wallet-alert-info" id="connection-status" role="status" aria-live="polite" hidden></p>
+
+        <section class="wallet-actions" aria-label="Wallet actions">
+            <article class="wallet-card wallet-action-card wallet-deposit-card">
+                <div class="wallet-card-icon" aria-hidden="true">↗</div>
+                <p class="wallet-card-kicker">Add funds</p>
+                <h2>Top up your wallet</h2>
+                <p>Make a secure deposit. We’ll add the money after the payment provider confirms it.</p>
+                <form method="POST" action="/wallet/deposit">
+                    <label class="wallet-label" for="deposit-amount">How much would you like to add?</label>
+                    <div class="wallet-input-wrap"><span>₦</span><input id="deposit-amount" name="amount" type="number" min="0.01" step="0.01" placeholder="5,000.00" required></div>
+                    <button class="wallet-button wallet-button-primary" type="submit">Continue to secure deposit <span aria-hidden="true">→</span></button>
+                </form>
+                <p class="wallet-footnote"><span aria-hidden="true">🔒</span> Payments are securely handled by Flutterwave.</p>
+            </article>
+
+            <article class="wallet-card wallet-action-card">
+                <div class="wallet-card-icon wallet-icon-pink" aria-hidden="true">♡</div>
+                <p class="wallet-card-kicker">Your payout details</p>
+                <h2>Bank account</h2>
+                <p>Save the account where you’d like approved withdrawals to land.</p>
+                <form method="POST" action="/wallet/bank">
+                    <label class="wallet-label" for="bank-name">Choose your bank</label>
+                    <select id="bank-name" name="bank_name" data-selected="{{.BankName}}" data-selected-code="{{.BankCode}}" required>
+                        <option value="">Loading supported banks…</option>
+                    </select>
+                    <input id="bank-code" name="bank_code" type="hidden" value="{{.BankCode}}">
+                    <p class="wallet-inline-status" id="bank-status" role="status" aria-live="polite"></p>
+                    <label class="wallet-label" for="account-name">Account name</label>
+                    <input id="account-name" name="account_name" value="{{.AccountName}}" placeholder="Name on your account" required>
+                    <label class="wallet-label" for="account-number">Account number</label>
+                    <input id="account-number" name="account_number" value="{{.AccountNumber}}" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" placeholder="10 digits" required>
+                    <button class="wallet-button wallet-button-secondary" type="submit">Save payout details</button>
+                </form>
+            </article>
+
+            <article class="wallet-card wallet-action-card wallet-withdraw-card">
+                <div class="wallet-card-icon wallet-icon-gold" aria-hidden="true">↓</div>
+                <p class="wallet-card-kicker">Cash out</p>
+                <h2>Request a withdrawal</h2>
+                <p>Choose an amount to send to your saved bank account. Requests need admin approval.</p>
+                <form method="POST" action="/wallet/withdraw">
+                    <label class="wallet-label" for="withdrawal-amount">Withdrawal amount</label>
+                    <div class="wallet-input-wrap"><span>₦</span><input id="withdrawal-amount" name="amount" type="number" min="1" step="1" placeholder="10,000" required></div>
+                    <button class="wallet-button wallet-button-secondary" type="submit">Request withdrawal <span aria-hidden="true">→</span></button>
+                </form>
+                <p class="wallet-footnote">Your funds stay safe and reserved while a payout is processing.</p>
+            </article>
+        </section>
+
+        <section class="wallet-history">
+            <div class="wallet-section-heading">
+                <div><p class="wallet-card-kicker">Your money at a glance</p><h2>Recent activity</h2></div>
+                <span class="wallet-history-count">{{len .Transactions}} entries</span>
+            </div>
+            <div class="wallet-history-grid">
+                <article class="wallet-card wallet-history-card">
+                    <h3><span class="wallet-history-icon">↗</span> Deposits</h3>
+                {{if .Deposits}}
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>When</th><th>Amount</th><th>Status</th></tr></thead>
+                        <tbody>
+                            {{range .Deposits}}
+                            <tr>
+                                <td>{{.CreatedAt.Format "02 Jan · 15:04"}}</td>
+                                <td class="wallet-table-amount">₦{{.Amount}}</td>
+                                <td><span class="wallet-status wallet-status-{{.Status}}">{{.Status}}</span></td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                </div>
+                {{else}}<p class="wallet-empty">Your deposit history will show up here.</p>{{end}}
+                </article>
+
+                <article class="wallet-card wallet-history-card">
+                    <h3><span class="wallet-history-icon wallet-history-pink">↓</span> Withdrawals</h3>
+                {{if .Withdrawals}}
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>When</th><th>Amount</th><th>Status</th></tr></thead>
+                        <tbody>
+                            {{range .Withdrawals}}
+                            <tr>
+                                <td>{{.CreatedAt.Format "02 Jan · 15:04"}}</td>
+                                <td class="wallet-table-amount">₦{{.Amount}}</td>
+                                <td><span class="wallet-status wallet-status-{{.Status}}">{{.Status}}</span></td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                </div>
+                {{else}}<p class="wallet-empty">When you request a payout, you can track it here.</p>{{end}}
+                </article>
+
+                <article class="wallet-card wallet-history-card wallet-full-history">
+                    <h3><span class="wallet-history-icon wallet-history-gold">✦</span> Wallet activity</h3>
+                {{if .Transactions}}
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>When</th><th>Activity</th><th>Amount</th><th>Reference</th></tr></thead>
+                        <tbody>
+                            {{range .Transactions}}
+                            <tr>
+                                <td>{{.CreatedAt.Format "02 Jan · 15:04"}}</td>
+                                <td>{{.Type}}</td>
+                                <td class="wallet-table-amount">₦{{.Amount}}</td>
+                                <td>{{.Reference}}</td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                </div>
+                {{else}}<p class="wallet-empty">Every deposit, purchase, and payout will appear here.</p>{{end}}
+                </article>
+            </div>
+        </section>
+    </main>
+    <script src="/static/js/wallet.js"></script>
+</body>
+</html>
+{{end}}

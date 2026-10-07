@@ -71,8 +71,18 @@ func (r *PaymentRepository) UpdateStatus(ctx context.Context, reference, status,
 		SET status = $1, transaction_id = $2, updated_at = $3
 		WHERE reference = $4`
 
-	_, err := r.db.ExecContext(ctx, q, status, sql.NullString{String: transactionID, Valid: transactionID != ""}, time.Now(), reference)
-	return err
+	result, err := r.db.ExecContext(ctx, q, status, sql.NullString{String: transactionID, Valid: transactionID != ""}, time.Now(), reference)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return ErrPaymentNotFound
+	}
+	return nil
 }
 
 // --- Webhook idempotency -------------------------------------------------

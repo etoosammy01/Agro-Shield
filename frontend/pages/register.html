@@ -140,43 +140,27 @@
 
                     <!-- LOCATION -->
                     <div class="form-group">
-
-                        <label for="location">
-                            Location (LGA)
-                        </label>
-
-                        <select name="location" id="location" required>
-
-                            <option value="" disabled selected>
-                                Select your LGA
-                            </option>
-
-                            <option value="Ado">Ado</option>
-                            <option value="Agatu">Agatu</option>
-                            <option value="Apa">Apa</option>
-                            <option value="Buruku">Buruku</option>
-                            <option value="Gboko">Gboko</option>
-                            <option value="Guma">Guma</option>
-                            <option value="Gwer East">Gwer East</option>
-                            <option value="Gwer West">Gwer West</option>
-                            <option value="Katsina-Ala">Katsina-Ala</option>
-                            <option value="Konshisha">Konshisha</option>
-                            <option value="Kwande">Kwande</option>
-                            <option value="Logo">Logo</option>
-                            <option value="Makurdi">Makurdi</option>
-                            <option value="Obi">Obi</option>
-                            <option value="Ogbadibo">Ogbadibo</option>
-                            <option value="Ohimini">Ohimini</option>
-                            <option value="Oju">Oju</option>
-                            <option value="Okpokwu">Okpokwu</option>
-                            <option value="Otukpo">Otukpo</option>
-                            <option value="Tarka">Tarka</option>
-                            <option value="Ukum">Ukum</option>
-                            <option value="Ushongo">Ushongo</option>
-                            <option value="Vandeikya">Vandeikya</option>
-
+                        <label for="community">Community / Village</label>
+                        <input name="community" type="text" id="community" autocomplete="address-level2" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="state-select">State</label>
+                        <select name="state" id="state-select" data-state-select data-selected="" autocomplete="address-level1" required>
+                            <option value="">Choose a country first</option>
                         </select>
-
+                        <input name="state" id="state-text" data-state-text autocomplete="address-level1" required hidden disabled>
+                    </div>
+                    <div class="form-group">
+                        <label for="lga-select">Local Government Area (LGA)</label>
+                        <select name="lga" id="lga-select" data-lga-select autocomplete="address-level3" required disabled>
+                            <option value="">Choose a state first</option>
+                        </select>
+                        <input name="lga" id="lga-text" data-lga-text autocomplete="address-level3" required hidden disabled>
+                    </div>
+                    <div class="form-group">
+                        <label for="country">Country</label>
+                        <input name="country" type="text" id="country" data-country-field value="Nigeria" autocomplete="country-name" required>
+                        <small id="location-directory-status" role="status" aria-live="polite"></small>
                     </div>
 
 
@@ -246,6 +230,7 @@
     </main>
 
 
+    <script src="/static/js/location-fields.js"></script>
     <script src="/static/js/register.js"></script>
 
 </body>

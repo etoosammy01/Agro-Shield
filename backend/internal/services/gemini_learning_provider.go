@@ -223,7 +223,7 @@ Keep the response under 400 words.
 				},
 			},
 		},
-		MaxOutputTokens: 500,
+		MaxOutputTokens: 350,
 	}
 
 	// ========================================================
@@ -232,7 +232,7 @@ Keep the response under 400 words.
 
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
-		60*time.Second,
+		35*time.Second,
 	)
 	defer cancel()
 

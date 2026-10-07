@@ -12,10 +12,11 @@ import (
 
 type OrderHandler struct {
 	orderService *services.OrderService
+	wallet       *services.WalletService
 }
 
-func NewOrderHandler(orderService *services.OrderService) *OrderHandler {
-	return &OrderHandler{orderService: orderService}
+func NewOrderHandler(orderService *services.OrderService, wallet *services.WalletService) *OrderHandler {
+	return &OrderHandler{orderService: orderService, wallet: wallet}
 }
 
 // ============================================================
@@ -116,7 +117,7 @@ func (h *OrderHandler) Place(w http.ResponseWriter, r *http.Request) {
 	cropID, _ := strconv.Atoi(r.FormValue("crop_id"))
 	quantity, _ := strconv.ParseFloat(r.FormValue("quantity"), 64)
 
-	if err := h.orderService.PlaceOrder(farmer.ID, cropID, quantity); err != nil {
+	if _, err := h.wallet.PayForOrder(r.Context(), farmer.ID, cropID, quantity); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

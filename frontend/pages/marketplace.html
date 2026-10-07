@@ -34,6 +34,7 @@
             {{end}}
 
             <a href="/profile">Profile</a>
+            <a href="/wallet">Wallet</a>
             <a href="/notifications">Notifications</a>
             <a href="/logout">Logout</a>
         </nav>
@@ -128,7 +129,7 @@
                     <input type="hidden" name="crop_id" value="{{.ID}}">
                     <input type="number" name="quantity" min="0.01" max="{{.Quantity}}" step="0.01" placeholder="Qty"
                         required>
-                    <button type="submit">Buy</button>
+                    <button type="submit">Pay with wallet</button>
                 </form>
 
                 {{end}}
@@ -320,7 +321,7 @@
                     <form method="POST" action="/marketplace" class="buy-form">
                         <input type="hidden" name="crop_id" value="{{.ID}}">
                         <input type="number" name="quantity" min="0.01" max="{{.Quantity}}" step="0.01" placeholder="Qty" required>
-                        <button type="submit">Buy</button>
+                        <button type="submit">Pay with wallet</button>
                     </form>
 
                 {{end}}

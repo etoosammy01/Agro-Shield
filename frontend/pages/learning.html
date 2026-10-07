@@ -44,12 +44,19 @@
             </div>
 
             <div class="learning-starters" aria-label="Example questions">
-                <button type="button" data-question="How do I start growing vegetables in a small space?">Growing vegetables in a small space</button>
-                <button type="button" data-question="What should I consider before starting poultry farming?">Starting poultry farming</button>
-                <button type="button" data-question="How can I improve the soil on my farm?">Improving farm soil</button>
+                <button type="button" data-category="Crop farming" data-question="How do I start growing vegetables in a small space?">🌱 Growing vegetables</button>
+                <button type="button" data-category="Poultry farming" data-question="What should I consider before starting poultry farming?">🐓 Starting poultry</button>
+                <button type="button" data-category="Crop farming" data-question="How can I improve the soil on my farm?">🌿 Improving my soil</button>
             </div>
 
             <form id="learning-form" class="learning-form">
+                <label for="farming-type">Choose what you want to learn about</label>
+                <select id="farming-type" name="farming_type" required>
+                    <option value="">Select a farming category</option>
+                    {{range .FarmingTypes}}<option value="{{.}}">{{.}}</option>{{end}}
+                    <option value="other">Other</option>
+                </select>
+                <input id="custom-farming-type" type="text" maxlength="80" placeholder="Enter your farming category" hidden disabled>
                 <label for="learning-question">Your question</label>
                 <div class="learning-compose">
                     <textarea id="learning-question" name="question" maxlength="1200" rows="2" placeholder="Ask anything about farming..." required></textarea>

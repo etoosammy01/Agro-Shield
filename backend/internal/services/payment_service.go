@@ -5,7 +5,10 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"backend/internal/models"
 	"backend/internal/repository"
@@ -21,12 +24,13 @@ import (
 // ============================================================
 
 type PaymentService struct {
-	repo *repository.PaymentRepository
-	fw   *FlutterwaveClient
+	repo   *repository.PaymentRepository
+	fw     *FlutterwaveClient
+	wallet *WalletService
 }
 
-func NewPaymentService(repo *repository.PaymentRepository, fw *FlutterwaveClient) *PaymentService {
-	return &PaymentService{repo: repo, fw: fw}
+func NewPaymentService(repo *repository.PaymentRepository, fw *FlutterwaveClient, wallet *WalletService) *PaymentService {
+	return &PaymentService{repo: repo, fw: fw, wallet: wallet}
 }
 
 // --- Initiate --------------------------------------------------------
@@ -94,6 +98,17 @@ func (s *PaymentService) Initiate(ctx context.Context, in InitiatePaymentInput) 
 // Flutterwave has on file for that transaction ID - treat as suspicious.
 var ErrReferenceMismatch = fmt.Errorf("reference mismatch")
 
+func verifiedPaymentStatus(providerStatus string) string {
+	switch strings.ToLower(strings.TrimSpace(providerStatus)) {
+	case "successful":
+		return models.PaymentSuccessful
+	case "failed", "cancelled", "canceled":
+		return models.PaymentFailed
+	default:
+		return models.PaymentPending
+	}
+}
+
 // ConfirmCallback re-verifies a transaction directly with Flutterwave
 // (never trust redirect query params alone - they can be faked) and
 // updates our payment record accordingly. Returns the resulting status.
@@ -107,10 +122,23 @@ func (s *PaymentService) ConfirmCallback(ctx context.Context, transactionID, txR
 		return "", ErrReferenceMismatch
 	}
 
-	status := models.PaymentFailed
-	if verified.Status == "successful" {
-		status = models.PaymentSuccessful
+	if strings.HasPrefix(txRef, "WALLET-") {
+		status := verifiedPaymentStatus(verified.Status)
+		if err := s.wallet.ConfirmDeposit(ctx, txRef, verified.TransactionID, verified.Amount, verified.Currency, verified.Status); err != nil {
+			return "", fmt.Errorf("confirm wallet deposit: %w", err)
+		}
+		return status, nil
 	}
+
+	payment, err := s.repo.GetByReference(ctx, txRef)
+	if err != nil {
+		return "", fmt.Errorf("find payment: %w", err)
+	}
+	if !sameMoney(payment.Amount, verified.Amount) || !strings.EqualFold(payment.Currency, verified.Currency) {
+		return "", errors.New("verified payment amount or currency does not match")
+	}
+
+	status := verifiedPaymentStatus(verified.Status)
 
 	if err := s.repo.UpdateStatus(ctx, txRef, status, transactionID); err != nil {
 		return "", fmt.Errorf("update payment status: %w", err)
@@ -138,13 +166,17 @@ func (s *PaymentService) ProcessWebhook(ctx context.Context, body []byte, receiv
 	var payload struct {
 		Event string `json:"event"`
 		Data  struct {
-			ID     int64  `json:"id"`
-			TxRef  string `json:"tx_ref"`
-			Status string `json:"status"`
+			ID        int64  `json:"id"`
+			TxRef     string `json:"tx_ref"`
+			Reference string `json:"reference"`
+			Status    string `json:"status"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
 		return false, fmt.Errorf("invalid payload: %w", err)
+	}
+	if strings.TrimSpace(payload.Event) == "" || payload.Data.ID <= 0 {
+		return false, errors.New("webhook is missing a valid event or transaction ID")
 	}
 
 	transactionID := fmt.Sprintf("%d", payload.Data.ID)
@@ -164,19 +196,57 @@ func (s *PaymentService) ProcessWebhook(ctx context.Context, body []byte, receiv
 		return true, nil
 	}
 
+	if strings.HasPrefix(strings.ToLower(payload.Event), "transfer.") {
+		terminal, err := s.wallet.ProcessTransferWebhook(ctx, body, receivedHash)
+		if err != nil {
+			return false, fmt.Errorf("process wallet transfer webhook: %w", err)
+		}
+		if !terminal {
+			return false, nil
+		}
+		if err := s.repo.MarkWebhookProcessed(ctx, transactionID, payload.Event); err != nil {
+			return false, fmt.Errorf("mark transfer webhook processed: %w", err)
+		}
+		return false, nil
+	}
+
 	// Re-verify with Flutterwave directly rather than trusting payload.Data.Status.
 	verified, err := s.fw.VerifyTransaction(transactionID)
 	if err != nil {
 		return false, fmt.Errorf("verify transaction: %w", err)
 	}
 
-	status := models.PaymentFailed
-	if verified.Status == "successful" {
-		status = models.PaymentSuccessful
+	if strings.HasPrefix(verified.TxRef, "WALLET-") {
+		if payload.Data.TxRef != verified.TxRef {
+			return false, ErrReferenceMismatch
+		}
+		if err := s.wallet.ConfirmDeposit(ctx, verified.TxRef, verified.TransactionID, verified.Amount, verified.Currency, verified.Status); err != nil {
+			return false, fmt.Errorf("confirm wallet deposit: %w", err)
+		}
+		if verifiedPaymentStatus(verified.Status) == models.PaymentPending {
+			return false, nil
+		}
+		if err := s.repo.MarkWebhookProcessed(ctx, transactionID, payload.Event); err != nil {
+			return false, fmt.Errorf("mark wallet deposit webhook processed: %w", err)
+		}
+		return false, nil
 	}
+
+	payment, err := s.repo.GetByReference(ctx, verified.TxRef)
+	if err != nil {
+		return false, fmt.Errorf("find payment: %w", err)
+	}
+	if payload.Data.TxRef != verified.TxRef || !sameMoney(payment.Amount, verified.Amount) || !strings.EqualFold(payment.Currency, verified.Currency) {
+		return false, errors.New("verified payment details do not match the recorded payment")
+	}
+
+	status := verifiedPaymentStatus(verified.Status)
 
 	if err := s.repo.UpdateStatus(ctx, verified.TxRef, status, transactionID); err != nil {
 		return false, fmt.Errorf("update payment status: %w", err)
+	}
+	if status == models.PaymentPending {
+		return false, nil
 	}
 
 	// TODO: once order-status transitions are wired up, also mark the
@@ -190,4 +260,9 @@ func (s *PaymentService) ProcessWebhook(ctx context.Context, body []byte, receiv
 	}
 
 	return false, nil
+}
+
+func sameMoney(expected string, verified float64) bool {
+	expectedAmount, err := strconv.ParseFloat(expected, 64)
+	return err == nil && strconv.FormatFloat(expectedAmount, 'f', 2, 64) == strconv.FormatFloat(verified, 'f', 2, 64)
 }

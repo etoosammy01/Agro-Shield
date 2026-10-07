@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ type GeminiProvider struct {
 	client        *genai.Client
 	model         string
 	learningModel string
+	learningFallbackModel string
 }
 
 // ============================================================
@@ -29,9 +31,6 @@ type GeminiProvider struct {
 func NewGeminiProvider(apiKey string) (*GeminiProvider, error) {
 
 	// Check that the Gemini API key was provided.
-	if apiKey == "" {
-		return nil, errors.New("gemini API key is missing")
-	}
 
 	// Create the Gemini client.
 	client, err := genai.NewClient(
@@ -56,8 +55,16 @@ func NewGeminiProvider(apiKey string) (*GeminiProvider, error) {
 
 		// Learning uses a lighter model, and the learning implementation lives in
 		// gemini_learning_provider.go.
-		learningModel: "gemini-3.8-flash",
+		learningModel: getEnvOrDefault("GEMINI_LEARNING_MODEL", "gemini-3.8-flash"),
+		learningFallbackModel: getEnvOrDefault("GEMINI_LEARNING_FALLBACK_MODEL", "gemini-2.5-flash"),
 	}, nil
+}
+
+func getEnvOrDefault(key, fallback string) string {
+	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+		return value
+	}
+	return fallback
 }
 
 // ======================terseerterese4@gmail.com======================================

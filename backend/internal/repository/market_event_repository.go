@@ -312,11 +312,15 @@ func (r *MarketEventRepository) RecordPrice(cropID int, price float64, unit, sou
 }
 
 // RecordExternalPrice stores a verified external observation with provenance.
-func (r *MarketEventRepository) RecordExternalPrice(produce string, price float64, unit, provider, market, lga, state, sourceURL string, collectedAt time.Time) error {
+func (r *MarketEventRepository) RecordExternalPrice(produce string, price float64, unit, provider, market, lga, state, country, sourceURL string, collectedAt time.Time) error {
 	if err := validateExternalPrice(produce, price, unit, provider, market, collectedAt); err != nil {
 		return err
 	}
-	_, err := r.db.Exec(`INSERT INTO external_market_prices (produce_type,price_per_unit,unit,provider,market_name,lga,state,collected_at,source_url) VALUES ($1,$2,$3,$4,$5,NULLIF($6,''),NULLIF($7,''),$8,NULLIF($9,''))`, strings.TrimSpace(produce), price, unit, provider, market, strings.TrimSpace(lga), strings.TrimSpace(state), collectedAt, strings.TrimSpace(sourceURL))
+	country = strings.TrimSpace(country)
+	if country == "" {
+		return fmt.Errorf("country is required")
+	}
+	_, err := r.db.Exec(`INSERT INTO external_market_prices (produce_type,price_per_unit,unit,provider,market_name,lga,state,country,collected_at,source_url) VALUES ($1,$2,$3,$4,$5,NULLIF($6,''),NULLIF($7,''),$8,$9,NULLIF($10,''))`, strings.TrimSpace(produce), price, unit, provider, market, strings.TrimSpace(lga), strings.TrimSpace(state), country, collectedAt, strings.TrimSpace(sourceURL))
 	return err
 }
 

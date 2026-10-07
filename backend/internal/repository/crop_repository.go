@@ -69,12 +69,12 @@ func (r *CropRepository) Create(crop *models.Crop) error {
 			$6::double precision,
 			$7::boolean,
 			$8::text,
-			$5::text,
-			'Benue'::text,
-			'Nigeria'::text,
-			$9::double precision,
-			$10::double precision,
-			$11::double precision,
+			$9::text,
+			$10::text,
+			$11::text,
+			$12::double precision,
+			$13::double precision,
+			$14::double precision,
 			CASE
 				WHEN $7::boolean = TRUE
 				THEN $3::double precision
@@ -99,6 +99,9 @@ func (r *CropRepository) Create(crop *models.Crop) error {
 		crop.PricePerUnit,
 		crop.ListedForSale,
 		crop.ImageURL,
+		crop.LGA,
+		crop.State,
+		crop.Country,
 		crop.Latitude,
 		crop.Longitude,
 		crop.LocationAccuracy,
@@ -380,9 +383,9 @@ func (r *CropRepository) Update(
 			price_per_unit = $5::double precision,
 			listed_for_sale = $6::boolean,
 			image_url = $7::text,
-			lga = $4::text,
-			state = 'Benue'::text,
-			country = 'Nigeria'::text,
+			lga = $13::text,
+			state = $14::text,
+			country = $15::text,
 			latitude = $10::double precision,
 			longitude = $11::double precision,
 			location_accuracy = $12::double precision,
@@ -405,6 +408,9 @@ func (r *CropRepository) Update(
 		crop.Latitude,
 		crop.Longitude,
 		crop.LocationAccuracy,
+		crop.LGA,
+		crop.State,
+		crop.Country,
 	)
 
 	if err != nil {

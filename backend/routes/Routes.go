@@ -56,6 +56,16 @@ func RegisterRoutes(container *app.Container) {
 		),
 	)
 
+	locationDirectory := handlers.NewLocationDirectory(services.NewNigeriaLocationService())
+	http.HandleFunc("/locations/nigeria/states", middleware.OnlyPath(
+		"/locations/nigeria/states",
+		locationDirectory.States,
+	))
+	http.HandleFunc("/locations/nigeria/lgas", middleware.OnlyPath(
+		"/locations/nigeria/lgas",
+		locationDirectory.LGAs,
+	))
+
 	// ========================================================
 	// AUTHENTICATION
 	// ========================================================
@@ -164,6 +174,7 @@ func RegisterRoutes(container *app.Container) {
 		container.Crop,
 		container.Order,
 		container.FarmerRepo,
+		container.Wallet,
 	)
 
 	http.HandleFunc(
@@ -219,11 +230,7 @@ func RegisterRoutes(container *app.Container) {
 	// MARKETPLACE
 	// ========================================================
 
-	marketplaceHandler := handlers.NewMarketplaceHandler(
-		container.Crop,
-		container.Order,
-		container.MarketEvents,
-	)
+	marketplaceHandler := handlers.NewMarketplaceHandler(container.Crop, container.Wallet, container.MarketEvents)
 
 	http.HandleFunc(
 		"/marketplace",
@@ -267,15 +274,15 @@ func RegisterRoutes(container *app.Container) {
 	)
 
 	http.HandleFunc(
-	"/feedback/rating",
-	middleware.OnlyPath(
 		"/feedback/rating",
-		middleware.RequireAuth(
-			container.FarmerRepo,
-			feedbackHandler.GetFarmerRating,
+		middleware.OnlyPath(
+			"/feedback/rating",
+			middleware.RequireAuth(
+				container.FarmerRepo,
+				feedbackHandler.GetFarmerRating,
+			),
 		),
-	),
-)
+	)
 
 	// ========================================================
 	// PRODUCT DETAILS
@@ -687,7 +694,7 @@ func RegisterRoutes(container *app.Container) {
 	// ORDERS
 	// ========================================================
 
-	orderHandler := handlers.NewOrderHandler(container.Order)
+	orderHandler := handlers.NewOrderHandler(container.Order, container.Wallet)
 
 	// Order list (buyer purchases / farmer sales)
 	// GET /orders
@@ -858,6 +865,44 @@ func RegisterRoutes(container *app.Container) {
 	paymentHandler := handlers.NewPaymentHandler(
 		container.Payment,
 	)
+	walletHandler := handlers.NewWalletHandler(container.Wallet)
+
+	http.HandleFunc("/wallet", middleware.OnlyPath(
+		"/wallet",
+		middleware.OnlyGet(middleware.RequireAuth(container.FarmerRepo, walletHandler.Page)),
+	))
+	http.HandleFunc("/wallet/deposit", middleware.OnlyPath(
+		"/wallet/deposit",
+		middleware.RequireAuth(container.FarmerRepo, walletHandler.Deposit),
+	))
+	http.HandleFunc("/wallet/withdraw", middleware.OnlyPath(
+		"/wallet/withdraw",
+		middleware.RequireAuth(container.FarmerRepo, walletHandler.Withdraw),
+	))
+	http.HandleFunc("/wallet/bank", middleware.OnlyPath(
+		"/wallet/bank",
+		middleware.RequireAuth(container.FarmerRepo, walletHandler.SaveBankDetails),
+	))
+	http.HandleFunc("/wallet/banks", middleware.OnlyPath(
+		"/wallet/banks",
+		middleware.RequireAuth(container.FarmerRepo, walletHandler.Banks),
+	))
+	http.HandleFunc("/admin/wallet-withdrawals", middleware.OnlyPath(
+		"/admin/wallet-withdrawals",
+		middleware.OnlyGet(middleware.RequireAuth(container.FarmerRepo, walletHandler.AdminPage)),
+	))
+	http.HandleFunc("/admin/wallet-withdrawals/approve", middleware.OnlyPath(
+		"/admin/wallet-withdrawals/approve",
+		middleware.RequireAuth(container.FarmerRepo, walletHandler.ApproveWithdrawal),
+	))
+	http.HandleFunc("/admin/wallet-withdrawals/reject", middleware.OnlyPath(
+		"/admin/wallet-withdrawals/reject",
+		middleware.RequireAuth(container.FarmerRepo, walletHandler.RejectWithdrawal),
+	))
+	http.HandleFunc("/admin/wallet-withdrawals/reconcile", middleware.OnlyPath(
+		"/admin/wallet-withdrawals/reconcile",
+		middleware.RequireAuth(container.FarmerRepo, walletHandler.ReconcileWithdrawal),
+	))
 
 	// Initiate a payment for an order - requires the buyer to
 	// be logged in.

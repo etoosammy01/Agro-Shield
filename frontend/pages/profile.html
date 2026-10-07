@@ -34,6 +34,8 @@
             <a href="/ai-assistant">AI Assistant</a>
             {{end}}
             <a href="/cart">Cart</a>
+            <a href="/wallet">Wallet</a>
+            {{if .IsWalletAdmin}}<a href="/admin/wallet-withdrawals">Withdrawal approvals</a>{{end}}
             <a href="/notifications">Notifications</a>
             <a href="/profile" aria-current="page">Profile</a>
             <a href="/logout">Logout</a>
@@ -42,6 +44,8 @@
     </header>
 
     <main class="profile">
+        {{if .Error}}<p role="alert">{{.Error}}</p>{{end}}
+        {{if .Success}}<p role="status">{{.Success}}</p>{{end}}
 
         <div class="profile-header">
 
@@ -62,7 +66,7 @@
 
                 <h1>{{.FullName}}</h1>
 
-                <p>{{if .IsBuyer}}Buyer{{else}}Farmer{{end}} • {{.Location}}</p>
+                <p>{{if .IsBuyer}}Buyer{{else}}Farmer{{end}} • {{if .IsOwner}}{{.Location}}, {{end}}{{.LGA}}, {{.State}}, {{.Country}}</p>
 
                 {{if .IsOwner}}<button type="button" id="edit-profile-btn">Edit Profile</button>{{end}}
 
@@ -79,7 +83,10 @@
                 <p><strong>Full Name:</strong> {{.FullName}}</p>
                 <p><strong>Phone:</strong> {{.Phone}}</p>
                 <p><strong>Email:</strong> {{.Email}}</p>
-                <p><strong>Location:</strong> {{.Location}}</p>
+                {{if .IsOwner}}<p><strong>Community / Village:</strong> {{.Location}}</p>{{end}}
+                <p><strong>Local Government Area:</strong> {{.LGA}}</p>
+                <p><strong>State:</strong> {{.State}}</p>
+                <p><strong>Country:</strong> {{.Country}}</p>
                 <p><strong>Account Type:</strong> {{if .IsBuyer}}Buyer{{else}}Farmer{{end}}</p>
                 <p><strong>Member Since:</strong> {{.CreatedAt.Format "January 2006"}}</p>
             </div>
@@ -227,33 +234,21 @@
             <label>E-mail</label>
             <input type="email" name="email" value="{{.Email}}" required>
 
-            <label for="profile-location">Location (LGA)</label>
-            <select id="profile-location" name="location" required>
-                <option value="" disabled>Select your LGA</option>
-                <option value="Ado" {{if eq .Location "Ado" }}selected{{end}}>Ado</option>
-                <option value="Agatu" {{if eq .Location "Agatu" }}selected{{end}}>Agatu</option>
-                <option value="Apa" {{if eq .Location "Apa" }}selected{{end}}>Apa</option>
-                <option value="Buruku" {{if eq .Location "Buruku" }}selected{{end}}>Buruku</option>
-                <option value="Gboko" {{if eq .Location "Gboko" }}selected{{end}}>Gboko</option>
-                <option value="Guma" {{if eq .Location "Guma" }}selected{{end}}>Guma</option>
-                <option value="Gwer East" {{if eq .Location "Gwer East" }}selected{{end}}>Gwer East</option>
-                <option value="Gwer West" {{if eq .Location "Gwer West" }}selected{{end}}>Gwer West</option>
-                <option value="Katsina-Ala" {{if eq .Location "Katsina-Ala" }}selected{{end}}>Katsina-Ala</option>
-                <option value="Konshisha" {{if eq .Location "Konshisha" }}selected{{end}}>Konshisha</option>
-                <option value="Kwande" {{if eq .Location "Kwande" }}selected{{end}}>Kwande</option>
-                <option value="Logo" {{if eq .Location "Logo" }}selected{{end}}>Logo</option>
-                <option value="Makurdi" {{if eq .Location "Makurdi" }}selected{{end}}>Makurdi</option>
-                <option value="Obi" {{if eq .Location "Obi" }}selected{{end}}>Obi</option>
-                <option value="Ogbadibo" {{if eq .Location "Ogbadibo" }}selected{{end}}>Ogbadibo</option>
-                <option value="Ohimini" {{if eq .Location "Ohimini" }}selected{{end}}>Ohimini</option>
-                <option value="Oju" {{if eq .Location "Oju" }}selected{{end}}>Oju</option>
-                <option value="Okpokwu" {{if eq .Location "Okpokwu" }}selected{{end}}>Okpokwu</option>
-                <option value="Otukpo" {{if eq .Location "Otukpo" }}selected{{end}}>Otukpo</option>
-                <option value="Tarka" {{if eq .Location "Tarka" }}selected{{end}}>Tarka</option>
-                <option value="Ukum" {{if eq .Location "Ukum" }}selected{{end}}>Ukum</option>
-                <option value="Ushongo" {{if eq .Location "Ushongo" }}selected{{end}}>Ushongo</option>
-                <option value="Vandeikya" {{if eq .Location "Vandeikya" }}selected{{end}}>Vandeikya</option>
+            <label for="profile-community">Community / Village</label>
+            <input id="profile-community" name="community" value="{{.Location}}" required>
+            <label for="profile-state-select">State</label>
+            <select id="profile-state-select" name="state" data-state-select data-selected="{{.State}}" autocomplete="address-level1" required>
+                <option value="">Loading states…</option>
             </select>
+            <input id="profile-state-text" name="state" data-state-text value="{{.State}}" autocomplete="address-level1" required hidden disabled>
+            <label for="profile-lga-select">Local Government Area (LGA)</label>
+            <select id="profile-lga-select" name="lga" data-lga-select data-selected="{{.LGA}}" autocomplete="address-level3" required disabled>
+                <option value="">Choose a state first</option>
+            </select>
+            <input id="profile-lga-text" name="lga" data-lga-text value="{{.LGA}}" autocomplete="address-level3" required hidden disabled>
+            <label for="profile-country">Country</label>
+            <input id="profile-country" name="country" data-country-field value="{{.Country}}" autocomplete="country-name" required>
+            <small id="location-directory-status" role="status" aria-live="polite"></small>
 
             <label>Passport Photograph</label>
             <input type="file" name="passport" accept="image/*">
@@ -296,7 +291,8 @@
     </div>{{end}}
 
     {{if .IsOwner}}
-    <script src="/static/js/profile.js"></script>{{end}}
+    <script src="/static/js/profile.js"></script>
+    <script src="/static/js/location-fields.js"></script>{{end}}
 
     <script src="/static/js/navigation.js"></script>
 </body>

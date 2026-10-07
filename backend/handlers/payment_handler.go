@@ -6,7 +6,10 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
+	"strings"
 
+	"backend/internal/models"
 	"backend/internal/services"
 )
 
@@ -48,7 +51,7 @@ func (h *PaymentHandler) InitiatePayment(w http.ResponseWriter, r *http.Request)
 	})
 	if err != nil {
 		log.Printf("initiate payment: %v", err)
-		http.Error(w, "could not initiate payment", http.StatusBadGateway)
+		http.Error(w, "Payment service is temporarily unavailable. No payment status was confirmed; check your payment status before retrying.", http.StatusBadGateway)
 		return
 	}
 
@@ -83,6 +86,18 @@ func (h *PaymentHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if strings.HasPrefix(txRef, "WALLET-") {
+		switch status {
+		case models.PaymentFailed:
+			http.Redirect(w, r, "/wallet?error="+url.QueryEscape("The provider reports this deposit failed, so it was not credited to your wallet. If your bank was charged, the bank or payment provider controls the reversal timing."), http.StatusSeeOther)
+		case models.PaymentSuccessful:
+			http.Redirect(w, r, "/wallet?success="+url.QueryEscape("Deposit verified and credited to your wallet."), http.StatusSeeOther)
+		default:
+			http.Redirect(w, r, "/wallet?success="+url.QueryEscape("Deposit is still being verified. Check deposit history and do not retry while it is pending."), http.StatusSeeOther)
+		}
+		return
+	}
+
 	writeJSON(w, http.StatusOK, map[string]string{
 		"status":    status,
 		"reference": txRef,
@@ -94,7 +109,7 @@ func (h *PaymentHandler) Callback(w http.ResponseWriter, r *http.Request) {
 func (h *PaymentHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 	receivedHash := r.Header.Get("verif-hash")
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
 	if err != nil {
 		http.Error(w, "could not read body", http.StatusBadRequest)
 		return

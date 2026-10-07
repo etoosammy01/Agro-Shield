@@ -29,7 +29,9 @@ func (h *Learning) Page(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if err := render.RenderTemplates(w, "learning.html", nil); err != nil {
+	if err := render.RenderTemplates(w, "learning.html", struct {
+		FarmingTypes []string
+	}{FarmingTypes: h.ai.LearningCategories()}); err != nil {
 		log.Printf("learning page render failed: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}

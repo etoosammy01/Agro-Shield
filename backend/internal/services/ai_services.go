@@ -15,6 +15,15 @@ import (
 
 var ErrInvalidLearningChat = errors.New("invalid learning chat")
 
+var learningFarmingTypes = []string{
+	"Crop farming",
+	"Livestock farming",
+	"Poultry farming",
+	"Fish farming and aquaculture",
+	"Mixed farming",
+	"Horticulture",
+}
+
 type AIService struct {
 	repo      *repository.DiagnosisRepository
 	provider  AIProvider
@@ -96,24 +105,32 @@ func (s *AIService) Diagnose(
 
 // backend/internal/services/ai_services.go
 func (s *AIService) Learn(farmingType string, messages []AIChatMessage) (string, error) {
-    if len(messages) == 0 || len(messages) > 12 {
-        return "", fmt.Errorf("%w: send between 1 and 12 chat messages", ErrInvalidLearningChat)
-    }
+	farmingType = strings.TrimSpace(farmingType)
+	if farmingType == "" || utf8.RuneCountInString(farmingType) > 80 {
+		return "", fmt.Errorf("%w: choose a farming category with at most 80 characters", ErrInvalidLearningChat)
+	}
+	if len(messages) == 0 || len(messages) > 12 {
+		return "", fmt.Errorf("%w: send between 1 and 12 chat messages", ErrInvalidLearningChat)
+	}
 
-    for index, message := range messages {
-        expectedRole := "user"
-        if index%2 == 1 {
-            expectedRole = "assistant"
-        }
-        if message.Role != expectedRole {
-            return "", fmt.Errorf("%w: chat messages must alternate between user and assistant", ErrInvalidLearningChat)
-        }
-        if strings.TrimSpace(message.Content) == "" || utf8.RuneCountInString(message.Content) > 1200 {
-            return "", fmt.Errorf("%w: chat messages must be between 1 and 1200 characters", ErrInvalidLearningChat)
-        }
-    }
+	for index, message := range messages {
+		expectedRole := "user"
+		if index%2 == 1 {
+			expectedRole = "assistant"
+		}
+		if message.Role != expectedRole {
+			return "", fmt.Errorf("%w: chat messages must alternate between user and assistant", ErrInvalidLearningChat)
+		}
+		if strings.TrimSpace(message.Content) == "" || utf8.RuneCountInString(message.Content) > 1200 {
+			return "", fmt.Errorf("%w: chat messages must be between 1 and 1200 characters", ErrInvalidLearningChat)
+		}
+	}
 
-    return s.provider.Learn(farmingType, messages)
+	return s.provider.Learn(farmingType, messages)
+}
+
+func (s *AIService) LearningCategories() []string {
+	return append([]string(nil), learningFarmingTypes...)
 }
 
 func (s *AIService) History(farmerID int) ([]models.Diagnosis, error) {

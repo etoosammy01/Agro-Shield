@@ -66,10 +66,11 @@ func (h *CompleteProfile) Handler(w http.ResponseWriter, r *http.Request) {
 		// Bank details stay optional, and only apply to farmers.
 		if !farmer.IsBuyer() {
 			bankName := r.FormValue("bank-name")
+			bankCode := r.FormValue("bank-code")
 			accountName := r.FormValue("account-name")
 			accountNumber := r.FormValue("account-number")
-			if bankName != "" || accountName != "" || accountNumber != "" {
-				if err := h.auth.UpdateBankDetails(farmer.ID, bankName, accountName, accountNumber); err != nil {
+			if bankName != "" || bankCode != "" || accountName != "" || accountNumber != "" {
+				if err := h.auth.UpdateBankDetails(farmer.ID, bankName, bankCode, accountName, accountNumber); err != nil {
 					log.Println("bank details update failed:", err)
 				}
 			}

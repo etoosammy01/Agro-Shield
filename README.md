@@ -755,6 +755,8 @@ DATABASE_URL=your_postgresql_connection_string
 
 FLUTTERWAVE_SECRET_KEY=your_flutterwave_secret_key
 FLUTTERWAVE_SECRET_HASH=your_flutterwave_secret_hash
+PAYMENT_REDIRECT_URL=http://localhost:8080/payments/callback
+WALLET_ADMIN_USER_IDS=1,2
 
 GEMINI_API_KEY=your_gemini_api_key
 
@@ -786,10 +788,12 @@ Depending on the enabled features, Agro-Shield may require environment variables
 | `DATABASE_URL`            | PostgreSQL connection          |
 | `FLUTTERWAVE_SECRET_KEY`  | Flutterwave API authentication |
 | `FLUTTERWAVE_SECRET_HASH` | Webhook verification           |
+| `PAYMENT_REDIRECT_URL`    | Flutterwave checkout callback  |
+| `WALLET_ADMIN_USER_IDS`   | Comma-separated user IDs allowed to review wallet withdrawals |
 | `GEMINI_API_KEY`          | AI services                    |
 | `APP_URL`                 | Application/base URL           |
 
-Actual environment variables should be documented alongside the relevant feature as the system evolves.
+Wallets use NGN in the first release. Wallet balances are created for new accounts and backfilled for existing accounts. Configure `WALLET_ADMIN_USER_IDS` with trusted account IDs (find IDs in the `farmers` table); leaving it empty disables in-app withdrawal approval. Configure the Flutterwave webhook at `/webhooks/flutterwave` for payment and transfer events, and ensure the Flutterwave account has transfers enabled. A transfer request that times out after being sent stays reserved and must be reconciled against its unique reference in Flutterwave before retrying or refunding.
 
 ---
 

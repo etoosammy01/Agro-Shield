@@ -115,6 +115,9 @@ func (h *Storage) StorageHandler(w http.ResponseWriter, r *http.Request) {
 				r,
 				farmer.ID,
 				farmer.FullName,
+				farmer.LGA,
+				farmer.State,
+				farmer.Country,
 			)
 
 		case "update":
@@ -123,6 +126,9 @@ func (h *Storage) StorageHandler(w http.ResponseWriter, r *http.Request) {
 				r,
 				farmer.ID,
 				farmer.FullName,
+				farmer.LGA,
+				farmer.State,
+				farmer.Country,
 			)
 
 		case "unlist":
@@ -173,6 +179,9 @@ func (h *Storage) createCrop(
 	r *http.Request,
 	farmerID int,
 	fullName string,
+	lga string,
+	state string,
+	country string,
 ) {
 	name := strings.TrimSpace(r.FormValue("produce"))
 	unit := strings.TrimSpace(r.FormValue("unit"))
@@ -269,6 +278,9 @@ func (h *Storage) createCrop(
 		name,
 		unit,
 		location,
+		lga,
+		state,
+		country,
 		quantity,
 		price,
 		listForSale,
@@ -291,6 +303,9 @@ func (h *Storage) updateCrop(
 	r *http.Request,
 	farmerID int,
 	fullName string,
+	lga string,
+	state string,
+	country string,
 ) {
 	cropID, err := strconv.Atoi(
 		strings.TrimSpace(r.FormValue("crop_id")),
@@ -415,6 +430,9 @@ func (h *Storage) updateCrop(
 		name,
 		unit,
 		location,
+		lga,
+		state,
+		country,
 		quantity,
 		price,
 		listForSale,

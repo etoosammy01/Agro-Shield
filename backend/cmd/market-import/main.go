@@ -70,18 +70,18 @@ func main() {
 }
 
 func importPrice(repo *repository.MarketEventRepository, row []string) error {
-	if len(row) != 9 {
-		return fmt.Errorf("price CSV requires 9 columns: produce,price,unit,provider,market,lga,state,source_url,collected_at")
+	if len(row) != 10 {
+		return fmt.Errorf("price CSV requires 10 columns: produce,price,unit,provider,market,lga,state,country,source_url,collected_at")
 	}
 	price, err := strconv.ParseFloat(strings.TrimSpace(row[1]), 64)
 	if err != nil {
 		return fmt.Errorf("invalid price: %w", err)
 	}
-	collectedAt, err := time.Parse(time.RFC3339, strings.TrimSpace(row[8]))
+	collectedAt, err := time.Parse(time.RFC3339, strings.TrimSpace(row[9]))
 	if err != nil {
 		return fmt.Errorf("invalid collected_at: %w", err)
 	}
-	return repo.RecordExternalPrice(row[0], price, row[2], row[3], row[4], row[5], row[6], row[7], collectedAt)
+	return repo.RecordExternalPrice(row[0], price, row[2], row[3], row[4], row[5], row[6], row[7], row[8], collectedAt)
 }
 
 func importNeighbor(repo *repository.MarketEventRepository, row []string) error {
