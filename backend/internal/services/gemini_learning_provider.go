@@ -240,6 +240,8 @@ Keep the response under 400 words.
 	// 5. GEMINI REQUEST CONFIGURATION
 	// ========================================================
 
+	thinkingBudget := int32(0)
+
 	config := &genai.GenerateContentConfig{
 		SystemInstruction: &genai.Content{
 			Parts: []*genai.Part{
@@ -248,9 +250,11 @@ Keep the response under 400 words.
 				},
 			},
 		},
-		MaxOutputTokens: 500,
+		MaxOutputTokens: 1500,
+		ThinkingConfig: &genai.ThinkingConfig{
+			ThinkingBudget: genai.Ptr(thinkingBudget),
+		},
 	}
-
 	// ========================================================
 	// 6. CREATE REQUEST TIMEOUT
 	// ========================================================
@@ -306,6 +310,9 @@ Keep the response under 400 words.
 	// ========================================================
 	// 9. CHECK GEMINI RESPONSE
 	// ========================================================
+	if result != nil && len(result.Candidates) > 0 {
+		log.Printf("learning: finish reason = %v", result.Candidates[0].FinishReason)
+	}
 
 	if result == nil || len(result.Candidates) == 0 {
 		return "",
