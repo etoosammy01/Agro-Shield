@@ -33,7 +33,24 @@ type Config struct {
 	WalletAdminUserIDs string
 }
 
-// Load reads application settings from environment variables.
+// LoadDatabaseURL reads only the database URL.
+// It lets database tools run without requiring AI API keys.
+func LoadDatabaseURL() (string, error) {
+	// Load .env when available.
+	_ = godotenv.Load()
+
+	// Read the database URL and remove extra spaces.
+	databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
+
+	// Stop if the database URL is missing.
+	if databaseURL == "" {
+		return "", fmt.Errorf("DATABASE_URL must not be empty")
+	}
+
+	return databaseURL, nil
+}
+
+// Load reads the application settings from environment variables.
 func Load() (Config, error) {
 	// Load .env when available.
 	// Deployment environments can provide variables directly.
@@ -71,9 +88,12 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("GEMINI_API_KEY must not be empty")
 	}
 
-	// Groq is the primary provider for the learning feature.
-	if cfg.GroqAPIKey == "" {
-		return Config{}, fmt.Errorf("GROQ_API_KEY must not be empty")
+	// At least one learning AI provider must be configured.
+	// Groq is primary, and OpenRouter is the backup.
+	if cfg.GroqAPIKey == "" && cfg.OpenRouterAPIKey == "" {
+		return Config{}, fmt.Errorf(
+			"at least one learning AI key is required: GROQ_API_KEY or OPENROUTER_API_KEY",
+		)
 	}
 
 	return cfg, nil
