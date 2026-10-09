@@ -14,12 +14,17 @@ import (
 )
 
 func main() {
+  // Load application configuration once at startup.
+cfg, err := config.Load()
+if err != nil {
+	log.Fatal(err)
+}
 
 	// ============================================================
 	// 1. CONNECT TO DATABASE
 	// ============================================================
 
-	db, err := database.ConnectDB()
+  db, err := database.ConnectDB(cfg.DatabaseURL)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -183,11 +188,7 @@ func main() {
 	// ============================================================
 	// 7. START HTTP SERVER
 	// ============================================================
-
-	cfg, err := config.Load()
-	if err != nil {
-		log.Fatal(err)
-	}
+  
 	if err = http.ListenAndServe(":"+cfg.Port, http.DefaultServeMux); err != nil {
 		log.Fatal(err)
 	}

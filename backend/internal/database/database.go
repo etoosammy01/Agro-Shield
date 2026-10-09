@@ -1,32 +1,34 @@
 package database
 
 import (
-	"backend/internal/config"
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-// ConnectDB opens the PostgreSQL database configured by DATABASE_URL.
-func ConnectDB() (*sql.DB, error) {
-	data, err := config.Load()
-	if err != nil {
-		log.Fatal(err)
+// ConnectDB opens PostgreSQL using the URL supplied by the application.
+func ConnectDB(databaseURL string) (*sql.DB, error) {
+	// Prevent opening a database connection without a URL.
+	if strings.TrimSpace(databaseURL) == "" {
+		return nil, fmt.Errorf("database URL must not be empty")
 	}
 
-	db, err := sql.Open("pgx", data.DatabaseURL)
+	// Open the PostgreSQL connection.
+	db, err := sql.Open("pgx", databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("open PostgreSQL: %w", err)
 	}
 
+	// Check that PostgreSQL is reachable.
 	if err := db.Ping(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("ping PostgreSQL: %w", err)
 	}
 
-	log.Println("✅ Connected to PostgreSQL database")
+	log.Println("Connected to PostgreSQL database")
 	return db, nil
 }
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"backend/internal/config"
 	"backend/internal/database"
 	"backend/internal/repository"
 	"encoding/csv"
@@ -22,14 +23,18 @@ func main() {
 		log.Fatal("usage: go run ./cmd/market-import -type prices|neighbors -file data.csv")
 	}
 
-	db, err := database.ConnectDB()
+	// Load only the database configuration.
+	databaseURL, err := config.LoadDatabaseURL()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Connect to PostgreSQL using the database URL.
+	db, err := database.ConnectDB(databaseURL)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
-	if err := database.RunMigration(db); err != nil {
-		log.Fatal(err)
-	}
 
 	file, err := os.Open(*path)
 	if err != nil {
