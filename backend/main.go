@@ -10,21 +10,22 @@ import (
 	"backend/internal/database"
 	"backend/internal/repository"
 	"backend/internal/services"
+	learningproviders "backend/internal/services/learning"
 	"backend/routes"
 )
 
 func main() {
-  // Load application configuration once at startup.
-cfg, err := config.Load()
-if err != nil {
-	log.Fatal(err)
-}
+	// Load application configuration once at startup.
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// ============================================================
 	// 1. CONNECT TO DATABASE
 	// ============================================================
 
-  db, err := database.ConnectDB(cfg.DatabaseURL)
+	db, err := database.ConnectDB(cfg.DatabaseURL)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -113,15 +114,55 @@ if err != nil {
 	// 4. CREATE AI PROVIDERS
 	// ============================================================
 
-	diagnosisProvider, err := services.NewGeminiDiagnosisProvider(os.Getenv("GEMINI_API_KEY"))
+	// ============================================================
+	// 4. CREATE AI PROVIDERS
+	// ============================================================
+
+	// ------------------------------------------------------------
+	// DIAGNOSIS AI
+	// Gemini handles diagnosis only.
+	// ------------------------------------------------------------
+
+	diagnosisProvider, err := services.NewGeminiDiagnosisProvider(
+		cfg.GeminiAPIKey,
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	learningProvider, err := services.NewGeminiLearningProvider(os.Getenv("GEMINI_API_KEY"))
-	if err != nil {
-		log.Fatal(err)
+	// ------------------------------------------------------------
+	// LEARNING AI
+	// Groq is primary. OpenRouter is the backup.
+	// ------------------------------------------------------------
+
+	var primaryLearning services.LearningProvider
+	var backupLearning services.LearningProvider
+
+	// Create Groq only when its API key is configured.
+	if cfg.GroqAPIKey != "" {
+		primaryLearning, err = learningproviders.NewGroqLearningProvider(
+			cfg.GroqAPIKey,
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
+
+	// Create OpenRouter only when its API key is configured.
+	if cfg.OpenRouterAPIKey != "" {
+		backupLearning, err = learningproviders.NewOpenRouterLearningProvider(
+			cfg.OpenRouterAPIKey,
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	// Combine both providers into one failover learning service.
+	learningProvider := learningproviders.NewFailoverLearningProvider(
+		primaryLearning,
+		backupLearning,
+	)
 
 	// ============================================================
 	// CREATE FLUTTERWAVE CLIENT          ← added
@@ -188,7 +229,7 @@ if err != nil {
 	// ============================================================
 	// 7. START HTTP SERVER
 	// ============================================================
-  
+
 	if err = http.ListenAndServe(":"+cfg.Port, http.DefaultServeMux); err != nil {
 		log.Fatal(err)
 	}
