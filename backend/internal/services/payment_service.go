@@ -24,23 +24,22 @@ import (
 // ============================================================
 
 type PaymentService struct {
-	repo   *repository.PaymentRepository
-	fw     *FlutterwaveClient
-	wallet *WalletService
+	repo    *repository.PaymentRepository
+	orders  *repository.OrderRepository
+	farmers *repository.FarmerRepository
+	fw      *FlutterwaveClient
+	wallet  *WalletService
 }
 
-func NewPaymentService(repo *repository.PaymentRepository, fw *FlutterwaveClient, wallet *WalletService) *PaymentService {
-	return &PaymentService{repo: repo, fw: fw, wallet: wallet}
+func NewPaymentService(repo *repository.PaymentRepository, orders *repository.OrderRepository, farmers *repository.FarmerRepository, fw *FlutterwaveClient, wallet *WalletService) *PaymentService {
+	return &PaymentService{repo: repo, orders: orders, farmers: farmers, fw: fw, wallet: wallet}
 }
 
 // --- Initiate --------------------------------------------------------
 
 type InitiatePaymentInput struct {
-	OrderID       int64
-	Amount        string // e.g. "5000.00" - keep as string, never float, for money
-	Currency      string // e.g. "NGN"
-	CustomerEmail string
-	CustomerName  string
+	OrderID int64
+	BuyerID int
 }
 
 type InitiatePaymentResult struct {
@@ -57,38 +56,56 @@ func generateReference(orderID int64) (string, error) {
 	return fmt.Sprintf("ORDER-%d-%s", orderID, hex.EncodeToString(buf)), nil
 }
 
-// Initiate creates a payment record, asks Flutterwave for a checkout link,
-// and returns it for the handler to send back to the frontend.
-//
-// NOTE: in a real flow you'd look up the order (amount, currency, customer)
-// from your orders repository using OrderID, rather than trusting these
-// values from the caller - otherwise a client could initiate a payment for
-// less than the order actually costs.
+// Initiate loads the order and customer from PostgreSQL. Financial and customer
+// details are never trusted from the browser. Only eligible unpaid orders can
+// be paid through this endpoint; wallet-paid completed orders are rejected.
 func (s *PaymentService) Initiate(ctx context.Context, in InitiatePaymentInput) (*InitiatePaymentResult, error) {
+	if in.OrderID <= 0 || in.BuyerID <= 0 {
+		return nil, errors.New("valid order and buyer are required")
+	}
+	order, err := s.orders.GetByID(int(in.OrderID))
+	if err != nil {
+		return nil, fmt.Errorf("load order: %w", err)
+	}
+	if order == nil {
+		return nil, errors.New("order not found")
+	}
+	if order.BuyerID != in.BuyerID {
+		return nil, errors.New("order does not belong to this buyer")
+	}
+	status := strings.ToLower(strings.TrimSpace(order.Status))
+	if status != "pending" && status != "pending_payment" {
+		return nil, fmt.Errorf("order is not awaiting external payment")
+	}
+	if order.TotalPrice <= 0 {
+		return nil, errors.New("order total must be greater than zero")
+	}
+	buyer, err := s.farmers.GetByID(in.BuyerID)
+	if err != nil {
+		return nil, fmt.Errorf("load buyer: %w", err)
+	}
+	if buyer == nil || !buyer.IsBuyer() || strings.TrimSpace(buyer.Email) == "" {
+		return nil, errors.New("a registered buyer with an email address is required")
+	}
+	amount := fmt.Sprintf("%.2f", order.TotalPrice)
 	reference, err := generateReference(in.OrderID)
 	if err != nil {
 		return nil, fmt.Errorf("generate reference: %w", err)
 	}
-
-	if _, err := s.repo.Create(ctx, in.OrderID, reference, in.Amount, in.Currency, "flutterwave"); err != nil {
+	if _, err := s.repo.Create(ctx, in.OrderID, reference, amount, "NGN", "flutterwave"); err != nil {
 		return nil, fmt.Errorf("create payment record: %w", err)
 	}
-
 	checkoutURL, err := s.fw.InitializePayment(InitializePaymentRequest{
-		Reference:     reference,
-		Amount:        in.Amount,
-		Currency:      in.Currency,
-		CustomerEmail: in.CustomerEmail,
-		CustomerName:  in.CustomerName,
-		Title:         "Order Payment",
-		Description:   fmt.Sprintf("Payment for order %d", in.OrderID),
+		Reference: reference, Amount: amount, Currency: "NGN",
+		CustomerEmail: buyer.Email, CustomerName: buyer.FullName,
+		Title: "Agro-Shield Order Payment", Description: fmt.Sprintf("Payment for order %d", in.OrderID),
 	})
 	if err != nil {
-		// The payment row stays "pending" - safe to retry initiation later
-		// with a fresh reference, or investigate why Flutterwave rejected it.
-		return nil, fmt.Errorf("initialize payment with flutterwave: %w", err)
+		return nil, fmt.Errorf("initialize payment with Flutterwave: %w", err)
 	}
-
+	if strings.TrimSpace(checkoutURL) == "" {
+		return nil, errors.New("Flutterwave returned no checkout URL")
+	}
 	return &InitiatePaymentResult{CheckoutURL: checkoutURL, Reference: reference}, nil
 }
 
@@ -143,7 +160,11 @@ func (s *PaymentService) ConfirmCallback(ctx context.Context, transactionID, txR
 	if err := s.repo.UpdateStatus(ctx, txRef, status, transactionID); err != nil {
 		return "", fmt.Errorf("update payment status: %w", err)
 	}
-
+	if status == models.PaymentSuccessful {
+		if err := s.orders.MarkPaid(int(payment.OrderID)); err != nil {
+			return "", fmt.Errorf("payment verified but order status update failed; reconcile payment %s: %w", txRef, err)
+		}
+	}
 	return status, nil
 }
 
@@ -249,9 +270,11 @@ func (s *PaymentService) ProcessWebhook(ctx context.Context, body []byte, receiv
 		return false, nil
 	}
 
-	// TODO: once order-status transitions are wired up, also mark the
-	// order itself paid here and trigger fulfillment - this is the one
-	// place in the system safe to do that from.
+	if status == models.PaymentSuccessful {
+		if err := s.orders.MarkPaid(int(payment.OrderID)); err != nil {
+			return false, fmt.Errorf("payment verified but order status update failed; reconcile payment %s: %w", verified.TxRef, err)
+		}
+	}
 
 	if err := s.repo.MarkWebhookProcessed(ctx, transactionID, payload.Event); err != nil {
 		// Not fatal - the payment update already succeeded. Worst case, a

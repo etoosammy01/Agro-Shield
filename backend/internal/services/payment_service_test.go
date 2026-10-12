@@ -25,3 +25,14 @@ func TestVerifiedPaymentStatus(t *testing.T) {
 		})
 	}
 }
+
+func TestVerifyTransactionRejectsInvalidIDsBeforeNetworkCall(t *testing.T) {
+	client := NewFlutterwaveClient("test-key", "test-hash", "http://localhost/callback")
+	for _, id := range []string{"", "abc", "0", "-1", "1/../../payments"} {
+		t.Run(id, func(t *testing.T) {
+			if _, err := client.VerifyTransaction(id); err == nil {
+				t.Fatalf("VerifyTransaction(%q) expected an error", id)
+			}
+		})
+	}
+}

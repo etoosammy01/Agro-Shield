@@ -141,7 +141,7 @@ func NewContainer(
 	// ========================================================
 
 	walletService := services.NewWalletService(walletRepo, farmerRepo, flutterwaveClient, walletAdminIDs)
-	paymentService := services.NewPaymentService(paymentRepo, flutterwaveClient, walletService)
+	paymentService := services.NewPaymentService(paymentRepo, orderRepo, farmerRepo, flutterwaveClient, walletService)
 
 	feedbackService := services.NewFeedbackService(
 		feedbackRepo,

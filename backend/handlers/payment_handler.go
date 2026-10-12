@@ -11,6 +11,7 @@ import (
 
 	"backend/internal/models"
 	"backend/internal/services"
+	"backend/middleware"
 )
 
 // ============================================================
@@ -28,26 +29,28 @@ func NewPaymentHandler(payment *services.PaymentService) *PaymentHandler {
 // --- POST /orders/pay ----------------------------------------------------
 
 type initiatePaymentRequest struct {
-	OrderID       int64  `json:"order_id"`
-	Amount        string `json:"amount"`
-	Currency      string `json:"currency"`
-	CustomerEmail string `json:"customer_email"`
-	CustomerName  string `json:"customer_name"`
+	OrderID int64 `json:"order_id"`
 }
 
 func (h *PaymentHandler) InitiatePayment(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	var req initiatePaymentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
+	farmer, ok := middleware.FarmerFromContext(r)
+	if !ok || farmer == nil || !farmer.IsBuyer() {
+		http.Error(w, "Only authenticated buyers can pay for orders", http.StatusForbidden)
+		return
+	}
 	result, err := h.payment.Initiate(r.Context(), services.InitiatePaymentInput{
-		OrderID:       req.OrderID,
-		Amount:        req.Amount,
-		Currency:      req.Currency,
-		CustomerEmail: req.CustomerEmail,
-		CustomerName:  req.CustomerName,
+		OrderID: req.OrderID,
+		BuyerID: farmer.ID,
 	})
 	if err != nil {
 		log.Printf("initiate payment: %v", err)
@@ -67,6 +70,10 @@ func (h *PaymentHandler) InitiatePayment(w http.ResponseWriter, r *http.Request)
 // hosted checkout page. This is a UX convenience ONLY - the webhook below
 // is the real source of truth for marking a payment complete.
 func (h *PaymentHandler) Callback(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	transactionID := r.URL.Query().Get("transaction_id")
 	txRef := r.URL.Query().Get("tx_ref")
 
@@ -107,6 +114,10 @@ func (h *PaymentHandler) Callback(w http.ResponseWriter, r *http.Request) {
 // --- POST /webhooks/flutterwave -------------------------------------------
 
 func (h *PaymentHandler) Webhook(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	receivedHash := r.Header.Get("verif-hash")
 
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))

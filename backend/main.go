@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"net/http"
-	"os"
 
 	app "backend/internal"
 	"backend/internal/config"
@@ -178,11 +177,11 @@ func main() {
 	// ============================================================
 
 	flutterwaveClient := services.NewFlutterwaveClient(
-		os.Getenv("FLUTTERWAVE_SECRET_KEY"),
-		os.Getenv("FLUTTERWAVE_SECRET_HASH"),
-		os.Getenv("PAYMENT_REDIRECT_URL"),
+		cfg.FlutterwaveSecretKey,
+		cfg.FlutterwaveSecretHash,
+		cfg.PaymentRedirectURL,
 	)
-	walletAdminIDs, err := services.ParseWalletAdminIDs(os.Getenv("WALLET_ADMIN_USER_IDS"))
+	walletAdminIDs, err := services.ParseWalletAdminIDs(cfg.WalletAdminUserIDs)
 	if err != nil {
 		log.Fatal(err)
 	}

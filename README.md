@@ -1004,6 +1004,13 @@ TEAM_AGREEMENT.md
 
 for the applicable ownership, usage, contribution, and intellectual-property terms.
 
+
+---
+
+# 💳 Flutterwave Sandbox Setup
+
+To configure and test wallet deposits/withdrawals with Flutterwave test credentials, follow [`FLUTTERWAVE_SANDBOX.md`](FLUTTERWAVE_SANDBOX.md). Copy `backend/.env.example` to `backend/.env` and fill in your local PostgreSQL, AI, and Flutterwave test credentials. Never commit `.env` or use live payment keys during development.
+
 ---
 
 # ⭐ Acknowledgements

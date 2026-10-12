@@ -3,6 +3,7 @@ package repository
 import (
 	"backend/internal/models"
 	"database/sql"
+	"fmt"
 )
 
 type OrderRepository struct {
@@ -58,6 +59,25 @@ func (r *OrderRepository) GetByID(id int) (*models.Order, error) {
 		return nil, err
 	}
 	return &o, nil
+}
+
+// MarkPaid changes an eligible external-payment order to paid. It deliberately
+// refuses to change wallet-paid/completed orders, preventing a second charge.
+func (r *OrderRepository) MarkPaid(id int) error {
+	result, err := r.db.Exec(`
+		UPDATE orders SET status = 'paid'
+		WHERE id = $1 AND status IN ('pending', 'pending_payment', 'paid')`, id)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return fmt.Errorf("order %d is not eligible for external payment confirmation", id)
+	}
+	return nil
 }
 
 // ListByBuyer returns everything a buyer has purchased.

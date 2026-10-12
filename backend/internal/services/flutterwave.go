@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -163,7 +164,11 @@ type verifyTransactionResponse struct {
 // Flutterwave. Call this from BOTH the redirect callback and the webhook
 // handler - never trust either one's claimed status without this check.
 func (c *FlutterwaveClient) VerifyTransaction(transactionID string) (*VerifiedTransaction, error) {
-	url := fmt.Sprintf("%s/transactions/%s/verify", flutterwaveBaseURL, transactionID)
+	id, err := strconv.ParseInt(strings.TrimSpace(transactionID), 10, 64)
+	if err != nil || id <= 0 {
+		return nil, fmt.Errorf("invalid Flutterwave transaction ID")
+	}
+	url := fmt.Sprintf("%s/transactions/%d/verify", flutterwaveBaseURL, id)
 
 	httpReq, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -188,6 +193,19 @@ func (c *FlutterwaveClient) VerifyTransaction(transactionID string) (*VerifiedTr
 	var parsed verifyTransactionResponse
 	if err := json.Unmarshal(respBody, &parsed); err != nil {
 		return nil, fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	if parsed.Status != "success" {
+		return nil, fmt.Errorf("Flutterwave did not verify transaction: %s", parsed.Status)
+	}
+	if parsed.Data.ID != id {
+		return nil, fmt.Errorf("verified transaction ID does not match request")
+	}
+	if strings.TrimSpace(parsed.Data.TxRef) == "" ||
+		strings.TrimSpace(parsed.Data.Status) == "" ||
+		strings.TrimSpace(parsed.Data.Currency) == "" ||
+		parsed.Data.Amount <= 0 {
+		return nil, fmt.Errorf("Flutterwave verification response is incomplete")
 	}
 
 	return &VerifiedTransaction{
