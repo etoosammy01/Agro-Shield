@@ -16,8 +16,24 @@
     let pending = false;
     const welcomeMessage = "Hello! What would you like to learn about farming today?";
     let typingMessage;
+    // Make text wrapped in **double asterisks** bold.
+// Keep all other text unchanged and safe.
+function renderBoldText(element, content) {
+    const parts = content.split(/(\*\*[^*]+\*\*)/g);
+
+    parts.forEach((part) => {
+        if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+            const bold = document.createElement("strong");
+            bold.textContent = part.slice(2, -2);
+            element.append(bold);
+        } else {
+            element.append(document.createTextNode(part));
+        }
+    });
+}
 
     function addMessage(content, role, isError = false) {
+        
         const message = document.createElement("div");
         message.className = `learning-message learning-message-${role}${isError ? " learning-message-error" : ""}`;
         if (role === "assistant") {
@@ -27,7 +43,7 @@
             message.append(label);
         }
         const text = document.createElement("p");
-        text.textContent = content;
+        renderBoldText(text, content);
         message.append(text);
         messageList.append(message);
         messageList.scrollTop = messageList.scrollHeight;
@@ -77,12 +93,37 @@
         showTyping();
 
         try {
-            const messages = [...history.slice(-10), { role: "user", content: question }];
-            const response = await fetch("/learning/chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ farmingType: category, messages })
-            });
+           // Keep every message within the backend's 1,200-character limit.
+const MAX_MESSAGE_LENGTH = 1200;
+const HISTORY_MESSAGE_LIMIT = 1100;
+
+// Prepare recent conversation history.
+const recentHistory = history.slice(-10)
+    .map((message) => ({
+        role: message.role,
+        content: Array.from(
+            String(message.content ?? "").trim()
+        ).slice(0, HISTORY_MESSAGE_LIMIT).join("")
+    }))
+    .filter((message) =>
+        ["user", "assistant"].includes(message.role) &&
+        message.content.length > 0
+    );
+
+// Build the messages sent to the backend.
+const messages = [
+    ...recentHistory,
+    {
+        role: "user",
+        content: question.trim()
+    }
+];
+
+// Reject an oversized new question before sending it.
+if (Array.from(question.trim()).length > MAX_MESSAGE_LENGTH) {
+    showError("Your question must not exceed 1,200 characters.");
+    return;
+}
             if (!response.ok) {
                 const detail = await response.text();
                 throw new Error(detail.trim() || "The assistant could not answer right now.");

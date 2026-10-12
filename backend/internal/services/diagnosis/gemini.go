@@ -237,7 +237,7 @@ Keep the complete answer below 250 words.`
 	}
 
 	config := &genai.GenerateContentConfig{
-		MaxOutputTokens: 300,
+		MaxOutputTokens: 800,
 		ThinkingConfig: &genai.ThinkingConfig{
 			ThinkingBudget: genai.Ptr(thinkingBudget),
 		},
