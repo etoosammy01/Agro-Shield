@@ -50,6 +50,8 @@ type WalletPageData struct {
 type WalletAdminPageData struct {
 	Withdrawals       []models.Withdrawal
 	Transfers         []models.Transfer
+	StalePending      []models.WalletDeposit
+	StaleAfterHours   int
 	RevenueTotal      string
 	RevenueCount      int
 	CommissionEnabled bool
@@ -352,8 +354,17 @@ func (h *WalletHandler) AdminPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Could not load platform revenue", http.StatusInternalServerError)
 		return
 	}
+	// Read-only operational signal: funding attempts no provider has settled.
+	// Nothing here credits or expires anything.
+	stalePending, err := h.wallet.StalePendingDeposits(r.Context())
+	if err != nil {
+		log.Printf("load stale pending deposits for admin %d: %v", farmer.ID, err)
+		http.Error(w, "Could not load pending deposits", http.StatusInternalServerError)
+		return
+	}
 	data := WalletAdminPageData{
 		Withdrawals: withdrawals, Transfers: transfers,
+		StalePending: stalePending, StaleAfterHours: int(h.wallet.StaleDepositAfter().Hours()),
 		RevenueTotal: revenueTotal, RevenueCount: revenueCount,
 		CommissionEnabled: h.wallet.CommissionEnabled(), CommissionLabel: h.wallet.CommissionLabel(),
 		Error: r.URL.Query().Get("error"), Success: r.URL.Query().Get("success"),
@@ -442,6 +453,25 @@ func (h *WalletHandler) ReconcileWithdrawal(w http.ResponseWriter, r *http.Reque
 		success:      "Provider status checked. Review the withdrawal status; funds stay reserved while the payout is processing.",
 		run: func(ctx context.Context, id int64, adminID int) error {
 			_, err := h.wallet.ReconcileWithdrawal(ctx, id, adminID)
+			return err
+		},
+	})
+}
+
+// RepairWallet recreates a missing wallet for an existing account.
+//
+// This is a repair, not a funding operation: it creates an empty NGN wallet and
+// never touches a balance. It exists for accounts that predate the wallets table
+// or were restored from a backup, which would otherwise be stuck on a 500 with no
+// way back. The service logs the operator and the target account.
+func (h *WalletHandler) RepairWallet(w http.ResponseWriter, r *http.Request) {
+	h.runAdminWalletAction(w, r, adminWalletAction{
+		idField:      "user_id",
+		redirectPath: adminWalletPath,
+		failure:      "Could not repair that wallet. Check the user id and whether the account exists; no balance was changed.",
+		success:      "Wallet repair completed. The account now has an empty NGN wallet.",
+		run: func(ctx context.Context, id int64, adminID int) error {
+			_, err := h.wallet.RepairWallet(ctx, int(id), adminID)
 			return err
 		},
 	})

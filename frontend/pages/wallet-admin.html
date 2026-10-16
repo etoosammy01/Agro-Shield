@@ -110,6 +110,47 @@
             </table>
         </div>
         {{else}}<p>No transfers need review.</p>{{end}}
+
+        <h2>Unsettled deposits</h2>
+        <p>
+            Funding attempts the provider has not settled after {{.StaleAfterHours}} hours.
+            This list is information only — nothing here is credited, expired or refunded
+            automatically. Confirm the real status with the provider before acting on an
+            entry, and never mark one successful just to clear it.
+        </p>
+        {{if .StalePending}}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>Reference</th><th>Provider</th><th>Amount</th><th>Status</th><th>Created</th></tr>
+                </thead>
+                <tbody>
+                    {{range .StalePending}}
+                    <tr>
+                        <td>{{.Reference}}</td>
+                        <td>{{.Provider}}</td>
+                        <td>{{.Amount}} {{.Currency}}</td>
+                        <td>{{.Status}}</td>
+                        <td>{{.CreatedAt}}</td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        {{else}}<p>No deposits have been waiting longer than {{.StaleAfterHours}} hours.</p>{{end}}
+
+        <h2>Wallet repair</h2>
+        <p>
+            Recreates a missing wallet for an existing account, for example an
+            account that predates the wallets table. It creates an empty NGN wallet
+            and never changes a balance, so it is safe to repeat. It cannot be used
+            for a user id that does not exist.
+        </p>
+        <form method="POST" action="/admin/wallets/repair">
+            <label for="repair-user-id">User ID</label>
+            <input id="repair-user-id" type="number" name="user_id" min="1" required>
+            <button type="submit">Repair wallet</button>
+        </form>
     </main>
 </body>
 </html>

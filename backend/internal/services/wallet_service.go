@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"backend/internal/models"
@@ -25,9 +27,13 @@ type WalletService struct {
 	// commissionBasisPoints is the platform's cut of marketplace sales, in
 	// hundredths of a percent: 2.5% is 250. Zero means no commission.
 	commissionBasisPoints int64
+
+	// staleDepositAfter is how long a funding attempt may stay unsettled before
+	// it is listed for an operator to investigate. Reporting only.
+	staleDepositAfter time.Duration
 }
 
-func NewWalletService(repo *repository.WalletRepository, farmers *repository.FarmerRepository, flutter *FlutterwaveClient, adminIDs []int, commissionBasisPoints int64) *WalletService {
+func NewWalletService(repo *repository.WalletRepository, farmers *repository.FarmerRepository, flutter *FlutterwaveClient, adminIDs []int, commissionBasisPoints int64, staleDepositAfter time.Duration) *WalletService {
 	adminSet := make(map[int]struct{}, len(adminIDs))
 	for _, id := range adminIDs {
 		if id > 0 {
@@ -40,7 +46,23 @@ func NewWalletService(repo *repository.WalletRepository, farmers *repository.Far
 		flutter:               flutter,
 		adminIDs:              adminSet,
 		commissionBasisPoints: commissionBasisPoints,
+		staleDepositAfter:     staleDepositAfter,
 	}
+}
+
+// ParseStaleDepositAfter converts WALLET_STALE_DEPOSIT_HOURS into the age at
+// which an unsettled funding attempt is listed for an operator to investigate.
+// An empty value means the 24-hour default.
+func ParseStaleDepositAfter(value string) (time.Duration, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		value = "24"
+	}
+	hours, err := strconv.Atoi(value)
+	if err != nil || hours <= 0 {
+		return 0, fmt.Errorf("invalid WALLET_STALE_DEPOSIT_HOURS %q: enter a whole number of hours greater than zero", value)
+	}
+	return time.Duration(hours) * time.Hour, nil
 }
 
 // ParseCommissionPercent converts a percentage such as "2.5" into basis points
@@ -125,6 +147,14 @@ func (s *WalletService) IsAdmin(farmerID int) bool {
 
 func (s *WalletService) Wallet(ctx context.Context, farmerID int) (*models.Wallet, []models.WalletTransaction, error) {
 	wallet, err := s.repo.GetWallet(ctx, farmerID)
+	if errors.Is(err, repository.ErrWalletNotFound) {
+		// Every account is meant to own a wallet — FarmerRepository.Create inserts
+		// one inside the registration transaction. If one is somehow missing,
+		// rebuild it for the authenticated owner here rather than leaving them on a
+		// permanent error with no way back. This is the owner's own wallet, so it is
+		// not creation on behalf of an arbitrary user.
+		wallet, err = s.repo.EnsureWallet(ctx, farmerID)
+	}
 	if err != nil {
 		return nil, nil, err
 	}
@@ -133,6 +163,48 @@ func (s *WalletService) Wallet(ctx context.Context, farmerID int) (*models.Walle
 		return nil, nil, err
 	}
 	return wallet, transactions, nil
+}
+
+// RepairWallet rebuilds a user's wallet if their account has none. Admin only.
+//
+// This is deliberately an explicit operation rather than something the funding
+// path does silently: creating a wallet during an arbitrary funding request would
+// let a request invent an account's financial state.
+func (s *WalletService) RepairWallet(ctx context.Context, farmerID, adminID int) (*models.Wallet, error) {
+	if !s.IsAdmin(adminID) {
+		return nil, errors.New("admin access required")
+	}
+	wallet, err := s.repo.EnsureWallet(ctx, farmerID)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("wallet repair: admin %d ensured a wallet for user %d", adminID, farmerID)
+	return wallet, nil
+}
+
+// IsWalletDeposit reports whether the reference belongs to a wallet funding
+// attempt, and which provider owns it. Routing reads the recorded provider rather
+// than the shape of the reference string.
+func (s *WalletService) IsWalletDeposit(ctx context.Context, reference string) (provider string, found bool, err error) {
+	provider, err = s.repo.DepositProvider(ctx, reference)
+	if errors.Is(err, repository.ErrWalletNotFound) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("%w: read deposit provider: %v", ErrWalletUnavailable, err)
+	}
+	return provider, true, nil
+}
+
+// StalePendingDeposits is a read-only operational report for an admin: funding
+// attempts a provider has not settled within the configured age. It never moves money.
+func (s *WalletService) StalePendingDeposits(ctx context.Context) ([]models.WalletDeposit, error) {
+	return s.repo.StalePendingDeposits(ctx, s.staleDepositAfter, 100)
+}
+
+// StaleDepositAfter exposes the configured reporting threshold for display.
+func (s *WalletService) StaleDepositAfter() time.Duration {
+	return s.staleDepositAfter
 }
 
 func (s *WalletService) Withdrawals(ctx context.Context, farmerID int) ([]models.Withdrawal, error) {
@@ -251,7 +323,7 @@ func (s *WalletService) InitiateDeposit(ctx context.Context, farmer *models.Farm
 	if err != nil {
 		return nil, fmt.Errorf("generate deposit reference: %w", err)
 	}
-	if err := s.repo.CreateDeposit(ctx, farmer.ID, reference, amount); err != nil {
+	if err := s.repo.CreateDeposit(ctx, farmer.ID, models.ProviderFlutterwave, reference, amount); err != nil {
 		return nil, fmt.Errorf("create wallet deposit: %w", err)
 	}
 	checkoutURL, err := s.flutter.InitializePayment(InitializePaymentRequest{
@@ -298,8 +370,15 @@ func (s *WalletService) ConfirmDeposit(ctx context.Context, reference, transacti
 	if currency != "NGN" {
 		return errors.New("wallet deposits must be paid in NGN")
 	}
-	if transactionID == "" || !strings.HasPrefix(reference, "WALLET-") {
+	if transactionID == "" {
 		return errors.New("invalid wallet deposit verification")
+	}
+	// The recorded provider is authoritative, not the reference's shape: a
+	// reference that belongs to no wallet funding attempt must never be credited.
+	if _, err := s.repo.DepositProvider(ctx, reference); errors.Is(err, repository.ErrWalletNotFound) {
+		return errors.New("invalid wallet deposit verification")
+	} else if err != nil {
+		return fmt.Errorf("%w: read deposit provider: %v", ErrWalletUnavailable, err)
 	}
 	return s.repo.CompleteDeposit(ctx, reference, transactionID, verifiedAmount, currency)
 }

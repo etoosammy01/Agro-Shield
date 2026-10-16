@@ -43,6 +43,11 @@ type Config struct {
 	// Wallet administration
 	WalletAdminUserIDs string
 
+	// WalletStaleDepositHours is how long a funding attempt may stay unsettled
+	// before it is listed on the admin page for an operator to investigate. It is
+	// a reporting threshold only — nothing is credited or expired automatically.
+	WalletStaleDepositHours string
+
 	// OTP delivery — SMS
 	//
 	// SMSProvider selects the transport: "log" writes one-time codes to the
@@ -92,6 +97,8 @@ func Load() (Config, error) {
 
 		WalletAdminUserIDs: strings.TrimSpace(os.Getenv("WALLET_ADMIN_USER_IDS")),
 
+		WalletStaleDepositHours: strings.TrimSpace(os.Getenv("WALLET_STALE_DEPOSIT_HOURS")),
+
 		CommissionPercent: strings.TrimSpace(os.Getenv("COMMISSION_PERCENT")),
 
 		SMSProvider:    strings.TrimSpace(os.Getenv("SMS_PROVIDER")),
@@ -123,6 +130,13 @@ func Load() (Config, error) {
 	}
 	if cfg.TermiiBaseURL == "" {
 		cfg.TermiiBaseURL = "https://api.ng.termii.com"
+	}
+
+	// A funding attempt left unsettled this long is worth an operator's attention.
+	// This only drives a read-only report on the admin page; nothing is credited
+	// or expired automatically from it.
+	if cfg.WalletStaleDepositHours == "" {
+		cfg.WalletStaleDepositHours = "24"
 	}
 
 	// Database access is required to start the application.
