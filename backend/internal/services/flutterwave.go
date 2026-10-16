@@ -23,6 +23,11 @@ type FlutterwaveClient struct {
 	SecretKey   string
 	SecretHash  string
 	RedirectURL string
+
+	// PaymentOptions is the default set of funding methods offered on hosted
+	// checkout, e.g. "card,banktransfer".
+	PaymentOptions string
+
 	httpClient  *http.Client
 	bankMu      sync.Mutex
 	bankCache   []Bank
@@ -30,12 +35,13 @@ type FlutterwaveClient struct {
 	bankCountry string
 }
 
-func NewFlutterwaveClient(secretKey, secretHash, redirectURL string) *FlutterwaveClient {
+func NewFlutterwaveClient(secretKey, secretHash, redirectURL, paymentOptions string) *FlutterwaveClient {
 	return &FlutterwaveClient{
-		SecretKey:   secretKey,
-		SecretHash:  secretHash,
-		RedirectURL: redirectURL,
-		httpClient:  &http.Client{Timeout: flutterwaveRequestTimeout},
+		SecretKey:      secretKey,
+		SecretHash:     secretHash,
+		RedirectURL:    redirectURL,
+		PaymentOptions: strings.TrimSpace(paymentOptions),
+		httpClient:     &http.Client{Timeout: flutterwaveRequestTimeout},
 	}
 }
 
@@ -58,6 +64,10 @@ type InitializePaymentRequest struct {
 	CustomerName  string
 	Title         string
 	Description   string
+
+	// PaymentOptions overrides the client default for this one checkout. Leave
+	// it empty to use the client's configured methods.
+	PaymentOptions string
 }
 
 type initializePaymentPayload struct {
@@ -65,6 +75,7 @@ type initializePaymentPayload struct {
 	Amount         string           `json:"amount"`
 	Currency       string           `json:"currency"`
 	RedirectURL    string           `json:"redirect_url"`
+	PaymentOptions string           `json:"payment_options,omitempty"`
 	Customer       fwCustomer       `json:"customer"`
 	Customizations fwCustomizations `json:"customizations"`
 }
@@ -89,11 +100,20 @@ type initializePaymentResponse struct {
 
 // InitializePayment asks Flutterwave for a hosted checkout link.
 func (c *FlutterwaveClient) InitializePayment(req InitializePaymentRequest) (string, error) {
+	// Which funding methods the checkout offers. Without this the methods are
+	// whatever the Flutterwave dashboard happens to be set to, which is not
+	// something this codebase can see or version.
+	paymentOptions := strings.TrimSpace(req.PaymentOptions)
+	if paymentOptions == "" {
+		paymentOptions = c.PaymentOptions
+	}
+
 	payload := initializePaymentPayload{
-		TxRef:       req.Reference,
-		Amount:      req.Amount,
-		Currency:    req.Currency,
-		RedirectURL: c.RedirectURL,
+		TxRef:          req.Reference,
+		Amount:         req.Amount,
+		Currency:       req.Currency,
+		RedirectURL:    c.RedirectURL,
+		PaymentOptions: paymentOptions,
 		Customer: fwCustomer{
 			Email: req.CustomerEmail,
 			Name:  req.CustomerName,

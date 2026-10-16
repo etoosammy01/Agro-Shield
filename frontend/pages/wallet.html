@@ -15,7 +15,7 @@
             <a href="/dashboard">Dashboard</a>
             <a href="/marketplace">Marketplace</a>
             <a href="/wallet" aria-current="page">Wallet</a>
-            {{if .IsAdmin}}<a href="/admin/wallet-withdrawals">Withdrawal approvals</a>{{end}}
+            {{if .IsAdmin}}<a href="/admin/wallet-withdrawals">Wallet approvals</a>{{end}}
             <a href="/profile">Profile</a>
             <a href="/logout">Logout</a>
         </nav>
@@ -83,13 +83,44 @@
                 <div class="wallet-card-icon wallet-icon-gold" aria-hidden="true">↓</div>
                 <p class="wallet-card-kicker">Cash out</p>
                 <h2>Request a withdrawal</h2>
-                <p>Choose an amount to send to your saved bank account. Requests need admin approval.</p>
+                <p>Choose an amount to send to your saved bank account. Requests need admin approval and a code we text to your phone.</p>
                 <form method="POST" action="/wallet/withdraw">
                     <label class="wallet-label" for="withdrawal-amount">Withdrawal amount</label>
                     <div class="wallet-input-wrap"><span>₦</span><input id="withdrawal-amount" name="amount" type="number" min="1" step="1" placeholder="10,000" required></div>
+
+                    <label class="wallet-label" for="withdrawal-code">Verification code</label>
+                    <input id="withdrawal-code" name="code" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" required>
+                    <button class="wallet-button wallet-button-secondary" type="button" data-otp-purpose="withdrawal" data-otp-target="withdrawal-code" data-otp-status="withdrawal-otp-status">Send code</button>
+                    <p class="wallet-inline-status" id="withdrawal-otp-status" role="status" aria-live="polite"></p>
+
                     <button class="wallet-button wallet-button-secondary" type="submit">Request withdrawal <span aria-hidden="true">→</span></button>
                 </form>
                 <p class="wallet-footnote">Your funds stay safe and reserved while a payout is processing.</p>
+            </article>
+
+            <article class="wallet-card wallet-action-card">
+                <div class="wallet-card-icon wallet-icon-pink" aria-hidden="true">⇄</div>
+                <p class="wallet-card-kicker">Send money</p>
+                <h2>Transfer to another wallet</h2>
+                <p>Send to another Agro-Shield member using the phone number on their account. An admin approves it before the money lands, so a mistake can be put right.</p>
+                <form method="POST" action="/wallet/transfer">
+                    <label class="wallet-label" for="transfer-phone">Recipient’s phone number</label>
+                    <input id="transfer-phone" name="recipient_phone" type="tel" inputmode="tel" placeholder="0801 234 5678" required>
+
+                    <label class="wallet-label" for="transfer-amount">Amount</label>
+                    <div class="wallet-input-wrap"><span>₦</span><input id="transfer-amount" name="amount" type="number" min="0.01" step="0.01" placeholder="2,500.00" required></div>
+
+                    <label class="wallet-label" for="transfer-note">Note <small>(optional)</small></label>
+                    <input id="transfer-note" name="note" maxlength="140" placeholder="What is this for?">
+
+                    <label class="wallet-label" for="transfer-code">Verification code</label>
+                    <input id="transfer-code" name="code" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" required>
+                    <button class="wallet-button wallet-button-secondary" type="button" data-otp-purpose="transfer" data-otp-target="transfer-code" data-otp-status="transfer-otp-status">Send code</button>
+                    <p class="wallet-inline-status" id="transfer-otp-status" role="status" aria-live="polite"></p>
+
+                    <button class="wallet-button wallet-button-secondary" type="submit">Send transfer <span aria-hidden="true">→</span></button>
+                </form>
+                <p class="wallet-footnote">The amount leaves your balance right away and is held until an admin approves it. If it’s rejected, it comes straight back.</p>
             </article>
         </section>
 
@@ -137,6 +168,30 @@
                     </table>
                 </div>
                 {{else}}<p class="wallet-empty">When you request a payout, you can track it here.</p>{{end}}
+                </article>
+
+                <article class="wallet-card wallet-history-card">
+                    <h3><span class="wallet-history-icon">⇄</span> Transfers</h3>
+                {{if .Transfers}}
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>When</th><th>With</th><th>Amount</th><th>Status</th></tr></thead>
+                        <tbody>
+                            {{range .Transfers}}
+                            <tr>
+                                <td>{{.CreatedAt.Format "02 Jan · 15:04"}}</td>
+                                <td>
+                                    {{if .IsIncoming $.Wallet.FarmerID}}from {{.SenderName}}{{else}}to {{.RecipientName}}{{end}}
+                                    {{if .Note}}<br><small>{{.Note}}</small>{{end}}
+                                </td>
+                                <td class="wallet-table-amount">₦{{.Amount}}</td>
+                                <td><span class="wallet-status wallet-status-{{.Status}}">{{.Status}}</span></td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                </div>
+                {{else}}<p class="wallet-empty">Money you send to, or receive from, another member will appear here.</p>{{end}}
                 </article>
 
                 <article class="wallet-card wallet-history-card wallet-full-history">

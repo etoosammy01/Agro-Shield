@@ -105,6 +105,12 @@ func main() {
 	walletRepo := repository.NewWalletRepository(db)
 
 	// ------------------------------------------------------------
+	// ONE-TIME PASSCODE REPOSITORY          ← added
+	// Backs password resets and wallet payout verification.
+	// ------------------------------------------------------------
+	otpRepo := repository.NewOTPRepository(db)
+
+	// ------------------------------------------------------------
 	// FEEDBACK REPOSITORY
 	// ------------------------------------------------------------
 	feedbackRepo := repository.NewFeedbackRepository(db)
@@ -180,10 +186,34 @@ func main() {
 		cfg.FlutterwaveSecretKey,
 		cfg.FlutterwaveSecretHash,
 		cfg.PaymentRedirectURL,
+		cfg.FlutterwavePaymentOptions,
 	)
 	walletAdminIDs, err := services.ParseWalletAdminIDs(cfg.WalletAdminUserIDs)
 	if err != nil {
 		log.Fatal(err)
+	}
+	commissionBasisPoints, err := services.ParseCommissionPercent(cfg.CommissionPercent)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// ============================================================
+	// CREATE SMS SENDER          ← added
+	//
+	// Delivers one-time passcodes. SMS_PROVIDER=log (the default)
+	// prints codes to the server log so development needs no SMS
+	// account; SMS_PROVIDER=termii sends real messages and requires
+	// TERMII_API_KEY and TERMII_SENDER_ID.
+	// ============================================================
+
+	smsSender := services.NewSMSSender(
+		cfg.SMSProvider,
+		cfg.TermiiAPIKey,
+		cfg.TermiiSenderID,
+		cfg.TermiiBaseURL,
+	)
+	if cfg.SMSProvider == "log" && cfg.AppEnv != "development" {
+		log.Printf("WARNING: SMS_PROVIDER=log in %s — one-time passcodes are being written to this log instead of being sent, and anyone with log access can read them", cfg.AppEnv)
 	}
 
 	// ============================================================
@@ -214,9 +244,12 @@ func main() {
 		// Payments          ← added
 		paymentRepo,
 		walletRepo,
+		otpRepo,
+		smsSender,
 		flutterwaveClient,
 		feedbackRepo,
 		walletAdminIDs,
+		commissionBasisPoints,
 	)
 
 	// ============================================================

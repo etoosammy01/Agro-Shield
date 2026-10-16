@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="/static/css/register.css">
     <link rel="stylesheet" href="/static/css/register-extra.css">
+    <link rel="stylesheet" href="/static/css/register-errors.css">
 
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
@@ -52,6 +53,12 @@
 
                     <h2>Create Account</h2>
 
+                    {{if .Error}}
+                    <div class="form-error-banner" role="alert">
+                        {{.Error}}
+                    </div>
+                    {{end}}
+
 
                     <!-- ROLE -->
                     <label>How would you like to use Agro-Shield?</label>
@@ -59,7 +66,7 @@
                     <div class="row role-select">
 
                         <label class="role-option">
-                            <input type="radio" name="role" value="farmer" checked>
+                            <input type="radio" name="role" value="farmer" {{if ne .Role "buyer" }}checked{{end}}>
 
                             <span>
                                 🌾 Farmer
@@ -67,7 +74,7 @@
                         </label>
 
                         <label class="role-option">
-                            <input type="radio" name="role" value="buyer">
+                            <input type="radio" name="role" value="buyer" {{if eq .Role "buyer" }}checked{{end}}>
 
                             <span>
                                 🛒 Buyer
@@ -94,7 +101,12 @@
                             </label>
 
                             <input name="first-name" type="text" id="first-name" placeholder="First Name"
-                                autocomplete="given-name" required>
+                                autocomplete="given-name" value="{{.FirstName}}" {{if
+                                .FieldErrors.first}}class="input-error" aria-invalid="true" {{end}} required>
+
+                            {{with .FieldErrors.first}}
+                            <p class="field-error">{{.}}</p>
+                            {{end}}
 
                         </div>
 
@@ -105,7 +117,12 @@
                             </label>
 
                             <input name="last-name" type="text" id="last-name" placeholder="Last Name"
-                                autocomplete="family-name" required>
+                                autocomplete="family-name" value="{{.LastName}}" {{if
+                                .FieldErrors.last}}class="input-error" aria-invalid="true" {{end}} required>
+
+                            {{with .FieldErrors.last}}
+                            <p class="field-error">{{.}}</p>
+                            {{end}}
 
                         </div>
 
@@ -120,7 +137,12 @@
                         </label>
 
                         <input name="email" type="email" id="email" placeholder="Enter your email" autocomplete="email"
+                            value="{{.Email}}" {{if .FieldErrors.email}}class="input-error" aria-invalid="true" {{end}}
                             required>
+
+                        {{with .FieldErrors.email}}
+                        <p class="field-error">{{.}}</p>
+                        {{end}}
 
                     </div>
 
@@ -133,7 +155,20 @@
                         </label>
 
                         <input name="phone" type="tel" id="phone" placeholder="Enter your phone number"
-                            autocomplete="tel" required>
+                            autocomplete="tel" value="{{.Phone}}" {{if .FieldErrors.phone}}class="input-error"
+                            aria-invalid="true" {{end}} {{if .PhoneTaken}}autofocus{{end}} required>
+
+                        {{with .FieldErrors.phone}}
+                        <p class="field-error">{{.}}</p>
+                        {{end}}
+
+                        {{if .PhoneTaken}}
+                        <p class="field-error-links">
+                            <a href="/login">Log in instead</a>
+                            <span aria-hidden="true">·</span>
+                            <a href="/forgot-password">Forgot your password?</a>
+                        </p>
+                        {{end}}
 
                     </div>
 
@@ -141,26 +176,54 @@
                     <!-- LOCATION -->
                     <div class="form-group">
                         <label for="community">Community / Village</label>
-                        <input name="community" type="text" id="community" autocomplete="address-level2" required>
+                        <input name="community" type="text" id="community" autocomplete="address-level2"
+                            value="{{.Community}}" {{if .FieldErrors.community}}class="input-error" aria-invalid="true"
+                            {{end}} required>
+
+                        {{with .FieldErrors.community}}
+                        <p class="field-error">{{.}}</p>
+                        {{end}}
                     </div>
                     <div class="form-group">
                         <label for="state-select">State</label>
-                        <select name="state" id="state-select" data-state-select data-selected="" autocomplete="address-level1" required>
+                        <select name="state" id="state-select" data-state-select data-selected="{{.State}}"
+                            autocomplete="address-level1" {{if .FieldErrors.state}}class="input-error"
+                            aria-invalid="true" {{end}} required>
                             <option value="">Choose a country first</option>
                         </select>
-                        <input name="state" id="state-text" data-state-text autocomplete="address-level1" required hidden disabled>
+                        <input name="state" id="state-text" data-state-text autocomplete="address-level1"
+                            value="{{.State}}" {{if .FieldErrors.state}}class="input-error" aria-invalid="true" {{end}}
+                            required hidden disabled>
+
+                        {{with .FieldErrors.state}}
+                        <p class="field-error">{{.}}</p>
+                        {{end}}
                     </div>
                     <div class="form-group">
                         <label for="lga-select">Local Government Area (LGA)</label>
-                        <select name="lga" id="lga-select" data-lga-select autocomplete="address-level3" required disabled>
+                        <select name="lga" id="lga-select" data-lga-select data-selected="{{.LGA}}"
+                            autocomplete="address-level3" {{if .FieldErrors.lga}}class="input-error" aria-invalid="true"
+                            {{end}} required disabled>
                             <option value="">Choose a state first</option>
                         </select>
-                        <input name="lga" id="lga-text" data-lga-text autocomplete="address-level3" required hidden disabled>
+                        <input name="lga" id="lga-text" data-lga-text autocomplete="address-level3" value="{{.LGA}}"
+                            {{if .FieldErrors.lga}}class="input-error" aria-invalid="true" {{end}} required hidden
+                            disabled>
+
+                        {{with .FieldErrors.lga}}
+                        <p class="field-error">{{.}}</p>
+                        {{end}}
                     </div>
                     <div class="form-group">
                         <label for="country">Country</label>
-                        <input name="country" type="text" id="country" data-country-field value="Nigeria" autocomplete="country-name" required>
+                        <input name="country" type="text" id="country" data-country-field value="{{.Country}}"
+                            autocomplete="country-name" {{if .FieldErrors.country}}class="input-error"
+                            aria-invalid="true" {{end}} required>
                         <small id="location-directory-status" role="status" aria-live="polite"></small>
+
+                        {{with .FieldErrors.country}}
+                        <p class="field-error">{{.}}</p>
+                        {{end}}
                     </div>
 
 
@@ -174,12 +237,17 @@
                         <div class="password-wrapper">
 
                             <input name="password" type="password" id="password" placeholder="Create password"
-                                autocomplete="new-password" required>
+                                autocomplete="new-password" {{if .FieldErrors.password}}class="input-error"
+                                aria-invalid="true" {{end}} required>
 
                             <i class="fa-solid fa-eye toggle-password" id="toggle-password" aria-label="Show password"
                                 role="button" tabindex="0"></i>
 
                         </div>
+
+                        {{with .FieldErrors.password}}
+                        <p class="field-error">{{.}}</p>
+                        {{end}}
 
                     </div>
 
@@ -194,12 +262,17 @@
                         <div class="password-wrapper">
 
                             <input name="confirm-password" type="password" id="confirm-password"
-                                placeholder="Confirm password" autocomplete="new-password" required>
+                                placeholder="Confirm password" autocomplete="new-password" {{if
+                                .FieldErrors.confirm}}class="input-error" aria-invalid="true" {{end}} required>
 
                             <i class="fa-solid fa-eye toggle-password" id="toggle-confirm-password"
                                 aria-label="Show confirm password" role="button" tabindex="0"></i>
 
                         </div>
+
+                        {{with .FieldErrors.confirm}}
+                        <p class="field-error">{{.}}</p>
+                        {{end}}
 
                     </div>
 

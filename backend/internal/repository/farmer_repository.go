@@ -3,8 +3,25 @@ package repository
 import (
 	"backend/internal/models"
 	"database/sql"
+	"errors"
 	"strings"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
+
+// ErrPhoneExists means an account is already registered with this phone number.
+//
+// Phone is UNIQUE in the farmers table, so Create hits this when two signups
+// race past the pre-check in AuthService.Register. Callers match it with
+// errors.Is rather than comparing error strings.
+var ErrPhoneExists = errors.New("phone number already registered")
+
+// isUniqueViolation reports whether err is a PostgreSQL unique-constraint
+// violation (SQLSTATE 23505).
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
 
 type FarmerRepository struct {
 	db *sql.DB
@@ -47,6 +64,11 @@ func (r *FarmerRepository) Create(farmer *models.Farmer) error {
 		farmer.AccountNumber,
 	).Scan(&farmer.ID)
 	if err != nil {
+		// Only phone is UNIQUE on this table, so a 23505 here means this
+		// number was claimed between the pre-check and this insert.
+		if isUniqueViolation(err) {
+			return ErrPhoneExists
+		}
 		return err
 	}
 

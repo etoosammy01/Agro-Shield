@@ -39,3 +39,40 @@ if (bankSelect && bankCode && bankStatus) {
     bankCode.value = bankSelect.selectedOptions[0]?.dataset.code ?? "";
   });
 }
+
+// "Send code" buttons for wallet actions that need a one-time passcode.
+// The code always goes to the phone number on the account, so the browser only
+// says which action it is for.
+document.querySelectorAll("[data-otp-purpose]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const status = document.getElementById(button.dataset.otpStatus);
+    const target = document.getElementById(button.dataset.otpTarget);
+    const setStatus = (text) => {
+      if (status) status.textContent = text;
+    };
+
+    button.disabled = true;
+    setStatus("Sending…");
+
+    fetch("/wallet/otp/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: "application/json",
+      },
+      body: new URLSearchParams({ purpose: button.dataset.otpPurpose }),
+    })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || "Could not send a verification code.");
+        }
+        setStatus(data.message || "Verification code sent.");
+        if (target) target.focus();
+      })
+      .catch((error) => setStatus(error.message))
+      .finally(() => {
+        button.disabled = false;
+      });
+  });
+});

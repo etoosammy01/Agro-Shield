@@ -106,6 +106,7 @@ func RegisterRoutes(container *app.Container) {
 
 	forgotPasswordHandler := handlers.NewForgotPasswordHandler(
 		container.Auth,
+		container.OTP,
 	)
 
 	http.HandleFunc(
@@ -865,11 +866,15 @@ func RegisterRoutes(container *app.Container) {
 	paymentHandler := handlers.NewPaymentHandler(
 		container.Payment,
 	)
-	walletHandler := handlers.NewWalletHandler(container.Wallet)
+	walletHandler := handlers.NewWalletHandler(container.Wallet, container.OTP, container.Notification)
 
 	http.HandleFunc("/wallet", middleware.OnlyPath(
 		"/wallet",
 		middleware.OnlyGet(middleware.RequireAuth(container.FarmerRepo, walletHandler.Page)),
+	))
+	http.HandleFunc("/wallet/otp/send", middleware.OnlyPath(
+		"/wallet/otp/send",
+		middleware.RequireAuth(container.FarmerRepo, walletHandler.SendOTP),
 	))
 	http.HandleFunc("/wallet/deposit", middleware.OnlyPath(
 		"/wallet/deposit",
@@ -878,6 +883,10 @@ func RegisterRoutes(container *app.Container) {
 	http.HandleFunc("/wallet/withdraw", middleware.OnlyPath(
 		"/wallet/withdraw",
 		middleware.RequireAuth(container.FarmerRepo, walletHandler.Withdraw),
+	))
+	http.HandleFunc("/wallet/transfer", middleware.OnlyPath(
+		"/wallet/transfer",
+		middleware.RequireAuth(container.FarmerRepo, walletHandler.Transfer),
 	))
 	http.HandleFunc("/wallet/bank", middleware.OnlyPath(
 		"/wallet/bank",
@@ -902,6 +911,16 @@ func RegisterRoutes(container *app.Container) {
 	http.HandleFunc("/admin/wallet-withdrawals/reconcile", middleware.OnlyPath(
 		"/admin/wallet-withdrawals/reconcile",
 		middleware.RequireAuth(container.FarmerRepo, walletHandler.ReconcileWithdrawal),
+	))
+	// Wallet-to-wallet transfers are reviewed on the same approvals page, so
+	// they need no listing route of their own.
+	http.HandleFunc("/admin/wallet-transfers/approve", middleware.OnlyPath(
+		"/admin/wallet-transfers/approve",
+		middleware.RequireAuth(container.FarmerRepo, walletHandler.ApproveTransfer),
+	))
+	http.HandleFunc("/admin/wallet-transfers/reject", middleware.OnlyPath(
+		"/admin/wallet-transfers/reject",
+		middleware.RequireAuth(container.FarmerRepo, walletHandler.RejectTransfer),
 	))
 
 	// Initiate a payment for an order - requires the buyer to

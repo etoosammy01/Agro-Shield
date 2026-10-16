@@ -35,6 +35,7 @@ type Container struct {
 	Chat         *services.ChatService
 	Payment      *services.PaymentService // ← added
 	Wallet       *services.WalletService
+	OTP          *services.OTPService // ← added
 	Feedback     *services.FeedbackService
 	MarketEvents *repository.MarketEventRepository
 
@@ -74,9 +75,12 @@ func NewContainer(
 
 	paymentRepo *repository.PaymentRepository,
 	walletRepo *repository.WalletRepository,
+	otpRepo *repository.OTPRepository,
+	smsSender services.SMSSender,
 	flutterwaveClient *services.FlutterwaveClient,
 	feedbackRepo *repository.FeedbackRepository,
 	walletAdminIDs []int,
+	commissionBasisPoints int64,
 ) *Container {
 
 	// ========================================================
@@ -140,8 +144,13 @@ func NewContainer(
 	// Flutterwave API.
 	// ========================================================
 
-	walletService := services.NewWalletService(walletRepo, farmerRepo, flutterwaveClient, walletAdminIDs)
+	walletService := services.NewWalletService(walletRepo, farmerRepo, flutterwaveClient, walletAdminIDs, commissionBasisPoints)
 	paymentService := services.NewPaymentService(paymentRepo, orderRepo, farmerRepo, flutterwaveClient, walletService)
+
+	// One-time passcodes guard password resets and wallet payouts. The
+	// transport is chosen by config, so local development can run with the
+	// log-only sender and no SMS account.
+	otpService := services.NewOTPService(otpRepo, smsSender)
 
 	feedbackService := services.NewFeedbackService(
 		feedbackRepo,
@@ -227,6 +236,7 @@ func NewContainer(
 
 		Payment: paymentService,
 		Wallet:  walletService,
+		OTP:     otpService,
 
 		// ----------------------------------------------------
 		// FARMER REPOSITORY

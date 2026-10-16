@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Wallet Withdrawal Approvals — Agro-Shield</title>
+    <title>Wallet Approvals — Agro-Shield</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="/static/css/wallet.css">
 </head>
@@ -13,15 +13,28 @@
         <a class="logo" href="/dashboard"><img src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield"></a>
         <nav aria-label="Main navigation">
             <a href="/wallet">Wallet</a>
-            <a href="/admin/wallet-withdrawals" aria-current="page">Withdrawal approvals</a>
+            <a href="/admin/wallet-withdrawals" aria-current="page">Wallet approvals</a>
             <a href="/profile">Profile</a>
             <a href="/logout">Logout</a>
         </nav>
     </header>
     <main class="wallet-admin-page">
-        <h1>Wallet withdrawal approvals</h1>
+        <h1>Wallet approvals</h1>
         {{if .Error}}<p role="alert">{{.Error}}</p>{{end}}
         {{if .Success}}<p role="status">{{.Success}}</p>{{end}}
+
+        <section class="admin-revenue">
+            <h2>Platform revenue</h2>
+            {{if .CommissionEnabled}}
+            <p>Commission is set to <strong>{{.CommissionLabel}}%</strong> of each sale, taken from the seller’s payout.</p>
+            {{else}}
+            <p>Commission is switched off, so sellers receive the full sale amount. Set <code>COMMISSION_PERCENT</code> to start collecting.</p>
+            {{end}}
+            <p><strong>₦{{.RevenueTotal}}</strong> collected across {{.RevenueCount}} {{if eq .RevenueCount 1}}sale{{else}}sales{{end}}.</p>
+            <p>This is a ledger only — it is not credited to any wallet, so it does not count towards a user’s balance or a transfer.</p>
+        </section>
+
+        <h2>Withdrawal requests</h2>
         {{if .Withdrawals}}
         <div class="table-wrap">
             <table>
@@ -64,6 +77,39 @@
             </table>
         </div>
         {{else}}<p>No withdrawal requests need review.</p>{{end}}
+
+        <h2>Wallet-to-wallet transfers</h2>
+        <p>Approving credits the recipient. The sender’s balance was already reduced when the transfer was requested, so a transfer you have not approved has not reached anyone.</p>
+        {{if .Transfers}}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>From</th><th>To</th><th>Amount</th><th>Note</th><th>Reference</th><th>Action</th></tr>
+                </thead>
+                <tbody>
+                    {{range .Transfers}}
+                    <tr>
+                        <td>{{.SenderName}} (#{{.SenderID}})</td>
+                        <td>{{.RecipientName}} (#{{.RecipientID}})<br>{{.RecipientPhone}}</td>
+                        <td>{{.Amount}} {{.Currency}}</td>
+                        <td>{{if .Note}}{{.Note}}{{else}}—{{end}}</td>
+                        <td>{{.Reference}}</td>
+                        <td>
+                            <form method="POST" action="/admin/wallet-transfers/approve">
+                                <input type="hidden" name="transfer_id" value="{{.ID}}">
+                                <button type="submit">Approve &amp; credit</button>
+                            </form>
+                            <form method="POST" action="/admin/wallet-transfers/reject">
+                                <input type="hidden" name="transfer_id" value="{{.ID}}">
+                                <button type="submit">Reject &amp; refund sender</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        {{else}}<p>No transfers need review.</p>{{end}}
     </main>
 </body>
 </html>

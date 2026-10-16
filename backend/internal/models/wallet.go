@@ -53,3 +53,37 @@ func (w Withdrawal) MaskedAccountNumber() string {
 	}
 	return "••••••" + w.AccountNumber[len(w.AccountNumber)-4:]
 }
+
+// Wallet-to-wallet transfer statuses.
+//
+// A transfer is reserved from the sender the moment it is requested, and the
+// recipient is only credited once an admin approves it — the same reserve-first
+// shape withdrawals already use, so a mistaken or fraudulent transfer can be
+// reversed without chasing money that has already left.
+const (
+	TransferPending   = "pending"
+	TransferCompleted = "completed"
+	TransferRejected  = "rejected"
+)
+
+type Transfer struct {
+	ID             int64
+	SenderID       int
+	SenderName     string
+	RecipientID    int
+	RecipientName  string
+	RecipientPhone string
+	Amount         string
+	Currency       string
+	Note           string
+	Reference      string
+	Status         string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+// IsIncoming reports whether this transfer credits the given user rather than
+// debiting them, so one list can present sent and received transfers together.
+func (t Transfer) IsIncoming(farmerID int) bool {
+	return t.RecipientID == farmerID && t.SenderID != farmerID
+}

@@ -1,0 +1,71 @@
+/* ============================================================
+   REGISTRATION FORM ERRORS
+   ============================================================ */
+
+/* General banner above the form */
+.auth-right form .form-error-banner {
+      margin: 0 0 20px;
+      padding: 12px 14px;
+
+      border: 1px solid #f0c9c9;
+      border-left: 4px solid #d64545;
+      border-radius: 10px;
+
+      background: #fff5f5;
+
+      color: #8f2d2d;
+
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.5;
+}
+
+/* Invalid inputs and selects */
+.auth-right form input.input-error,
+.auth-right form select.input-error {
+      border-color: #d64545;
+      border-width: 1px;
+}
+
+.auth-right form input.input-error:focus,
+.auth-right form select.input-error:focus {
+      border-color: #d64545;
+
+      box-shadow: 0 0 0 3px rgba(214, 69, 69, 0.12);
+}
+
+/* Message directly under a field */
+.field-error {
+      margin-top: 6px;
+
+      color: #b42318;
+
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.4;
+}
+
+/* "Log in instead · Forgot your password?" */
+.field-error-links {
+      margin-top: 6px;
+
+      font-size: 13px;
+      font-weight: 600;
+}
+
+.field-error-links a {
+      color: var(--color-brand, #1f7a4d);
+
+      text-decoration: none;
+}
+
+.field-error-links a:hover {
+      color: var(--color-brand-dark, #14532d);
+
+      text-decoration: underline;
+}
+
+.field-error-links span {
+      margin: 0 6px;
+
+      color: #8a968f;   }

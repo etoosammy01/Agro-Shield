@@ -17,6 +17,16 @@ import (
 // schema convention rather than introducing a new one.
 const DefaultPhotoURL = "/static/assets/images/un.jpeg"
 
+// Sentinel errors that handlers can match with errors.Is to show the right
+// message to the user, instead of comparing error strings.
+var (
+	// ErrPhoneTaken means the phone number already belongs to an account.
+	ErrPhoneTaken = repository.ErrPhoneExists
+
+	// ErrPasswordTooShort means the password is under the minimum length.
+	ErrPasswordTooShort = errors.New("password must be at least 8 characters")
+)
+
 type AuthService struct {
 	repo *repository.FarmerRepository
 }
@@ -34,6 +44,9 @@ func NewAuthService(repo *repository.FarmerRepository) *AuthService {
 // they're collected on the mandatory Complete Your Profile step that
 // follows registration. If no photo is supplied, the account is created
 // with DefaultPhotoURL until a real one is uploaded.
+//
+// Returns ErrPhoneTaken if the phone number is already registered, and
+// ErrPasswordTooShort if the password is too short.
 func (s *AuthService) Register(firstName, lastName, phone, email, password, community, lga, state, country, role, photoURL, bankName, accountName, accountNumber string) (*models.Farmer, error) {
 
 	if firstName == "" || lastName == "" {
@@ -49,7 +62,7 @@ func (s *AuthService) Register(firstName, lastName, phone, email, password, comm
 		return nil, errors.New("community, LGA, state, and country are required")
 	}
 	if len(password) < 8 {
-		return nil, errors.New("password must be at least 8 characters")
+		return nil, ErrPasswordTooShort
 	}
 	if role != "buyer" {
 		role = "farmer"
@@ -64,7 +77,7 @@ func (s *AuthService) Register(firstName, lastName, phone, email, password, comm
 		return nil, err
 	}
 	if existing != nil {
-		return nil, errors.New("phone number already registered")
+		return nil, ErrPhoneTaken
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -89,6 +102,9 @@ func (s *AuthService) Register(firstName, lastName, phone, email, password, comm
 		AccountNumber: accountNumber,
 	}
 
+	// If another signup claimed this phone between the check above and now,
+	// the repository returns repository.ErrPhoneExists, which is the same
+	// value as ErrPhoneTaken, so callers handle both cases identically.
 	if err := s.repo.Create(farmer); err != nil {
 		return nil, err
 	}
@@ -131,6 +147,13 @@ func (s *AuthService) Login(phone, password string) (*models.Farmer, error) {
 // GetFarmerByID loads a user's full details, e.g. for the profile page.
 func (s *AuthService) GetFarmerByID(id int) (*models.Farmer, error) {
 	return s.repo.GetByID(id)
+}
+
+// FindByPhone loads an account by phone number, returning (nil, nil) when no
+// account exists. The password-reset flow uses this to decide where to send a
+// one-time passcode, and deliberately does not tell the caller which case it got.
+func (s *AuthService) FindByPhone(phone string) (*models.Farmer, error) {
+	return s.repo.GetByPhone(strings.TrimSpace(phone))
 }
 
 // UpdateProfile edits a user's name, phone and location.
@@ -183,6 +206,12 @@ func (s *AuthService) UpdateBankDetails(id int, bankName, bankCode, accountName,
 }
 
 // ResetPassword changes a user's password.
+//
+// WARNING: this method performs no verification of the caller's identity — it is
+// only the write. It previously backed a flow that let anyone who knew a
+// registered phone number set a new password and take over that account. Every
+// caller MUST first prove control of the account's phone number with a
+// one-time passcode (services.OTPService.Verify) before reaching this.
 func (s *AuthService) ResetPassword(phone, newPassword string) error {
 	if phone == "" {
 		return errors.New("phone number is required")
@@ -193,7 +222,7 @@ func (s *AuthService) ResetPassword(phone, newPassword string) error {
 	}
 
 	if len(newPassword) < 8 {
-		return errors.New("password must be at least 8 characters")
+		return ErrPasswordTooShort
 	}
 
 	farmer, err := s.repo.GetByPhone(phone)
