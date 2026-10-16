@@ -139,7 +139,13 @@ func (s *PaymentService) ConfirmCallback(ctx context.Context, transactionID, txR
 		return "", ErrReferenceMismatch
 	}
 
-	if strings.HasPrefix(txRef, "WALLET-") {
+	// Route on the provider recorded against the funding attempt, not on the
+	// reference's shape.
+	_, isWalletDeposit, err := s.wallet.IsWalletDeposit(ctx, txRef)
+	if err != nil {
+		return "", err
+	}
+	if isWalletDeposit {
 		status := verifiedPaymentStatus(verified.Status)
 		if err := s.wallet.ConfirmDeposit(ctx, txRef, verified.TransactionID, verified.Amount, verified.Currency, verified.Status); err != nil {
 			return "", fmt.Errorf("confirm wallet deposit: %w", err)
@@ -237,7 +243,11 @@ func (s *PaymentService) ProcessWebhook(ctx context.Context, body []byte, receiv
 		return false, fmt.Errorf("verify transaction: %w", err)
 	}
 
-	if strings.HasPrefix(verified.TxRef, "WALLET-") {
+	_, isWalletDeposit, err := s.wallet.IsWalletDeposit(ctx, verified.TxRef)
+	if err != nil {
+		return false, err
+	}
+	if isWalletDeposit {
 		if payload.Data.TxRef != verified.TxRef {
 			return false, ErrReferenceMismatch
 		}

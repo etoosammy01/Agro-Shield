@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"backend/internal/models"
@@ -86,13 +87,72 @@ func (r *WalletRepository) GetWallet(ctx context.Context, farmerID int) (*models
 	return &wallet, err
 }
 
-func (r *WalletRepository) CreateDeposit(ctx context.Context, farmerID int, reference, amount string) error {
-	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO wallet_deposits (wallet_id, reference, amount, currency)
-		SELECT id, $2, $3::numeric, 'NGN' FROM wallets WHERE farmer_id = $1`,
-		farmerID, reference, amount,
+// EnsureWallet returns the user's wallet, creating it if it is somehow missing.
+//
+// Registration already inserts a wallet in the same transaction as the account
+// (FarmerRepository.Create) and RunMigration backfills users that predate the
+// wallets table. This covers every other way a wallet can go missing — a restored
+// backup, a hand-inserted row — so the owner heals on first use instead of being
+// stuck on a permanent "could not load wallet".
+//
+// Concurrent calls are safe: farmer_id is UNIQUE, so a losing
+// INSERT ... ON CONFLICT DO NOTHING writes nothing and both callers read the
+// same row. An unknown farmerID fails the FK, which is correct: no wallet can
+// exist for a user who does not.
+func (r *WalletRepository) EnsureWallet(ctx context.Context, farmerID int) (*models.Wallet, error) {
+	if farmerID <= 0 {
+		return nil, ErrWalletNotFound
+	}
+	if _, err := r.db.ExecContext(ctx, `
+		INSERT INTO wallets (farmer_id) VALUES ($1)
+		ON CONFLICT (farmer_id) DO NOTHING`, farmerID); err != nil {
+		return nil, err
+	}
+	return r.GetWallet(ctx, farmerID)
+}
+
+// DepositProvider returns the payment provider recorded on the wallet deposit
+// with this reference. ErrWalletNotFound means no wallet funding attempt uses
+// that reference, which is how callers tell a wallet deposit apart from an order
+// payment without relying on the reference's shape.
+func (r *WalletRepository) DepositProvider(ctx context.Context, reference string) (string, error) {
+	var provider string
+	err := r.db.QueryRowContext(ctx, `
+		SELECT provider FROM wallet_deposits WHERE reference = $1`, reference).Scan(&provider)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrWalletNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+	return provider, nil
+}
+
+// CreateDeposit records a funding attempt before the provider is called, so an
+// ambiguous provider response always has a durable row to reconcile against.
+func (r *WalletRepository) CreateDeposit(ctx context.Context, farmerID int, provider, reference, amount string) error {
+	if strings.TrimSpace(provider) == "" {
+		return fmt.Errorf("deposit provider is required")
+	}
+	result, err := r.db.ExecContext(ctx, `
+		INSERT INTO wallet_deposits (wallet_id, provider, reference, amount, currency)
+		SELECT id, $4, $2, $3::numeric, 'NGN' FROM wallets WHERE farmer_id = $1`,
+		farmerID, reference, amount, provider,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	// The INSERT ... SELECT writes nothing when the user has no wallet row. That
+	// used to return nil, which let the caller go on to create a payment the
+	// wallet could never be credited for. Report it instead.
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return ErrWalletNotFound
+	}
+	return nil
 }
 
 func (r *WalletRepository) CompleteDeposit(ctx context.Context, reference, transactionID, amount, currency string) error {
@@ -125,7 +185,8 @@ func (r *WalletRepository) CompleteDeposit(ctx context.Context, reference, trans
 
 	result, err := tx.ExecContext(ctx, `
 		UPDATE wallet_deposits
-		SET status = 'successful', provider_transaction_id = $1, updated_at = $2
+		SET status = 'successful', provider_transaction_id = $1, updated_at = $2,
+			verified_amount = $4::numeric, verified_currency = $5
 		WHERE reference = $3 AND status = 'pending' AND amount = $4::numeric AND currency = $5`,
 		transactionID, time.Now(), reference, amount, currency,
 	)
@@ -166,7 +227,8 @@ func (r *WalletRepository) FailDeposit(ctx context.Context, reference string) er
 
 func (r *WalletRepository) ListDeposits(ctx context.Context, farmerID int) ([]models.WalletDeposit, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT d.amount::text, d.currency, d.reference, d.status, d.created_at
+		SELECT d.id, d.provider, d.amount::text, d.currency, d.reference, d.status,
+			COALESCE(d.verified_amount::text, ''), d.created_at
 		FROM wallet_deposits d
 		JOIN wallets w ON w.id = d.wallet_id
 		WHERE w.farmer_id = $1
@@ -179,7 +241,46 @@ func (r *WalletRepository) ListDeposits(ctx context.Context, farmerID int) ([]mo
 	var deposits []models.WalletDeposit
 	for rows.Next() {
 		var deposit models.WalletDeposit
-		if err := rows.Scan(&deposit.Amount, &deposit.Currency, &deposit.Reference, &deposit.Status, &deposit.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&deposit.ID, &deposit.Provider, &deposit.Amount, &deposit.Currency,
+			&deposit.Reference, &deposit.Status, &deposit.VerifiedAmount, &deposit.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		deposits = append(deposits, deposit)
+	}
+	return deposits, rows.Err()
+}
+
+// StalePendingDeposits lists funding attempts that a provider has not settled
+// within the given age, oldest first, for an operator to investigate.
+//
+// This is a report only: it never moves money and never credits a wallet. A
+// deposit is only ever settled by CompleteDeposit, from a verified provider
+// confirmation, so re-running this can't double-credit anything.
+func (r *WalletRepository) StalePendingDeposits(ctx context.Context, olderThan time.Duration, limit int) ([]models.WalletDeposit, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT d.id, d.provider, d.amount::text, d.currency, d.reference, d.status,
+			COALESCE(d.verified_amount::text, ''), d.created_at
+		FROM wallet_deposits d
+		WHERE d.status IN ('pending', 'processing')
+			AND d.created_at < CURRENT_TIMESTAMP - $1::interval
+		ORDER BY d.created_at ASC, d.id ASC
+		LIMIT $2`, fmt.Sprintf("%d seconds", int64(olderThan.Seconds())), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var deposits []models.WalletDeposit
+	for rows.Next() {
+		var deposit models.WalletDeposit
+		if err := rows.Scan(
+			&deposit.ID, &deposit.Provider, &deposit.Amount, &deposit.Currency,
+			&deposit.Reference, &deposit.Status, &deposit.VerifiedAmount, &deposit.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		deposits = append(deposits, deposit)

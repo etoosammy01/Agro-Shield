@@ -22,12 +22,31 @@ type WalletTransaction struct {
 	CreatedAt time.Time
 }
 
+// Wallet funding providers. wallet_deposits.provider records which vendor owns a
+// funding attempt, so confirmation is routed from stored data rather than from
+// the shape of the reference string. Monnify is added alongside its client.
+const ProviderFlutterwave = "flutterwave"
+
+// Funding lifecycle. A deposit is only ever credited from DepositPending, and
+// the terminal states are never processed again.
+const (
+	DepositPending    = "pending"
+	DepositProcessing = "processing"
+	DepositSuccessful = "successful"
+	DepositFailed     = "failed"
+	DepositExpired    = "expired"
+	DepositReversed   = "reversed"
+)
+
 type WalletDeposit struct {
-	Amount    string
-	Currency  string
-	Reference string
-	Status    string
-	CreatedAt time.Time
+	ID             int64
+	Provider       string
+	Amount         string
+	Currency       string
+	Reference      string
+	Status         string
+	VerifiedAmount string
+	CreatedAt      time.Time
 }
 
 type Withdrawal struct {

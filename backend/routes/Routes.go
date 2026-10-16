@@ -922,6 +922,12 @@ func RegisterRoutes(container *app.Container) {
 		"/admin/wallet-transfers/reject",
 		middleware.RequireAuth(container.FarmerRepo, walletHandler.RejectTransfer),
 	))
+	// Recreates a missing wallet for an existing account. It creates an empty
+	// NGN wallet and never moves money, so it is safe to repeat.
+	http.HandleFunc("/admin/wallets/repair", middleware.OnlyPath(
+		"/admin/wallets/repair",
+		middleware.RequireAuth(container.FarmerRepo, walletHandler.RepairWallet),
+	))
 
 	// Initiate a payment for an order - requires the buyer to
 	// be logged in.

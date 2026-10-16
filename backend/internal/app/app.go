@@ -1,9 +1,18 @@
 package app
 
 import (
+	"time"
+
 	"backend/internal/repository"
 	"backend/internal/services"
 )
+
+// NOTE: this package is not referenced anywhere. main.go builds its container
+// from internal/appcontainer.go (package app, different directory), which is the
+// live one. This copy has drifted — it is missing the OTP service and the wallet
+// repair threshold below — so nothing should be wired up to it by mistake. It
+// still has to compile, which is the only reason it is kept in step at all.
+// Deleting it is the real fix and is waiting on the owner's decision.
 
 // ============================================================
 // APPLICATION CONTAINER
@@ -78,6 +87,7 @@ func NewContainer(
 	feedbackRepo *repository.FeedbackRepository,
 	walletAdminIDs []int,
 	commissionBasisPoints int64,
+	staleDepositAfter time.Duration,
 ) *Container {
 
 	// ========================================================
@@ -141,7 +151,7 @@ func NewContainer(
 	// Flutterwave API.
 	// ========================================================
 
-	walletService := services.NewWalletService(walletRepo, farmerRepo, flutterwaveClient, walletAdminIDs, commissionBasisPoints)
+	walletService := services.NewWalletService(walletRepo, farmerRepo, flutterwaveClient, walletAdminIDs, commissionBasisPoints, staleDepositAfter)
 	paymentService := services.NewPaymentService(paymentRepo, orderRepo, farmerRepo, flutterwaveClient, walletService)
 
 	feedbackService := services.NewFeedbackService(
