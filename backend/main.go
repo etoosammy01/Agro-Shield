@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 
@@ -103,6 +104,14 @@ func main() {
 	// ------------------------------------------------------------
 	paymentRepo := repository.NewPaymentRepository(db)
 	walletRepo := repository.NewWalletRepository(db)
+
+	// ------------------------------------------------------------
+	// BANK LOOKUP REPOSITORY          ← added
+	// Caches which bank an account number belongs to, and the name
+	// registered on it, so a number is swept against the bank
+	// shortlist at most once.
+	// ------------------------------------------------------------
+	bankLookupRepo := repository.NewBankLookupRepository(db)
 
 	// ------------------------------------------------------------
 	// ONE-TIME PASSCODE REPOSITORY          ← added
@@ -248,6 +257,7 @@ func main() {
 		// Payments          ← added
 		paymentRepo,
 		walletRepo,
+		bankLookupRepo,
 		otpRepo,
 		smsSender,
 		flutterwaveClient,
@@ -262,6 +272,11 @@ func main() {
 	// ============================================================
 
 	routes.RegisterRoutes(container)
+
+	// Pending payments and approvals need an owner even when nobody opens the
+	// page. This pass re-checks deposits by reference, reminds admins about aged
+	// requests, and releases only money the provider cannot have paid.
+	go container.Wallet.RunReconciliation(context.Background(), services.DefaultReconciliationInterval)
 
 	// ============================================================
 	// 7. START HTTP SERVER

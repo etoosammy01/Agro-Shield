@@ -22,6 +22,8 @@
 <a href="/storage">Storage</a>
 <a href="/marketplace">Marketplace</a>
 <a href="/negotiations" aria-current="page">Negotiations</a>
+<a href="/orders">Orders</a>
+<a href="/deliveries">Deliveries</a>
 <a href="/chat">Chat</a>
 <a href="/ai-assistant">AI Assistant</a>
 <a href="/cart">🛒</a>
@@ -36,7 +38,7 @@
     <h1>My Negotiations</h1>
     <p>Price negotiations you've started or received, with buyers and sellers.</p>
 
-    <table>
+    <table class="table-cards">
         <thead>
             <tr>
                 <th>Crop</th>
@@ -49,10 +51,10 @@
         <tbody>
             {{range .Negotiations}}
             <tr>
-                <td>{{.CropName}}</td>
-                <td class="negotiation-person">{{if eq .BuyerID $.UserID}}{{if .SellerPhotoURL}}<img src="{{.SellerPhotoURL}}" alt="">{{else}}👤{{end}}{{.SellerName}}{{else}}{{if .BuyerPhotoURL}}<img src="{{.BuyerPhotoURL}}" alt="">{{else}}👤{{end}}{{.BuyerName}}{{end}}</td>
-                <td><span class="status status-{{.Status}}">{{.Status}}</span></td>
-                <td>{{.RoundCount}}/{{.MaxRounds}}</td>
+                <td data-label="Crop">{{.CropName}}</td>
+                <td class="negotiation-person" data-label="With">{{if eq .BuyerID $.UserID}}{{if .SellerPhotoURL}}<img src="{{.SellerPhotoURL}}" alt="">{{else}}👤{{end}}{{.SellerName}}{{else}}{{if .BuyerPhotoURL}}<img src="{{.BuyerPhotoURL}}" alt="">{{else}}👤{{end}}{{.BuyerName}}{{end}}</td>
+                <td data-label="Status"><span class="status status-{{.Status}}">{{.Status}}</span></td>
+                <td data-label="Rounds Used">{{.RoundCount}}/{{.MaxRounds}}</td>
                 <td><a class="open-chat-btn" href="/negotiation?id={{.ID}}">Open chat</a></td>
             </tr>
             {{else}}

@@ -57,7 +57,7 @@ func (h *OrderHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 // ============================================================
-// GET /orders/{id}
+// GET /order?id=123
 // ============================================================
 func (h *OrderHandler) Detail(w http.ResponseWriter, r *http.Request) {
 	farmer, ok := middleware.FarmerFromContext(r)
@@ -66,7 +66,10 @@ func (h *OrderHandler) Detail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
+	// The route is registered as "/order" and links carry ?id=, so the path
+	// never holds an id - PathValue was always empty and every order link
+	// returned 404.
+	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 	if err != nil || id <= 0 {
 		http.NotFound(w, r)
 		return
@@ -87,10 +90,32 @@ func (h *OrderHandler) Detail(w http.ResponseWriter, r *http.Request) {
 		"Farmer":  farmer,
 		"IsBuyer": farmer.IsBuyer(),
 		"Order":   order,
+		// A rejected delivery request comes back here as a short code, so the
+		// message sits on the form itself instead of on a plain-text error page.
+		"DeliveryError": deliveryErrorMessage(r.URL.Query().Get("delivery_error")),
 	}
 
 	if err := render.RenderTemplates(w, "order.html", data); err != nil {
 		http.Error(w, "Template error", http.StatusInternalServerError)
+	}
+}
+
+// deliveryErrorMessage maps a whitelisted code to a sentence. An unknown or
+// missing code renders nothing, so arbitrary query text is never reflected.
+func deliveryErrorMessage(code string) string {
+	switch code {
+	case "address":
+		return "Enter a delivery address."
+	case "quantity":
+		return "Enter a quantity greater than zero."
+	case "quantity_max":
+		return "The delivery quantity cannot be more than the ordered quantity."
+	case "forbidden":
+		return "You can only request delivery for your own order."
+	case "unavailable":
+		return "We couldn't create that delivery right now. Please try again."
+	default:
+		return ""
 	}
 }
 

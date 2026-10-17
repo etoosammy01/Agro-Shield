@@ -26,12 +26,16 @@ type ForgotPasswordPageData struct {
 	// CodeSent keeps the verification-code field on screen after the first
 	// step, so the user doesn't have to re-request it.
 	CodeSent bool
+	// Phone is echoed back into the form. Without it the field was cleared
+	// after the code was requested, so the second step submitted an empty
+	// number and reported the code as invalid even when it was correct.
+	Phone string
 }
 
 func (h *ForgotPassword) Handler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		h.renderPage(w, ForgotPasswordPageData{})
+		h.renderPage(w, "", ForgotPasswordPageData{})
 
 	case http.MethodPost:
 		if err := r.ParseForm(); err != nil {
@@ -57,7 +61,7 @@ func (h *ForgotPassword) Handler(w http.ResponseWriter, r *http.Request) {
 // be used to discover which phone numbers are registered.
 func (h *ForgotPassword) sendCode(w http.ResponseWriter, r *http.Request, phone string) {
 	if phone == "" {
-		h.renderPage(w, ForgotPasswordPageData{Error: "Enter your phone number first."})
+		h.renderPage(w, phone, ForgotPasswordPageData{Error: "Enter your phone number first."})
 		return
 	}
 
@@ -66,21 +70,21 @@ func (h *ForgotPassword) sendCode(w http.ResponseWriter, r *http.Request, phone 
 	farmer, err := h.auth.FindByPhone(phone)
 	if err != nil {
 		log.Printf("password reset lookup: %v", err)
-		h.renderPage(w, ForgotPasswordPageData{Success: genericSent, CodeSent: true})
+		h.renderPage(w, phone, ForgotPasswordPageData{Success: genericSent, CodeSent: true})
 		return
 	}
 	if farmer == nil {
-		h.renderPage(w, ForgotPasswordPageData{Success: genericSent, CodeSent: true})
+		h.renderPage(w, phone, ForgotPasswordPageData{Success: genericSent, CodeSent: true})
 		return
 	}
 
 	if err := h.otp.Issue(r.Context(), farmer.ID, farmer.Phone, models.OTPPurposePasswordReset); err != nil {
 		log.Printf("issue password reset code for user %d: %v", farmer.ID, err)
-		h.renderPage(w, ForgotPasswordPageData{Error: otpUserMessage(err), CodeSent: true})
+		h.renderPage(w, phone, ForgotPasswordPageData{Error: otpUserMessage(err), CodeSent: true})
 		return
 	}
 
-	h.renderPage(w, ForgotPasswordPageData{
+	h.renderPage(w, phone, ForgotPasswordPageData{
 		Success:  "We've sent a verification code to your phone. It expires in 5 minutes.",
 		CodeSent: true,
 	})
@@ -95,11 +99,11 @@ func (h *ForgotPassword) resetPassword(w http.ResponseWriter, r *http.Request, p
 	confirmPassword := r.FormValue("confirm_password")
 
 	if newPassword != confirmPassword {
-		h.renderPage(w, ForgotPasswordPageData{Error: "Passwords do not match", CodeSent: true})
+		h.renderPage(w, phone, ForgotPasswordPageData{Error: "Passwords do not match", CodeSent: true})
 		return
 	}
 	if code == "" {
-		h.renderPage(w, ForgotPasswordPageData{Error: "Enter the verification code we sent to your phone.", CodeSent: true})
+		h.renderPage(w, phone, ForgotPasswordPageData{Error: "Enter the verification code we sent to your phone.", CodeSent: true})
 		return
 	}
 
@@ -110,27 +114,27 @@ func (h *ForgotPassword) resetPassword(w http.ResponseWriter, r *http.Request, p
 	farmer, err := h.auth.FindByPhone(phone)
 	if err != nil {
 		log.Printf("password reset lookup: %v", err)
-		h.renderPage(w, ForgotPasswordPageData{Error: genericInvalid, CodeSent: true})
+		h.renderPage(w, phone, ForgotPasswordPageData{Error: genericInvalid, CodeSent: true})
 		return
 	}
 	if farmer == nil {
-		h.renderPage(w, ForgotPasswordPageData{Error: genericInvalid, CodeSent: true})
+		h.renderPage(w, phone, ForgotPasswordPageData{Error: genericInvalid, CodeSent: true})
 		return
 	}
 
 	if err := h.otp.Verify(r.Context(), farmer.ID, models.OTPPurposePasswordReset, code); err != nil {
 		log.Printf("verify password reset code for user %d: %v", farmer.ID, err)
-		h.renderPage(w, ForgotPasswordPageData{Error: otpUserMessage(err), CodeSent: true})
+		h.renderPage(w, phone, ForgotPasswordPageData{Error: otpUserMessage(err), CodeSent: true})
 		return
 	}
 
 	if err := h.auth.ResetPassword(phone, newPassword); err != nil {
 		log.Printf("reset password for user %d: %v", farmer.ID, err)
-		h.renderPage(w, ForgotPasswordPageData{Error: err.Error(), CodeSent: true})
+		h.renderPage(w, phone, ForgotPasswordPageData{Error: err.Error(), CodeSent: true})
 		return
 	}
 
-	h.renderPage(w, ForgotPasswordPageData{Success: "Password updated — you can now log in."})
+	h.renderPage(w, phone, ForgotPasswordPageData{Success: "Password updated — you can now log in."})
 }
 
 // otpUserMessage turns an OTP error into something safe to show. Only the
@@ -145,7 +149,8 @@ func otpUserMessage(err error) string {
 	}
 }
 
-func (h *ForgotPassword) renderPage(w http.ResponseWriter, data ForgotPasswordPageData) {
+func (h *ForgotPassword) renderPage(w http.ResponseWriter, phone string, data ForgotPasswordPageData) {
+	data.Phone = phone
 	if err := render.RenderTemplates(w, "forgot-password.html", data); err != nil {
 		log.Println("render error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)

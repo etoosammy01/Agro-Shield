@@ -21,6 +21,8 @@
         <a href="/dashboard">Dashboard</a>
         <a href="/storage" aria-current="page">Storage</a>
         <a href="/marketplace">Marketplace</a>
+        <a href="/orders">Orders</a>
+        <a href="/deliveries">Deliveries</a>
         <a href="/chat">Chat</a>
         <a href="/ai-assistant">AI Assistant</a>
         <a href="/cart">Cart</a>
@@ -48,7 +50,7 @@
         <input type="search" id="search" placeholder="Search produce...">
     </div>
 
-    <table>
+    <table class="table-cards">
         <thead>
             <tr>
                 <th>Photo</th>
@@ -65,21 +67,21 @@
         <tbody id="storage-body">
             {{range .Crops}}
             <tr data-product-name="{{.Name}}">
-                <td>
+                <td data-label="Photo">
                     {{if .ImageURL}}
                         <img src="{{.ImageURL}}" alt="{{.Name}}" class="thumb" onerror="this.onerror=null; this.src='/static/assets/placeholder/product-placeholder.jpg';">
                     {{else}}
                         <span>—</span>
                     {{end}}
                 </td>
-                <td>{{.Name}}</td>
-                <td>{{.Quantity}}</td>
-                <td>{{.Unit}}</td>
-                <td>{{.Location}}</td>
-                <td>₦{{money .PricePerUnit}}</td>
-                <td>{{if .ListedForSale}}Yes{{else}}No{{end}}</td>
-                <td>{{.CreatedAt.Format "02 Jan 2006"}}</td>
-                <td class="product-actions">
+                <td data-label="Products">{{.Name}}</td>
+                <td data-label="Quantity">{{.Quantity}}</td>
+                <td data-label="Unit">{{.Unit}}</td>
+                <td data-label="Location">{{.Location}}</td>
+                <td data-label="Price/Unit">₦{{money .PricePerUnit}}</td>
+                <td data-label="Listed for Sale">{{if .ListedForSale}}Yes{{else}}No{{end}}</td>
+                <td data-label="Date Stored">{{.CreatedAt.Format "02 Jan 2006"}}</td>
+                <td class="product-actions" data-label="Actions">
                     <a class="product-action edit-action" href="/storage?edit={{.ID}}">Edit</a>
                     <form method="POST" action="/storage">
                         <input type="hidden" name="action" value="{{if .ListedForSale}}unlist{{else}}relist{{end}}">

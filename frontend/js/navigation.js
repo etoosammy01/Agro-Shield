@@ -1,3 +1,8 @@
+// Set before anything else. The mobile rules that hide the nav behind a toggle
+// are scoped to html.js, so a browser with JavaScript disabled keeps a usable
+// nav instead of losing it entirely.
+document.documentElement.classList.add("js");
+
 document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll(".navbar").forEach(navbar => {
         const nav = navbar.querySelector("nav");
@@ -39,10 +44,247 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         nav.addEventListener("click", event => {
-            if (event.target.closest("a")) { 
-                navbar.classList.remove("nav-open"); 
-                toggle.setAttribute("aria-expanded", "false"); 
+            if (event.target.closest("a")) {
+                navbar.classList.remove("nav-open");
+                toggle.setAttribute("aria-expanded", "false");
             }
         });
     });
+
+    // ==========================================================
+    // BOTTOM TAB BAR
+    //
+    // A hamburger in the top corner is routinely missed by
+    // first-time smartphone users, so the core destinations get
+    // permanent tabs at the bottom of the screen. Everything is
+    // built from the links the page already renders - no page
+    // markup changes, and a tab can never point at a page this
+    // section does not reach.
+    // ==========================================================
+
+    // Named tabIcons rather than icons so it cannot be confused with the icon
+    // set the header toggle uses above.
+    const tabIcons = {
+        home: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></svg>`,
+        market: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18l-1.2 12.2a2 2 0 0 1-2 1.8H6.2a2 2 0 0 1-2-1.8Z"/><path d="M8.5 7V5.5a3.5 3.5 0 0 1 7 0V7"/></svg>`,
+        wallet: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18"/></svg>`,
+        chat: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z"/></svg>`,
+        profile: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>`,
+        more: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12h.01"/><path d="M12 12h.01"/><path d="M18.5 12h.01"/></svg>`
+    };
+
+    // Priority order. Whichever of these the page's own nav links to becomes a
+    // tab; the rest stay in the More menu.
+    const coreRoutes = [
+        ["/dashboard", "Home", tabIcons.home],
+        ["/marketplace", "Market", tabIcons.market],
+        ["/wallet", "Wallet", tabIcons.wallet],
+        ["/chat", "Chat", tabIcons.chat],
+        ["/profile", "Profile", tabIcons.profile]
+    ];
+
+    // Four tabs plus More, so each keeps a comfortable tap target at 320px.
+    const maxTabs = 4;
+
+    document.querySelectorAll(".navbar").forEach(navbar => {
+        const nav = navbar.querySelector("nav");
+        if (!nav) return;
+
+        const tabs = coreRoutes
+            .filter(([href]) => nav.querySelector(`a[href="${href}"]`))
+            .slice(0, maxTabs);
+
+        // The landing page and the auth pages have a header but no app
+        // navigation. They are left exactly as they are.
+        if (tabs.length < 2) return;
+
+        const bar = document.createElement("nav");
+        bar.className = "mobile-tabbar";
+        // Not "Main navigation": the header above is already a nav with that
+        // label, and two identical landmarks are ambiguous to a screen reader.
+        bar.setAttribute("aria-label", "Quick navigation");
+
+        tabs.forEach(([href, label, icon]) => {
+            const link = nav.querySelector(`a[href="${href}"]`);
+            const tab = document.createElement("a");
+            tab.href = href;
+            // Reuse the marker the page already sets, so the tab bar agrees
+            // with the top nav about which page you are on.
+            if (link && link.getAttribute("aria-current") === "page") {
+                tab.setAttribute("aria-current", "page");
+            }
+            tab.innerHTML = `${icon}<span>${label}</span>`;
+            bar.appendChild(tab);
+        });
+
+        const more = document.createElement("button");
+        more.type = "button";
+        more.innerHTML = `${tabIcons.more}<span>More</span>`;
+        more.setAttribute("aria-label", "More pages");
+
+        // If the page you are on lives in the More menu rather than a tab,
+        // mark More so the bar still shows where you are.
+        const current = nav.querySelector('a[aria-current="page"]');
+        if (current && !tabs.some(([href]) => current.getAttribute("href") === href)) {
+            more.setAttribute("aria-current", "page");
+        }
+
+        more.addEventListener("click", () => {
+            const open = navbar.classList.toggle("nav-open");
+            const toggle = navbar.querySelector(".nav-toggle");
+            if (toggle) {
+                toggle.setAttribute("aria-expanded", String(open));
+                toggle.setAttribute("aria-label", open ? "Close navigation" : "Open navigation");
+                toggle.innerHTML = `<span aria-hidden="true">${open ? "×" : "☰"}</span>`;
+            }
+            // The menu hangs off the sticky header, so bring it into view.
+            if (open) window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+
+        bar.appendChild(more);
+        document.body.appendChild(bar);
+        // Drives the bottom padding in style.css. Set only where a bar was
+        // really added, so pages without one keep their current spacing.
+        document.body.classList.add("has-tabbar");
+    });
+});
+
+// ==========================================================
+// ADMIN CONSOLE
+//
+// The approvals page moves money, so the safety work happens
+// here rather than in the markup: a decision is named back to
+// the admin before it is sent, a form cannot be submitted
+// twice by a slow connection, and a reference can be lifted
+// without selecting a long string by hand. Everything is
+// scoped to .wallet-admin-body - no farmer page changes.
+// ==========================================================
+document.addEventListener("DOMContentLoaded", () => {
+    if (!document.body.classList.contains("wallet-admin-body")) return;
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!reduceMotion) {
+        document.documentElement.style.scrollBehavior = "smooth";
+    }
+
+    // ---- Name the decision before it is sent ----
+
+    document.querySelectorAll("form").forEach(form => {
+        form.addEventListener("submit", event => {
+            const question = form.dataset.confirm;
+            if (question && !window.confirm(question)) {
+                // Cancelling must leave the page exactly as it was, so the
+                // button is only disabled once the submit is really going.
+                event.preventDefault();
+                return;
+            }
+            // Disable on the next tick: the browser owns the form data and the
+            // submitter at this point, and changing either mid-event can make
+            // an old browser drop the submission altogether.
+            window.setTimeout(() => {
+                form.querySelectorAll('button[type="submit"], button:not([type])').forEach(button => {
+                    button.disabled = true;
+                    button.dataset.originalLabel = button.textContent;
+                    button.textContent = "Working…";
+                });
+            }, 0);
+        });
+    });
+
+    // If the admin comes back with the Back button, the browser may restore the
+    // page with the submit button still disabled. A form left saying "Working…"
+    // on a page that is no longer submitting reads as a broken console.
+    window.addEventListener("pageshow", event => {
+        if (!event.persisted) return;
+        document.querySelectorAll("form button[disabled]").forEach(button => {
+            button.disabled = false;
+            if (button.dataset.originalLabel) {
+                button.textContent = button.dataset.originalLabel;
+            }
+        });
+    });
+
+    // ---- Copy a reference without selecting it by hand ----
+
+    const writeClipboard = async text => {
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+                return true;
+            }
+        } catch (error) {
+            // Fall through to the selection path below. The admin may be on
+            // http:// on a local network, where the clipboard API is absent.
+        }
+        try {
+            const area = document.createElement("textarea");
+            area.value = text;
+            area.setAttribute("readonly", "");
+            area.style.position = "fixed";
+            area.style.top = "0";
+            area.style.left = "-9999px";
+            document.body.appendChild(area);
+            area.select();
+            const copied = document.execCommand("copy");
+            document.body.removeChild(area);
+            return copied;
+        } catch (error) {
+            return false;
+        }
+    };
+
+    document.querySelectorAll("[data-copy]").forEach(button => {
+        button.addEventListener("click", async () => {
+            const copied = await writeClipboard(button.dataset.copy || "");
+            const original = button.textContent;
+            button.textContent = copied ? "Copied" : "Select it";
+            button.setAttribute("aria-live", "polite");
+            window.setTimeout(() => {
+                button.textContent = original;
+            }, 1600);
+        });
+    });
+
+    // ---- Keep the sidebar in step with the section in view ----
+
+    const sections = Array.from(document.querySelectorAll(".admin-section[id]"));
+    const links = Array.from(document.querySelectorAll(".admin-nav-link"));
+    const nav = document.querySelector(".admin-nav");
+
+    const markActive = id => {
+        links.forEach(link => {
+            link.classList.toggle("is-active", link.getAttribute("href") === `#${id}`);
+            if (link.classList.contains("is-active")) {
+                link.setAttribute("aria-current", "location");
+            } else {
+                link.removeAttribute("aria-current");
+            }
+        });
+
+        // On a phone the nav is a horizontal strip. Slide the section you are
+        // reading into the middle of it so the tabs stay legible.
+        if (!nav || !window.matchMedia("(max-width: 900px)").matches) return;
+        const active = links.find(link => link.getAttribute("href") === `#${id}`);
+        if (!active) return;
+        const navRect = nav.getBoundingClientRect();
+        const linkRect = active.getBoundingClientRect();
+        nav.scrollBy({
+            left: linkRect.left - navRect.left - (navRect.width - linkRect.width) / 2,
+            behavior: reduceMotion ? "auto" : "smooth"
+        });
+    };
+
+    if (sections.length && "IntersectionObserver" in window) {
+        const observer = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) markActive(entry.target.id);
+            });
+        }, {
+            // A narrow band across the middle of the viewport: whichever
+            // section crosses it owns the highlight.
+            rootMargin: "-45% 0px -50% 0px",
+            threshold: 0
+        });
+        sections.forEach(section => observer.observe(section));
+    }
 });

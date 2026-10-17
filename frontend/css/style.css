@@ -21,24 +21,36 @@ html, body{
 
 body{
     font-family:var(--font-body);background:var(--color-page);color:var(--color-ink);
+    /* Nothing may push the page sideways. Long unbroken strings - references
+       such as WITHDRAW-7-abc, account numbers, emails - are a common cause.
+       break-word is the fallback. `anywhere` is the one that matters: it is
+       counted when the browser works out a box's minimum width, so a long
+       string can no longer force its container wider than the screen.
+       break-word alone does not do that - which is why the footer's support
+       email was still able to push the home page sideways. */
+    overflow-wrap:break-word;
+    overflow-wrap:anywhere;
+}
+
+/* Media is the other common cause. */
+img, svg, video, canvas, iframe{
+    max-width:100%;
 }
 
 .navbar{
     display:flex;
-    outline: 1px solid green;
-    background-color: papayawhip;
     top: 0;
     justify-content:space-between;
     align-items:center;
     gap:24px;
-    padding:16px 48px;background:var(--color-surface);box-shadow:var(--shadow-sm);position:sticky;z-index:9999;
+    padding:16px clamp(16px, 4vw, 48px);background:var(--color-surface);box-shadow:var(--shadow-sm);position:sticky;z-index:9999;
 }
 
 .logo{
     display:inline-flex;
     align-items:center;
     width:240px;
-    height:72px;
+    height:auto;
     color:var(--color-ink);
     text-decoration:none;
     flex:0 0 auto;
@@ -47,7 +59,7 @@ body{
 .logo img{
     display:block;
     width:100%;
-    height:100%;
+    height:auto;
     object-fit:contain;
     object-position:center;
 }
@@ -91,20 +103,24 @@ nav a{
     flex:0 0 auto;
 }
 
+/* The current page is marked by colour only. The underline that used to be
+   here read as a hover state rather than as "you are here" - most visibly on
+   the dashboard and the AI Assistant page. */
 nav a[aria-current="page"],
 nav a.active{
     color:#166534;
-    text-decoration:underline;
-    text-underline-offset:6px;
 }
 
+/* The dropdown is only hidden when the script that can reopen it has run. Without
+   JavaScript the nav stays visible as a scrollable strip rather than vanishing,
+   which is what used to leave pages with no way out. */
 @media (max-width: 900px){
-    .navbar{padding:14px 24px;}.nav-toggle{display:grid;place-items:center}.nav-quick-actions{display:flex}.navbar nav{display:none;position:absolute;top:100%;left:0;right:0;padding:10px 24px 16px;background:var(--color-surface);box-shadow:var(--shadow-md);flex-direction:column;gap:0;max-height:calc(100vh - 70px);overflow:auto}.navbar.nav-open nav{display:flex}.navbar nav a{padding:13px 0;border-bottom:1px solid #eef2ef}.navbar nav a:last-child{border-bottom:0}
+    .navbar{padding:14px clamp(16px, 4vw, 24px);}.nav-toggle{display:grid;place-items:center}.nav-quick-actions{display:flex}html.js .navbar nav{display:none;position:absolute;top:100%;left:0;right:0;padding:10px 24px 16px;background:var(--color-surface);box-shadow:var(--shadow-md);flex-direction:column;gap:0;max-height:calc(100vh - 70px);overflow:auto}html.js .navbar.nav-open nav{display:flex}.navbar nav a{padding:13px 0;border-bottom:1px solid #eef2ef}.navbar nav a:last-child{border-bottom:0}
 }
 
 @media (max-width: 600px){
     .navbar{padding:12px 16px;}
-    .logo{width:180px;height:54px;}
+    .logo{width:180px;height:auto;}
     nav{gap:14px;}
 }
 
@@ -225,7 +241,10 @@ button:disabled,
 
     width:100%;
     max-width:600px;
-    height:500px;
+    /* Was a fixed 500px. 6/5 reproduces the desktop crop exactly. On a phone the
+       portrait photo is shown whole instead - see the breakpoint below. */
+    height:auto;
+    aspect-ratio:6 / 5;
 
     object-fit:cover;
 
@@ -235,6 +254,17 @@ button:disabled,
 
     transition:opacity .8s ease-in-out;
 
+}
+
+@media (max-width: 600px){
+    /* These photographs are portrait - the first is roughly 9:16. Cropping one
+       into a 4:3 landscape box kept only the middle third of it, cutting the
+       farmer's head off on the page whose whole job is to introduce them.
+       Natural ratio shows the whole picture, at whatever shape each of the ten
+       photos happens to be. */
+    .hero-image img{
+        aspect-ratio:auto;
+    }
 }
 
 
@@ -320,7 +350,7 @@ button:disabled,
 
     .logo {
         width: 180px;
-        height: 54px;
+        height: auto;
     }
 
     nav {
@@ -394,4 +424,292 @@ button:disabled,
     padding:25px;
     color:#9ca3af;
     font-size:15px;
+}
+
+/* The footer was three columns with 80px gaps and 80px side padding and no
+   breakpoint at all: at 360px that is 160px of padding plus 160px of gaps,
+   leaving roughly 13px per column. It now folds down in two steps. */
+@media (max-width: 900px){
+    .footer-container{
+        grid-template-columns:1fr 1fr;
+        gap:clamp(28px, 5vw, 56px);
+        padding:clamp(40px, 7vw, 70px) clamp(20px, 5vw, 48px) clamp(28px, 5vw, 50px);
+    }
+
+    .footer-brand{
+        grid-column:1 / -1;
+    }
+}
+
+@media (max-width: 600px){
+    .footer-container{
+        grid-template-columns:1fr;
+        gap:32px;
+        padding:40px 16px 28px;
+    }
+
+    .footer-brand p{
+        max-width:none;
+    }
+}
+
+/* =========================================================
+   MOBILE TAB BAR
+   Built by navigation.js from the links the page already has,
+   so it appears only on pages that have an app navigation. On a
+   phone it puts the core destinations one tap away - a hamburger
+   in the top corner is routinely missed by first-time smartphone
+   users. Inert until the script creates the element.
+========================================================= */
+
+.mobile-tabbar{
+    display:none;
+}
+
+@media (max-width: 900px){
+    .js .mobile-tabbar{
+        position:fixed;
+        right:0;
+        bottom:0;
+        left:0;
+        z-index:9998;
+        display:grid;
+        grid-auto-flow:column;
+        grid-auto-columns:1fr;
+        border-top:1px solid var(--color-border);
+        background:var(--color-surface);
+        box-shadow:0 -6px 24px rgba(24,61,38,.09);
+        /* Keeps the tabs clear of an Android gesture bar. */
+        padding-bottom:env(safe-area-inset-bottom, 0px);
+    }
+
+    .mobile-tabbar a,
+    .mobile-tabbar button{
+        display:flex;
+        min-height:56px;
+        flex-direction:column;
+        align-items:center;
+        justify-content:center;
+        gap:3px;
+        padding:6px 2px;
+        border:0;
+        background:none;
+        color:var(--color-muted);
+        font:inherit;
+        font-size:.68rem;
+        font-weight:700;
+        line-height:1.1;
+        text-align:center;
+        text-decoration:none;
+        cursor:pointer;
+    }
+
+    .mobile-tabbar [aria-current="page"]{
+        color:var(--color-brand);
+    }
+
+    .mobile-tabbar svg{
+        width:22px;
+        height:22px;
+        stroke:currentColor;
+        fill:none;
+        stroke-width:2;
+        stroke-linecap:round;
+        stroke-linejoin:round;
+    }
+
+    /* Without this the last row of every page hides behind the bar. Scoped to
+       pages that actually grew one, so the landing and auth pages keep the
+       bottom spacing they have today. */
+    .js .has-tabbar{
+        padding-bottom:calc(60px + env(safe-area-inset-bottom, 0px));
+    }
+}
+
+/* =========================================================
+   HOME PAGE — MOBILE
+   .hero exists only on the home page and .footer only on the
+   home page and learning.html, so everything below changes
+   those two pages and nothing else.
+========================================================= */
+
+/* THE SIDEWAYS SCROLL, and why the footer colour appeared to stop halfway.
+   Grid and flex children are min-width:auto by default: they refuse to shrink
+   below their content's own minimum width. The footer was three columns of
+   2fr 1fr 1fr with 80px gaps and 80px of side padding, and one column holds
+   "Email: agroshieldsupport@gmail.com". On a 360px phone the padding and gaps
+   alone accounted for 320px, so those columns could never fit - the grid grew
+   to roughly 800px and took the whole page with it.
+   That is also the footer symptom: a background paints only its own element's
+   box, so once the page scrolled past the viewport the dark footer ended and
+   the page background carried on behind it.
+   min-width:0 lets these boxes shrink below their content, which together with
+   overflow-wrap:anywhere on body means neither a long string nor a wide column
+   can push the page open again. */
+.hero-content,
+.hero-image,
+.footer-brand,
+.footer-links,
+.footer-contact{
+    min-width:0;
+}
+
+@media (max-width: 600px){
+    /* 56px of padding and a 60px gap is a lot of a 640px-tall screen. */
+    .hero{
+        padding:36px 18px 44px;
+        gap:28px;
+    }
+
+    .hero-content h1{
+        font-size:1.7rem;
+        line-height:1.25;
+        margin-bottom:14px;
+    }
+
+    .hero-content h2{
+        font-size:1.02rem;
+        line-height:1.45;
+        margin-bottom:12px;
+    }
+
+    .hero-content p{
+        font-size:.95rem;
+        line-height:1.6;
+        margin-bottom:24px;
+    }
+
+    .hero-buttons{
+        gap:12px;
+    }
+
+    /* Full width and 50px tall. The generic mobile rule further up cuts these
+       to 42px, which is under the 44px minimum and awkward to hit one-handed -
+       these two buttons are the main thing a new visitor taps. */
+    .hero-buttons .primary-btn,
+    .hero-buttons .secondary-btn{
+        flex:1 1 100%;
+        min-height:50px;
+        font-size:16px;
+    }
+
+    .hero-image img{
+        border-radius:14px;
+    }
+
+    /* Footer links were 20px of text with a 15px margin under them - a miss for
+       a thumb. Padding to ~44px gives a target that can actually be hit. */
+    .footer-links h3,
+    .footer-contact h3{
+        font-size:19px;
+        margin-bottom:14px;
+    }
+
+    .footer-links a{
+        padding:12px 0;
+        margin-bottom:0;
+    }
+
+    .footer-contact p{
+        margin-bottom:10px;
+    }
+}
+
+/* =========================================================
+   RESPONSIVE FOUNDATION
+   style.css is loaded by all 26 pages, so these are the rules
+   that keep a page nobody has individually reviewed behaving on
+   a phone. Nothing in this section targets one page.
+========================================================= */
+
+/* THE SIDEWAYS SCROLL - the underlying cause on every page.
+   Grid and flex children are min-width:auto by default, which means they
+   refuse to shrink below the width of their own content. That is what
+   "the content outgrew its container" actually is: one wide cell, one long
+   string, or one image with an intrinsic width is enough to push the whole
+   row - and with it the page - wider than the screen. The page then scrolls
+   sideways, and because a background paints only its own element's box,
+   dark sections look like they stop partway across the screen.
+   :where() keeps this at zero specificity, so any page or component rule
+   still overrides it. */
+:where(main, header, footer, section, article, aside, nav, div, form,
+       fieldset, ul, ol, li, figure, p){
+    min-width:0;
+}
+
+table{
+    max-width:100%;
+}
+
+/* =========================================================
+   TABLES ON A PHONE
+   A nine-column table cannot fit a 360px screen. The previous
+   answer was a forced 1100px width plus a sideways scroll, which
+   means dragging the table across to read one row.
+   Add class="table-cards" to a table and, at 900px and below,
+   each row becomes a card and each cell is labelled from its own
+   data-label. The data-label should repeat the matching <th>.
+   Pure CSS - no JavaScript, and no change to any row's content.
+========================================================= */
+
+@media (max-width: 900px){
+    .table-cards{
+        display:block;
+        background:none;
+        border-radius:0;
+        box-shadow:none;
+    }
+
+    /* The per-cell labels stand in for the header row. */
+    .table-cards thead{
+        display:none;
+    }
+
+    .table-cards tbody,
+    .table-cards tr,
+    .table-cards td{
+        display:block;
+        width:100%;
+    }
+
+    .table-cards tr{
+        margin-bottom:14px;
+        border:1px solid var(--color-border);
+        border-radius:var(--radius-md);
+        background:var(--color-surface);
+        box-shadow:var(--shadow-sm);
+    }
+
+    .table-cards td{
+        display:grid;
+        grid-template-columns:minmax(84px, 38%) 1fr;
+        align-items:center;
+        gap:10px;
+        padding:11px 14px;
+        border-bottom:1px solid var(--color-border);
+        text-align:left;
+    }
+
+    .table-cards td:last-child{
+        border-bottom:0;
+    }
+
+    .table-cards td::before{
+        content:attr(data-label);
+        font-size:.72rem;
+        font-weight:700;
+        letter-spacing:.04em;
+        text-transform:uppercase;
+        color:var(--color-muted);
+    }
+
+    /* A cell with no data-label - an empty state, or a full-width action bar -
+       uses the whole row rather than leaving a blank first column. */
+    .table-cards td:not([data-label]){
+        grid-template-columns:1fr;
+    }
+
+    .table-cards td:not([data-label])::before{
+        content:none;
+    }
 }

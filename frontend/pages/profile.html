@@ -34,6 +34,8 @@
             <a href="/ai-assistant">AI Assistant</a>
             {{end}}
             <a href="/cart">Cart</a>
+            <a href="/orders">Orders</a>
+            <a href="/deliveries">Deliveries</a>
             <a href="/wallet">Wallet</a>
             {{if .IsWalletAdmin}}<a href="/admin/wallet-withdrawals">Withdrawal approvals</a>{{end}}
             <a href="/notifications">Notifications</a>
@@ -98,7 +100,7 @@
                 <h2>Purchase History</h2>
 
                 {{if .Purchases}}
-                <table>
+                <table class="table-cards">
                     <thead>
                         <tr>
                             <th>Crop</th>
@@ -111,11 +113,11 @@
                     <tbody>
                         {{range .Purchases}}
                         <tr>
-                            <td>{{.CropName}}</td>
-                            <td>{{.SellerName}}</td>
-                            <td>{{.Quantity}}</td>
-                            <td>₦{{money .TotalPrice}}</td>
-                            <td>{{.CreatedAt.Format "02 Jan 2006"}}</td>
+                            <td data-label="Crop">{{.CropName}}</td>
+                            <td data-label="Seller">{{.SellerName}}</td>
+                            <td data-label="Qty">{{.Quantity}}</td>
+                            <td data-label="Total">₦{{money .TotalPrice}}</td>
+                            <td data-label="Date">{{.CreatedAt.Format "02 Jan 2006"}}</td>
                         </tr>
                         {{end}}
                     </tbody>
@@ -133,7 +135,7 @@
                 <h2>My Product</h2>
 
                 {{if .Crops}}
-                <table>
+                <table class="table-cards">
                     <thead>
                         <tr>
                             <th>Crop</th>
@@ -145,10 +147,10 @@
                     <tbody>
                         {{range .Crops}}
                         <tr>
-                            <td>{{.Name}}</td>
-                            <td>{{.Quantity}} {{.Unit}}</td>
-                            <td>{{if .ListedForSale}}Yes{{else}}No{{end}}</td>
-                            <td>₦{{money .PricePerUnit}}</td>
+                            <td data-label="Crop">{{.Name}}</td>
+                            <td data-label="Quantity">{{.Quantity}} {{.Unit}}</td>
+                            <td data-label="Listed for Sale">{{if .ListedForSale}}Yes{{else}}No{{end}}</td>
+                            <td data-label="Price/Unit">₦{{money .PricePerUnit}}</td>
                         </tr>
                         {{end}}
                     </tbody>
@@ -164,7 +166,7 @@
                 <h2>Recent Sales</h2>
 
                 {{if .Sales}}
-                <table>
+                <table class="table-cards">
                     <thead>
                         <tr>
                             <th>Crop</th>
@@ -177,11 +179,11 @@
                     <tbody>
                         {{range .Sales}}
                         <tr>
-                            <td>{{.CropName}}</td>
-                            <td>{{.BuyerName}}</td>
-                            <td>{{.Quantity}}</td>
-                            <td>₦{{money .TotalPrice}}</td>
-                            <td>{{.CreatedAt.Format "02 Jan 2006"}}</td>
+                            <td data-label="Crop">{{.CropName}}</td>
+                            <td data-label="Buyer">{{.BuyerName}}</td>
+                            <td data-label="Qty">{{.Quantity}}</td>
+                            <td data-label="Total">₦{{money .TotalPrice}}</td>
+                            <td data-label="Date">{{.CreatedAt.Format "02 Jan 2006"}}</td>
                         </tr>
                         {{end}}
                     </tbody>

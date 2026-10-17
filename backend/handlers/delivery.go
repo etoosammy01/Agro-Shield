@@ -56,7 +56,7 @@ func (h *DeliveryHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 // ============================================================
-// GET /deliveries/{id}
+// GET /delivery?id=123
 // ============================================================
 func (h *DeliveryHandler) Detail(w http.ResponseWriter, r *http.Request) {
 	farmer, ok := middleware.FarmerFromContext(r)
@@ -65,7 +65,10 @@ func (h *DeliveryHandler) Detail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
+	// The route is registered as "/delivery" and links carry ?id=, so the path
+	// never holds an id - PathValue was always empty and every delivery link
+	// returned 404.
+	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 	if err != nil || id <= 0 {
 		http.NotFound(w, r)
 		return
@@ -108,6 +111,12 @@ func (h *DeliveryHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Creating a delivery has a side effect, so it must never happen on a GET.
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form", http.StatusBadRequest)
 		return
@@ -126,11 +135,39 @@ func (h *DeliveryHandler) Create(w http.ResponseWriter, r *http.Request) {
 		quantity,
 	)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		// Send the buyer back to the order page so the message appears on the
+		// form itself instead of as a plain-text error page.
+		code := deliveryErrorCode(err)
+		if code == "notfound" {
+			http.Redirect(w, r, "/orders", http.StatusSeeOther)
+			return
+		}
+		http.Redirect(w, r, "/order?id="+strconv.Itoa(orderID)+"&delivery_error="+code+"#request-delivery", http.StatusSeeOther)
 		return
 	}
 
-	http.Redirect(w, r, "/deliveries/"+strconv.Itoa(delivery.ID), http.StatusSeeOther)
+	http.Redirect(w, r, "/delivery?id="+strconv.Itoa(delivery.ID), http.StatusSeeOther)
+}
+
+// deliveryErrorCode turns a CreateFromOrder error into a short code the order
+// page understands. Only codes in this whitelist are ever placed in a URL or a
+// page, so a raw error string (which could carry database detail) is never
+// shown to the buyer.
+func deliveryErrorCode(err error) string {
+	switch err.Error() {
+	case "delivery address is required":
+		return "address"
+	case "quantity must be greater than zero":
+		return "quantity"
+	case "order not found":
+		return "notfound"
+	case "you can only create a delivery for your own order":
+		return "forbidden"
+	case "delivery quantity cannot exceed the ordered quantity":
+		return "quantity_max"
+	default:
+		return "unavailable"
+	}
 }
 
 // ============================================================
@@ -143,7 +180,7 @@ func (h *DeliveryHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
+	id, err := strconv.Atoi(r.FormValue("id"))
 	if err != nil || id <= 0 {
 		http.NotFound(w, r)
 		return
@@ -159,7 +196,7 @@ func (h *DeliveryHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/deliveries/"+strconv.Itoa(id), http.StatusSeeOther)
+	http.Redirect(w, r, "/delivery?id="+strconv.Itoa(id), http.StatusSeeOther)
 }
 
 // ============================================================
@@ -172,7 +209,7 @@ func (h *DeliveryHandler) UpdateTracking(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
+	id, err := strconv.Atoi(r.FormValue("id"))
 	if err != nil || id <= 0 {
 		http.NotFound(w, r)
 		return
@@ -196,7 +233,7 @@ func (h *DeliveryHandler) UpdateTracking(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	http.Redirect(w, r, "/deliveries/"+strconv.Itoa(id), http.StatusSeeOther)
+	http.Redirect(w, r, "/delivery?id="+strconv.Itoa(id), http.StatusSeeOther)
 }
 
 // ============================================================
@@ -209,7 +246,7 @@ func (h *DeliveryHandler) MarkDelivered(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
+	id, err := strconv.Atoi(r.FormValue("id"))
 	if err != nil || id <= 0 {
 		http.NotFound(w, r)
 		return
@@ -225,7 +262,7 @@ func (h *DeliveryHandler) MarkDelivered(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	http.Redirect(w, r, "/deliveries/"+strconv.Itoa(id), http.StatusSeeOther)
+	http.Redirect(w, r, "/delivery?id="+strconv.Itoa(id), http.StatusSeeOther)
 }
 
 // ============================================================
@@ -238,7 +275,7 @@ func (h *DeliveryHandler) MarkFailed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
+	id, err := strconv.Atoi(r.FormValue("id"))
 	if err != nil || id <= 0 {
 		http.NotFound(w, r)
 		return
@@ -254,7 +291,7 @@ func (h *DeliveryHandler) MarkFailed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/deliveries/"+strconv.Itoa(id), http.StatusSeeOther)
+	http.Redirect(w, r, "/delivery?id="+strconv.Itoa(id), http.StatusSeeOther)
 }
 
 // ============================================================
@@ -267,7 +304,7 @@ func (h *DeliveryHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
+	id, err := strconv.Atoi(r.FormValue("id"))
 	if err != nil || id <= 0 {
 		http.NotFound(w, r)
 		return

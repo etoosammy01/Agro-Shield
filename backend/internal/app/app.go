@@ -83,6 +83,7 @@ func NewContainer(
 
 	paymentRepo *repository.PaymentRepository,
 	walletRepo *repository.WalletRepository,
+	bankLookupRepo *repository.BankLookupRepository,
 	flutterwaveClient *services.FlutterwaveClient,
 	feedbackRepo *repository.FeedbackRepository,
 	walletAdminIDs []int,

@@ -453,11 +453,22 @@ tbody tr:hover {
 
     .storage {
         padding: 30px 16px;
-        overflow-x: auto;
     }
 
-    .storage table {
-        min-width: 1100px;
+    /* The nine columns now stack into labelled cards - see .table-cards in
+       style.css. That replaces the old answer, which was to force the table to
+       1100px and let .storage scroll sideways so the farmer had to drag each
+       row across to read it. */
+
+    /* This cell is display:flex with !important, so the card's grid layout does
+       not reach it. Wrapping sends the buttons onto their own line under the
+       "Actions" label instead of squeezing them into one row. */
+    .storage .product-actions {
+        flex-wrap: wrap;
+    }
+
+    .storage .product-actions::before {
+        flex: 1 1 100%;
     }
 
     .storage-header {

@@ -77,6 +77,7 @@ func NewContainer(
 
 	paymentRepo *repository.PaymentRepository,
 	walletRepo *repository.WalletRepository,
+	bankLookupRepo *repository.BankLookupRepository,
 	otpRepo *repository.OTPRepository,
 	smsSender services.SMSSender,
 	flutterwaveClient *services.FlutterwaveClient,
