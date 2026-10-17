@@ -171,8 +171,9 @@ type VerifiedTransaction struct {
 }
 
 type verifyTransactionResponse struct {
-	Status string `json:"status"`
-	Data   struct {
+	Status  string `json:"status"`
+	Message string `json:"message"`
+	Data    struct {
 		ID       int64   `json:"id"`
 		TxRef    string  `json:"tx_ref"`
 		Status   string  `json:"status"`
@@ -227,6 +228,89 @@ func (c *FlutterwaveClient) VerifyTransaction(transactionID string) (*VerifiedTr
 		strings.TrimSpace(parsed.Data.Currency) == "" ||
 		parsed.Data.Amount <= 0 {
 		return nil, fmt.Errorf("Flutterwave verification response is incomplete")
+	}
+
+	return &VerifiedTransaction{
+		TransactionID: fmt.Sprintf("%d", parsed.Data.ID),
+		TxRef:         parsed.Data.TxRef,
+		Status:        parsed.Data.Status,
+		Amount:        parsed.Data.Amount,
+		Currency:      parsed.Data.Currency,
+	}, nil
+}
+
+// ErrTransactionNotFound means the provider answered and has no transaction
+// for the reference.
+//
+// Like ErrAccountNotResolved, this is separated from every other failure on
+// purpose. Only this answer may close a deposit attempt; a timeout, a rejected
+// key or a 5xx proves nothing about the payment and must leave the attempt
+// pending for the next pass.
+var ErrTransactionNotFound = errors.New("no transaction exists for this reference")
+
+// VerifyTransactionByReference asks Flutterwave whether any transaction was
+// ever created for a reference, which is the question the deposit reconciliation
+// needs: the numeric id is only known once a payment has been made, so a deposit
+// whose webhook never arrived can only be checked by the reference we stored.
+func (c *FlutterwaveClient) VerifyTransactionByReference(reference string) (*VerifiedTransaction, error) {
+	reference = strings.TrimSpace(reference)
+	if reference == "" {
+		return nil, fmt.Errorf("transaction reference is required")
+	}
+	endpoint := fmt.Sprintf("%s/transactions/verify_by_reference?tx_ref=%s",
+		flutterwaveBaseURL, url.QueryEscape(reference))
+
+	httpReq, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build reference verification request: %w", err)
+	}
+	httpReq.Header.Set("Authorization", "Bearer "+c.SecretKey)
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("call flutterwave reference verification: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := readFlutterwaveResponse(resp)
+	if err != nil {
+		return nil, err
+	}
+	// The not-found answer arrives as a 400 carrying "No transaction found"
+	// rather than as a 404, so the body decides, exactly as ResolveAccount does.
+	if resp.StatusCode != http.StatusOK {
+		detail := providerMessage(respBody)
+		if resp.StatusCode == http.StatusNotFound || notFoundMessage(detail) {
+			if detail == "" {
+				detail = fmt.Sprintf("provider returned %d", resp.StatusCode)
+			}
+			return nil, fmt.Errorf("%w: %s", ErrTransactionNotFound, detail)
+		}
+		return nil, fmt.Errorf("flutterwave reference verification returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var parsed verifyTransactionResponse
+	if err := json.Unmarshal(respBody, &parsed); err != nil {
+		return nil, fmt.Errorf("unmarshal reference verification: %w", err)
+	}
+	if parsed.Status != "success" {
+		if notFoundMessage(parsed.Message) {
+			return nil, fmt.Errorf("%w: %s", ErrTransactionNotFound, parsed.Message)
+		}
+		return nil, fmt.Errorf("flutterwave could not verify the reference: %s", parsed.Message)
+	}
+	if strings.TrimSpace(parsed.Data.TxRef) == "" {
+		// A success with no transaction is contradictory, not an answer. Reading
+		// it as "nothing exists" would expire an attempt on a provider quirk.
+		return nil, fmt.Errorf("Flutterwave reference verification response is incomplete")
+	}
+	if parsed.Data.TxRef != reference {
+		return nil, fmt.Errorf("verified reference does not match request")
+	}
+	if strings.TrimSpace(parsed.Data.Status) == "" ||
+		strings.TrimSpace(parsed.Data.Currency) == "" ||
+		parsed.Data.Amount <= 0 {
+		return nil, fmt.Errorf("Flutterwave reference verification response is incomplete")
 	}
 
 	return &VerifiedTransaction{
@@ -460,6 +544,13 @@ func notFoundMessage(message string) bool {
 		return false
 	}
 	if strings.Contains(lowered, "invalid account") {
+		return true
+	}
+	// The verify-by-reference endpoint answers a reference it never issued with
+	// HTTP 400 "No transaction was found for this id" - observed against the
+	// test key. Without this, an abandoned checkout is reported as an
+	// infrastructure failure on every pass and can never be closed.
+	if strings.Contains(lowered, "no transaction") {
 		return true
 	}
 	return strings.Contains(lowered, "not found") || strings.Contains(lowered, "does not exist")

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 
@@ -266,6 +267,11 @@ func main() {
 	// ============================================================
 
 	routes.RegisterRoutes(container)
+
+	// Pending payments and approvals need an owner even when nobody opens the
+	// page. This pass re-checks deposits by reference, reminds admins about aged
+	// requests, and releases only money the provider cannot have paid.
+	go container.Wallet.RunReconciliation(context.Background(), services.DefaultReconciliationInterval)
 
 	// ============================================================
 	// 7. START HTTP SERVER

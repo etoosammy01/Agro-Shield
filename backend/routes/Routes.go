@@ -888,6 +888,17 @@ func RegisterRoutes(container *app.Container) {
 		"/wallet/transfer",
 		middleware.RequireAuth(container.FarmerRepo, walletHandler.Transfer),
 	))
+	// A user may release their own request while it is still pending. The
+	// service refuses once an admin has started paying it, because the money may
+	// already be on its way.
+	http.HandleFunc("/wallet/withdraw/cancel", middleware.OnlyPath(
+		"/wallet/withdraw/cancel",
+		middleware.RequireAuth(container.FarmerRepo, walletHandler.CancelWithdrawal),
+	))
+	http.HandleFunc("/wallet/transfer/cancel", middleware.OnlyPath(
+		"/wallet/transfer/cancel",
+		middleware.RequireAuth(container.FarmerRepo, walletHandler.CancelTransfer),
+	))
 	http.HandleFunc("/wallet/bank", middleware.OnlyPath(
 		"/wallet/bank",
 		middleware.RequireAuth(container.FarmerRepo, walletHandler.SaveBankDetails),
@@ -903,6 +914,12 @@ func RegisterRoutes(container *app.Container) {
 	http.HandleFunc("/admin/wallet-withdrawals", middleware.OnlyPath(
 		"/admin/wallet-withdrawals",
 		middleware.OnlyGet(middleware.RequireAuth(container.FarmerRepo, walletHandler.AdminPage)),
+	))
+	// Admins are managed from the approvals page itself, so granting the role no
+	// longer needs a database client or a restart.
+	http.HandleFunc("/admin/wallet-admins", middleware.OnlyPath(
+		"/admin/wallet-admins",
+		middleware.RequireAuth(container.FarmerRepo, walletHandler.SetWalletAdmin),
 	))
 	http.HandleFunc("/admin/wallet-withdrawals/approve", middleware.OnlyPath(
 		"/admin/wallet-withdrawals/approve",

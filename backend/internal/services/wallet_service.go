@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 
 	"backend/internal/models"
@@ -26,6 +27,15 @@ type WalletService struct {
 	flutter *FlutterwaveClient
 
 	adminIDs map[int]struct{}
+
+	// configuredAdminIDs is the set from WALLET_ADMIN_USER_IDS. It is kept apart
+	// from adminIDs so a refresh from the database cannot drop an operator who
+	// was configured in the environment.
+	configuredAdminIDs map[int]struct{}
+
+	// adminMu guards adminIDs, which the reconciliation loop rewrites while
+	// handlers read it.
+	adminMu sync.RWMutex
 
 	// resolver is the account-name half of the Flutterwave client, held as a
 	// narrow interface so the bank fan-out can be tested without HTTP. It is
@@ -54,11 +64,15 @@ type notifier interface {
 }
 
 func NewWalletService(repo walletStore, farmers farmerStore, flutter *FlutterwaveClient, lookups *repository.BankLookupRepository, adminIDs []int, commissionBasisPoints int64, notify notifier) *WalletService {
-	adminSet := make(map[int]struct{}, len(adminIDs))
+	configured := make(map[int]struct{}, len(adminIDs))
 	for _, id := range adminIDs {
 		if id > 0 {
-			adminSet[id] = struct{}{}
+			configured[id] = struct{}{}
 		}
+	}
+	adminSet := make(map[int]struct{}, len(configured))
+	for id := range configured {
+		adminSet[id] = struct{}{}
 	}
 	return &WalletService{
 		repo:                  repo,
@@ -68,21 +82,161 @@ func NewWalletService(repo walletStore, farmers farmerStore, flutter *Flutterwav
 		resolver:              flutter,
 		directory:             flutter,
 		adminIDs:              adminSet,
+		configuredAdminIDs:    configured,
 		commissionBasisPoints: commissionBasisPoints,
 		notify:                notify,
 	}
 }
 
-// AdminIDs lists the configured wallet admins, so a new request can be put in
-// front of the people who have to act on it. Sorted so the order a notification
-// fan-out happens in is not left to Go's map iteration.
+// AdminIDs lists the wallet admins, so a new request can be put in front of the
+// people who have to act on it. Sorted so the order a notification fan-out
+// happens in is not left to Go's map iteration.
 func (s *WalletService) AdminIDs() []int {
+	s.adminMu.RLock()
+	defer s.adminMu.RUnlock()
+
 	ids := make([]int, 0, len(s.adminIDs))
 	for id := range s.adminIDs {
 		ids = append(ids, id)
 	}
 	sort.Ints(ids)
 	return ids
+}
+
+// RefreshAdminIDs reloads the accounts flagged as admins in the database and
+// merges them with the ones configured in the environment. It is called at
+// startup, on every reconciliation pass, and before an admin page or action is
+// served, so flagging an account takes effect without a restart.
+func (s *WalletService) RefreshAdminIDs(ctx context.Context) error {
+	flagged, err := s.repo.ListAdminIDs(ctx)
+	if err != nil {
+		return err
+	}
+
+	merged := make(map[int]struct{}, len(s.configuredAdminIDs)+len(flagged))
+	for id := range s.configuredAdminIDs {
+		merged[id] = struct{}{}
+	}
+	for _, id := range flagged {
+		if id > 0 {
+			merged[id] = struct{}{}
+		}
+	}
+
+	s.adminMu.Lock()
+	s.adminIDs = merged
+	s.adminMu.Unlock()
+	return nil
+}
+
+// isConfiguredAdmin reports whether the environment granted the role. That set
+// is immutable after construction, so it needs no lock.
+func (s *WalletService) isConfiguredAdmin(farmerID int) bool {
+	_, ok := s.configuredAdminIDs[farmerID]
+	return ok
+}
+
+// AdminAccounts lists everyone who can review wallet requests: the accounts
+// flagged in the database plus anyone granted the role by configuration. The
+// page needs both, because a configured admin cannot be removed from it.
+func (s *WalletService) AdminAccounts(ctx context.Context) ([]models.AdminAccount, error) {
+	flagged, err := s.repo.ListAdminAccounts(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	seen := make(map[int]struct{}, len(flagged))
+	accounts := make([]models.AdminAccount, 0, len(flagged))
+	for _, account := range flagged {
+		account.FromConfig = s.isConfiguredAdmin(account.FarmerID)
+		seen[account.FarmerID] = struct{}{}
+		accounts = append(accounts, account)
+	}
+
+	// An ID granted only by configuration has no row in the flagged list, so its
+	// name has to be read from the account itself.
+	for _, id := range s.AdminIDs() {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		account := models.AdminAccount{FarmerID: id, FromConfig: true}
+		if s.farmers != nil {
+			if farmer, err := s.farmers.GetByID(id); err == nil && farmer != nil {
+				account.FullName = farmer.FullName
+				account.Phone = farmer.Phone
+			}
+		}
+		if account.FullName == "" {
+			account.FullName = fmt.Sprintf("Account #%d", id)
+		}
+		accounts = append(accounts, account)
+	}
+
+	sort.Slice(accounts, func(i, j int) bool {
+		if accounts[i].FullName == accounts[j].FullName {
+			return accounts[i].FarmerID < accounts[j].FarmerID
+		}
+		return accounts[i].FullName < accounts[j].FullName
+	})
+	return accounts, nil
+}
+
+// SetAdmin grants or revokes the wallet admin role on one account.
+//
+// An admin cannot remove themselves: if they were the only DB-flagged admin,
+// the page would lock everyone out of itself. Removing another admin is
+// allowed, because the actor remains.
+func (s *WalletService) SetAdmin(ctx context.Context, actorID, targetID int, admin bool) error {
+	if !s.IsAdmin(actorID) {
+		return ErrNotAdmin
+	}
+	if targetID <= 0 {
+		return ErrAdminNotFound
+	}
+	if !admin {
+		if s.isConfiguredAdmin(targetID) {
+			return ErrAdminFromConfig
+		}
+		if targetID == actorID {
+			return ErrAdminSelfRemoval
+		}
+	}
+
+	found, err := s.repo.SetAdmin(ctx, targetID, admin)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return ErrAdminNotFound
+	}
+	if err := s.RefreshAdminIDs(ctx); err != nil {
+		// The write succeeded; the cache catches up on the next page or pass.
+		log.Printf("refresh wallet admins after change: %v", err)
+	}
+	return nil
+}
+
+// SetAdminByPhone is how the page names a person: an admin knows the phone
+// number an account registered with, not its numeric id.
+func (s *WalletService) SetAdminByPhone(ctx context.Context, actorID int, phone string, admin bool) error {
+	if !s.IsAdmin(actorID) {
+		return ErrNotAdmin
+	}
+	phone = strings.TrimSpace(phone)
+	if phone == "" {
+		return ErrAdminPhoneRequired
+	}
+	if s.farmers == nil {
+		return ErrAdminNotFound
+	}
+	farmer, err := s.farmers.GetByPhone(phone)
+	if err != nil {
+		return err
+	}
+	if farmer == nil {
+		return ErrAdminNotFound
+	}
+	return s.SetAdmin(ctx, actorID, farmer.ID, admin)
 }
 
 // notifyUser delivers one notification, best-effort.
@@ -158,9 +312,11 @@ type bankLookupStore interface {
 type walletStore interface {
 	GetWallet(ctx context.Context, farmerID int) (*models.Wallet, error)
 	CreateDeposit(ctx context.Context, farmerID int, reference, amount string) error
-	CompleteDeposit(ctx context.Context, reference, transactionID, amount, currency string) error
+	CompleteDeposit(ctx context.Context, reference, transactionID, amount, currency string) (bool, error)
 	FailDeposit(ctx context.Context, reference string) error
 	ListDeposits(ctx context.Context, farmerID int) ([]models.WalletDeposit, error)
+	ListPendingDepositsOlderThan(ctx context.Context, cutoff time.Time) ([]models.PendingDeposit, error)
+	ExpireDeposit(ctx context.Context, reference string) error
 
 	CreateWithdrawal(ctx context.Context, farmerID int, reference, amount string) error
 	ListFarmerWithdrawals(ctx context.Context, farmerID int) ([]models.Withdrawal, error)
@@ -168,6 +324,9 @@ type walletStore interface {
 	GetWithdrawal(ctx context.Context, withdrawalID int64) (*models.Withdrawal, error)
 	BeginWithdrawal(ctx context.Context, withdrawalID int64, adminID int) (*models.Withdrawal, error)
 	RejectWithdrawal(ctx context.Context, withdrawalID int64, adminID int) error
+	CancelWithdrawal(ctx context.Context, withdrawalID int64, farmerID int) error
+	ExpireStaleWithdrawals(ctx context.Context, cutoff time.Time) ([]models.Withdrawal, error)
+	ClaimWithdrawalReminder(ctx context.Context, withdrawalID int64, cutoff time.Time) (bool, error)
 	SetTransferID(ctx context.Context, reference, transferID string) error
 	CompleteTransfer(ctx context.Context, reference, transferID, status string, amount int64, currency string) (bool, error)
 	GetWithdrawalByReference(ctx context.Context, reference string) (*models.Withdrawal, error)
@@ -179,8 +338,14 @@ type walletStore interface {
 	ListPendingTransfers(ctx context.Context) ([]models.Transfer, error)
 	ApproveTransfer(ctx context.Context, transferID int64, adminID int) (*models.Transfer, error)
 	RejectTransfer(ctx context.Context, transferID int64, adminID int) (*models.Transfer, error)
+	CancelTransfer(ctx context.Context, transferID int64, senderID int) error
+	ExpireStaleTransfers(ctx context.Context, cutoff time.Time) ([]models.Transfer, error)
+	ClaimTransferReminder(ctx context.Context, transferID int64, cutoff time.Time) (bool, error)
 
 	ListTransactions(ctx context.Context, farmerID int) ([]models.WalletTransaction, error)
+	ListAdminIDs(ctx context.Context) ([]int, error)
+	ListAdminAccounts(ctx context.Context) ([]models.AdminAccount, error)
+	SetAdmin(ctx context.Context, farmerID int, admin bool) (bool, error)
 	PayForOrder(ctx context.Context, buyerID, cropID int, quantity float64, commissionBasisPoints int64) (int64, error)
 	PlatformRevenueTotal(ctx context.Context) (string, int, error)
 }
@@ -272,6 +437,9 @@ func ParseWalletAdminIDs(value string) ([]int, error) {
 }
 
 func (s *WalletService) IsAdmin(farmerID int) bool {
+	s.adminMu.RLock()
+	defer s.adminMu.RUnlock()
+
 	_, ok := s.adminIDs[farmerID]
 	return ok
 }
@@ -429,32 +597,333 @@ func (s *WalletService) InitiateDeposit(ctx context.Context, farmer *models.Farm
 }
 
 func (s *WalletService) ConfirmDeposit(ctx context.Context, reference, transactionID string, amount float64, currency, status string) error {
+	_, err := s.confirmDeposit(ctx, reference, transactionID, amount, currency, status)
+	return err
+}
+
+// confirmDeposit is ConfirmDeposit with the transition reported. The webhook and
+// the reconciliation pass can both settle the same payment; only the call that
+// actually moved the row should tell the farmer, or one deposit reads as two.
+func (s *WalletService) confirmDeposit(ctx context.Context, reference, transactionID string, amount float64, currency, status string) (bool, error) {
 	switch strings.ToLower(status) {
 	case "failed", "cancelled", "canceled":
-		return s.repo.FailDeposit(ctx, reference)
+		return false, s.repo.FailDeposit(ctx, reference)
 	case "successful":
 	default:
-		return nil
+		return false, nil
 	}
 	if math.IsNaN(amount) || math.IsInf(amount, 0) || amount <= 0 {
-		return errors.New("invalid verified deposit amount")
+		return false, errors.New("invalid verified deposit amount")
 	}
 	cents := amount * 100
 	roundedCents := math.Round(cents)
 	if math.Abs(cents-roundedCents) > 0.000001 {
-		return errors.New("verified deposit amount has unsupported precision")
+		return false, errors.New("verified deposit amount has unsupported precision")
 	}
 	verifiedAmount, _, err := normalizeWalletAmount(strconv.FormatFloat(roundedCents/100, 'f', 2, 64), false)
 	if err != nil {
-		return fmt.Errorf("invalid verified deposit amount: %w", err)
+		return false, fmt.Errorf("invalid verified deposit amount: %w", err)
 	}
 	if currency != "NGN" {
-		return errors.New("wallet deposits must be paid in NGN")
+		return false, errors.New("wallet deposits must be paid in NGN")
 	}
 	if transactionID == "" || !strings.HasPrefix(reference, "WALLET-") {
-		return errors.New("invalid wallet deposit verification")
+		return false, errors.New("invalid wallet deposit verification")
 	}
 	return s.repo.CompleteDeposit(ctx, reference, transactionID, verifiedAmount, currency)
+}
+
+// --- pending requests -------------------------------------------------------
+//
+// Every non-terminal state needs an owner and a way out. The webhook remains
+// the source of truth for a deposit; the pass below is the backstop for the one
+// that never arrives, and it never closes an attempt the provider still knows
+// about. Requests are treated differently because one side of a payout may be a
+// provider transfer, which no local timer is allowed to call back.
+
+const (
+	// depositVerifyAfter is how long a deposit is left to the webhook before the
+	// pass starts asking the provider directly.
+	depositVerifyAfter = 15 * time.Minute
+
+	// depositExpireAfter is the longest an attempt stays pending after the
+	// provider has said it has no transaction for the reference.
+	depositExpireAfter = 24 * time.Hour
+
+	// requestExpireAfter bounds how long a request can hold a user's money with
+	// no decision, for requests that never reached the provider.
+	requestExpireAfter = 30 * 24 * time.Hour
+
+	// approvalReminderAfter is when admins are nudged about an aged request.
+	approvalReminderAfter = 4 * time.Hour
+
+	// DefaultReconciliationInterval matches the deposit verification window, so
+	// a stuck deposit is re-checked promptly without hammering the provider.
+	DefaultReconciliationInterval = 15 * time.Minute
+)
+
+// ApprovalReminderAfter is approvalReminderAfter for callers that report the
+// same ageing on a page: the overview and the reminder pass must count the same
+// requests as "waiting too long".
+const ApprovalReminderAfter = approvalReminderAfter
+
+// Deposit reconciliation failures the page and the pass both need to name.
+var (
+	ErrRequestNotFound   = errors.New("that request could not be found")
+	ErrRequestNotPending = errors.New("that request is no longer pending, so it cannot be cancelled")
+)
+
+// Refusals the admin page shows as the reason an admin change did not happen.
+var (
+	ErrNotAdmin           = errors.New("only a wallet admin can change admin access")
+	ErrAdminNotFound      = errors.New("no account was found for that number")
+	ErrAdminPhoneRequired = errors.New("enter the phone number of the account")
+	ErrAdminSelfRemoval   = errors.New("another admin has to remove you")
+	ErrAdminFromConfig    = errors.New("this admin is set by WALLET_ADMIN_USER_IDS and has to be removed there")
+)
+
+// PendingDepositsAwaitingProvider is the admin page's exception list: attempts
+// that have waited longer than the normal window. It is a read of the same rows
+// the reconciliation pass is working through, not a separate queue.
+func (s *WalletService) PendingDepositsAwaitingProvider(ctx context.Context) ([]models.PendingDeposit, error) {
+	return s.repo.ListPendingDepositsOlderThan(ctx, time.Now().Add(-depositVerifyAfter))
+}
+
+// ReconcilePendingDeposits is the backstop for a deposit whose webhook never
+// arrived. It asks the provider by reference, because the numeric transaction id
+// is only known once a payment exists.
+//
+// The rules that matter here:
+//   - a provider answer of "successful" credits the wallet, using the amount the
+//     provider reports and the same validation the webhook uses;
+//   - a provider answer of "failed" closes the attempt as failed;
+//   - "no such transaction" may close it as expired, but only after the full
+//     window, so a checkout still in progress is never cut off;
+//   - every other failure - timeout, bad key, 5xx, unreadable body - says nothing
+//     about the payment and leaves the attempt pending for the next pass.
+func (s *WalletService) ReconcilePendingDeposits(ctx context.Context) error {
+	deposits, err := s.repo.ListPendingDepositsOlderThan(ctx, time.Now().Add(-depositVerifyAfter))
+	if err != nil {
+		return fmt.Errorf("list pending deposits: %w", err)
+	}
+	for _, deposit := range deposits {
+		verified, err := s.flutter.VerifyTransactionByReference(deposit.Reference)
+		if errors.Is(err, ErrTransactionNotFound) {
+			if time.Since(deposit.CreatedAt) < depositExpireAfter {
+				// The provider has nothing yet, but the attempt is still inside
+				// the window in which a slow checkout could complete.
+				continue
+			}
+			if err := s.repo.ExpireDeposit(ctx, deposit.Reference); err != nil {
+				if !errors.Is(err, repository.ErrRequestNotPending) {
+					log.Printf("expire deposit %s: %v", deposit.Reference, err)
+				}
+				continue
+			}
+			s.notifyUser(deposit.FarmerID, "Deposit expired",
+				fmt.Sprintf("We did not receive a payment for your ₦%s deposit and the payment provider has no record of it, so the request has been closed. No money was added. If your bank shows a charge, contact support with reference %s.",
+					deposit.Amount, deposit.Reference),
+				"wallet_deposit_expired")
+			continue
+		}
+		if err != nil {
+			// We could not ask. Silence is not evidence, so leave it pending.
+			log.Printf("verify pending deposit %s: %v", deposit.Reference, err)
+			continue
+		}
+		if verified.TxRef != deposit.Reference {
+			log.Printf("deposit %s verified against reference %s; leaving it pending", deposit.Reference, verified.TxRef)
+			continue
+		}
+		settled, err := s.confirmDeposit(ctx, deposit.Reference, verified.TransactionID,
+			verified.Amount, verified.Currency, verified.Status)
+		if err != nil {
+			log.Printf("confirm pending deposit %s: %v", deposit.Reference, err)
+			continue
+		}
+		if settled {
+			s.notifyUser(deposit.FarmerID, "Deposit received",
+				fmt.Sprintf("₦%s was added to your wallet.", deposit.Amount),
+				"wallet_deposit_successful")
+		}
+	}
+	return nil
+}
+
+// ExpireStaleRequests releases requests that never reached the provider and have
+// held a user's money past the ageing window. It reports how many were released.
+//
+// The store decides what is safe to release, not this method: only pending rows
+// without a provider transfer qualify. Anything that may have been paid stays
+// put for an admin, where the ageing reminder surfaces it.
+func (s *WalletService) ExpireStaleRequests(ctx context.Context) (int, error) {
+	cutoff := time.Now().Add(-requestExpireAfter)
+
+	withdrawals, err := s.repo.ExpireStaleWithdrawals(ctx, cutoff)
+	if err != nil {
+		return 0, fmt.Errorf("expire pending withdrawals: %w", err)
+	}
+	for _, withdrawal := range withdrawals {
+		s.notifyUser(withdrawal.FarmerID, "Withdrawal request expired",
+			fmt.Sprintf("Your ₦%s withdrawal request expired without approval, so the money is back in your wallet. You can request it again.",
+				withdrawal.Amount),
+			"wallet_withdrawal_expired")
+	}
+
+	transfers, err := s.repo.ExpireStaleTransfers(ctx, cutoff)
+	if err != nil {
+		return len(withdrawals), fmt.Errorf("expire pending transfers: %w", err)
+	}
+	for _, transfer := range transfers {
+		s.notifyUser(transfer.SenderID, "Transfer request expired",
+			fmt.Sprintf("Your ₦%s transfer request expired without approval, so the money is back in your wallet.",
+				transfer.Amount),
+			"wallet_transfer_expired")
+	}
+	return len(withdrawals) + len(transfers), nil
+}
+
+// RemindAgedApprovals nudges admins once about each request that has waited too
+// long. The store claims the reminder before it is sent, so a restart or a second
+// instance cannot send it again.
+func (s *WalletService) RemindAgedApprovals(ctx context.Context) error {
+	cutoff := time.Now().Add(-approvalReminderAfter)
+
+	withdrawals, err := s.repo.ListWithdrawals(ctx, true)
+	if err != nil {
+		return fmt.Errorf("list aged withdrawals: %w", err)
+	}
+	for _, withdrawal := range withdrawals {
+		if withdrawal.Status != models.WithdrawalPending && withdrawal.Status != models.WithdrawalProcessing {
+			continue
+		}
+		if withdrawal.CreatedAt.After(cutoff) {
+			continue
+		}
+		claimed, err := s.repo.ClaimWithdrawalReminder(ctx, withdrawal.ID, cutoff)
+		if err != nil {
+			log.Printf("claim withdrawal reminder %d: %v", withdrawal.ID, err)
+			continue
+		}
+		if !claimed {
+			continue
+		}
+		state := "waiting for approval"
+		if withdrawal.Status == models.WithdrawalProcessing {
+			state = "still processing at the payment provider"
+		}
+		// The requester is skipped for the same reason as the original request:
+		// when they are an admin, the self-approval rule means it is not waiting
+		// for them.
+		s.notifyAdminsExcept(withdrawal.FarmerID, "Withdrawal still waiting",
+			fmt.Sprintf("%s (#%d) asked to withdraw ₦%s, and it has been %s since %s. Review it on the wallet approvals page.",
+				withdrawal.FullName, withdrawal.FarmerID, withdrawal.Amount, state,
+				withdrawal.CreatedAt.Format("02 Jan 15:04")),
+			"wallet_withdrawal_reminder")
+	}
+
+	transfers, err := s.repo.ListPendingTransfers(ctx)
+	if err != nil {
+		return fmt.Errorf("list aged transfers: %w", err)
+	}
+	for _, transfer := range transfers {
+		if transfer.CreatedAt.After(cutoff) {
+			continue
+		}
+		claimed, err := s.repo.ClaimTransferReminder(ctx, transfer.ID, cutoff)
+		if err != nil {
+			log.Printf("claim transfer reminder %d: %v", transfer.ID, err)
+			continue
+		}
+		if !claimed {
+			continue
+		}
+		s.notifyAdminsExcept(transfer.SenderID, "Transfer still waiting",
+			fmt.Sprintf("%s sent ₦%s to %s, and it has been waiting for approval since %s. Review it on the wallet approvals page.",
+				transfer.SenderName, transfer.Amount, transfer.RecipientName,
+				transfer.CreatedAt.Format("02 Jan 15:04")),
+			"wallet_transfer_reminder")
+	}
+	return nil
+}
+
+// RunReconciliation runs the pending-request pass until ctx is cancelled. It
+// runs once at startup as well, so a server restart does not delay the requests
+// that aged while it was down by a whole interval.
+func (s *WalletService) RunReconciliation(ctx context.Context, interval time.Duration) {
+	if interval <= 0 {
+		interval = DefaultReconciliationInterval
+	}
+	s.reconciliationPass(ctx)
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.reconciliationPass(ctx)
+		}
+	}
+}
+
+func (s *WalletService) reconciliationPass(ctx context.Context) {
+	// Pick up admins flagged in the database, so the reminder fan-out reaches
+	// them and the approvals link appears for them without a restart.
+	if err := s.RefreshAdminIDs(ctx); err != nil {
+		log.Printf("refresh wallet admins: %v", err)
+	}
+	if err := s.ReconcilePendingDeposits(ctx); err != nil {
+		log.Printf("reconcile pending deposits: %v", err)
+	}
+	if _, err := s.ExpireStaleRequests(ctx); err != nil {
+		log.Printf("expire stale wallet requests: %v", err)
+	}
+	if err := s.RemindAgedApprovals(ctx); err != nil {
+		log.Printf("remind aged wallet approvals: %v", err)
+	}
+}
+
+// CancelWithdrawal lets the farmer release their own pending request and get
+// the reservation back. Once an admin has begun paying it, the store refuses.
+func (s *WalletService) CancelWithdrawal(ctx context.Context, farmerID int, withdrawalID int64) error {
+	if farmerID <= 0 || withdrawalID <= 0 {
+		return ErrRequestNotFound
+	}
+	err := s.repo.CancelWithdrawal(ctx, withdrawalID, farmerID)
+	switch {
+	case errors.Is(err, repository.ErrWithdrawalNotFound):
+		return ErrRequestNotFound
+	case errors.Is(err, repository.ErrRequestNotPending):
+		return ErrRequestNotPending
+	case err != nil:
+		return fmt.Errorf("%w: %v", ErrWalletUnavailable, err)
+	}
+	s.notifyUser(farmerID, "Withdrawal request cancelled",
+		"The withdrawal request was cancelled and the reserved money is back in your wallet.",
+		"wallet_withdrawal_cancelled")
+	return nil
+}
+
+// CancelTransfer is the transfer half of CancelWithdrawal.
+func (s *WalletService) CancelTransfer(ctx context.Context, senderID int, transferID int64) error {
+	if senderID <= 0 || transferID <= 0 {
+		return ErrRequestNotFound
+	}
+	err := s.repo.CancelTransfer(ctx, transferID, senderID)
+	switch {
+	case errors.Is(err, repository.ErrTransferNotFound):
+		return ErrRequestNotFound
+	case errors.Is(err, repository.ErrRequestNotPending):
+		return ErrRequestNotPending
+	case err != nil:
+		return fmt.Errorf("%w: %v", ErrTransferUnavailable, err)
+	}
+	s.notifyUser(senderID, "Transfer request cancelled",
+		"The transfer request was cancelled and the money is back in your wallet.",
+		"wallet_transfer_cancelled")
+	return nil
 }
 
 // PreflightWithdrawal reports whether a withdrawal request would be accepted,

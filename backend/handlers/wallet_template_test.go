@@ -393,3 +393,242 @@ func TestWalletAdminPagePluralisesASingleSale(t *testing.T) {
 		t.Error("a single sale was not rendered in the singular")
 	}
 }
+
+// A bare "pending" left a farmer unable to tell whether a person or the payment
+// provider was holding the money, and gave them no way out of a request they no
+// longer wanted.
+func TestWalletPageNamesWhoAPendingRequestIsWaitingFor(t *testing.T) {
+	created := time.Date(2026, 10, 17, 5, 44, 0, 0, time.UTC)
+	data := WalletPageData{
+		Wallet: &models.Wallet{ID: 1, FarmerID: 7, Balance: "1500.00", Currency: "NGN"},
+		Deposits: []models.WalletDeposit{{
+			Amount: "5000.00", Currency: "NGN", Reference: "WALLET-7-abc",
+			Status: models.DepositPending, CreatedAt: created,
+		}},
+		Withdrawals: []models.Withdrawal{{
+			ID: 5, FarmerID: 7, Amount: "4000.00", Currency: "NGN",
+			Status: models.WithdrawalPending, Reference: "WITHDRAW-7-abc",
+			CreatedAt: created,
+		}},
+		Transfers: []models.Transfer{{
+			ID: 9, SenderID: 7, SenderName: "Bola Farms",
+			RecipientID: 42, RecipientName: "Ada Obi",
+			Amount: "250.00", Currency: "NGN", Status: models.TransferPending,
+			Reference: "TRANSFER-7-abc", CreatedAt: created,
+		}},
+	}
+
+	recorder := httptest.NewRecorder()
+	if err := render.RenderTemplates(recorder, "wallet.html", data); err != nil {
+		t.Fatalf("render wallet.html: %v", err)
+	}
+	body := recorder.Body.String()
+
+	for _, want := range []string{
+		"Pending since 05:44 — waiting for the payment provider",
+		"Pending since 05:44 — waiting for admin approval",
+		`name="withdrawal_id" value="5"`,
+		`/wallet/withdraw/cancel`,
+		`name="transfer_id" value="9"`,
+		`/wallet/transfer/cancel`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the pending request did not render %q", want)
+		}
+	}
+}
+
+// Cancelling is the sender's action. Offering it on a transfer they are
+// receiving would point at money they never controlled.
+func TestWalletPageOnlyOffersCancelOnTheSendersPendingTransfer(t *testing.T) {
+	data := WalletPageData{
+		Wallet: &models.Wallet{ID: 1, FarmerID: 7, Balance: "1500.00", Currency: "NGN"},
+		Transfers: []models.Transfer{
+			{
+				ID: 11, SenderID: 42, SenderName: "Ada Obi",
+				RecipientID: 7, RecipientName: "Bola Farms",
+				Amount: "100.00", Currency: "NGN", Status: models.TransferPending,
+				Reference: "TRANSFER-42-in", CreatedAt: time.Now(),
+			},
+			{
+				ID: 12, SenderID: 7, SenderName: "Bola Farms",
+				RecipientID: 42, RecipientName: "Ada Obi",
+				Amount: "100.00", Currency: "NGN", Status: models.TransferCompleted,
+				Reference: "TRANSFER-7-done", CreatedAt: time.Now(),
+			},
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+	if err := render.RenderTemplates(recorder, "wallet.html", data); err != nil {
+		t.Fatalf("render wallet.html: %v", err)
+	}
+	body := recorder.Body.String()
+
+	for _, unwanted := range []string{
+		`name="transfer_id" value="11"`,
+		`name="transfer_id" value="12"`,
+	} {
+		if strings.Contains(body, unwanted) {
+			t.Errorf("a cancel form was rendered for %s, which the viewer cannot cancel", unwanted)
+		}
+	}
+}
+
+// The overview is what tells an admin at a glance whether anything is late;
+// without it they have to read every row to find that out.
+func TestWalletAdminPageSummarisesWhatIsWaiting(t *testing.T) {
+	rendered := func(t *testing.T, aged int) string {
+		t.Helper()
+		data := WalletAdminPageData{
+			Withdrawals: []models.Withdrawal{{ID: 1}, {ID: 2}},
+			Transfers:   []models.Transfer{{ID: 3}},
+			PendingDeposits: []models.PendingDeposit{{
+				Reference: "WALLET-7-abc", CreatedAt: time.Now().Add(-2 * time.Hour),
+			}},
+			AgedRequests: aged,
+		}
+		recorder := httptest.NewRecorder()
+		if err := render.RenderTemplates(recorder, "wallet-admin.html", data); err != nil {
+			t.Fatalf("render wallet-admin.html: %v", err)
+		}
+		return recorder.Body.String()
+	}
+
+	body := rendered(t, 2)
+	for _, want := range []string{
+		"Withdrawals waiting", "Transfers waiting", "Deposits unconfirmed", "Waiting over 4h",
+		`href="#withdrawals"`, `href="#transfers"`, `href="#deposits"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the overview did not render %q", want)
+		}
+	}
+	if !strings.Contains(body, "wallet-admin-stat-warn") {
+		t.Error("an overdue request did not mark the ageing card")
+	}
+
+	if strings.Contains(rendered(t, 0), "wallet-admin-stat-warn") {
+		t.Error("nothing was overdue, but the ageing card was still marked")
+	}
+}
+
+// Managing admins from the page is what removes the database client from the
+// path. The viewer and a configured admin must be shown without a remove
+// button, because neither removal would stick.
+func TestWalletAdminPageManagesAdminsFromThePage(t *testing.T) {
+	data := WalletAdminPageData{
+		AdminID: 7,
+		Admins: []models.AdminAccount{
+			{FarmerID: 7, FullName: "Bola Farms", Phone: "08010000001"},
+			{FarmerID: 9, FullName: "Ada Obi", Phone: "08020000002"},
+			{FarmerID: 2, FullName: "Configured Admin", FromConfig: true},
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+	if err := render.RenderTemplates(recorder, "wallet-admin.html", data); err != nil {
+		t.Fatalf("render wallet-admin.html: %v", err)
+	}
+	body := recorder.Body.String()
+
+	for _, want := range []string{
+		"Wallet admins", "Bola Farms", "Ada Obi", "Configured Admin",
+		`action="/admin/wallet-admins"`, "Make admin", "Configured", "You",
+		`name="farmer_id" value="9"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the admin section did not render %q", want)
+		}
+	}
+	for _, unwanted := range []string{
+		`name="farmer_id" value="7"`, // you cannot remove yourself
+		`name="farmer_id" value="2"`, // a configured admin cannot be removed here
+	} {
+		if strings.Contains(body, unwanted) {
+			t.Errorf("a remove form was rendered for %s", unwanted)
+		}
+	}
+}
+
+// The exception list exists so a deposit stuck at the provider is visible to a
+// person, rather than accumulating silently behind a "pending" badge.
+func TestWalletAdminPageListsDepositsAwaitingTheProvider(t *testing.T) {
+	data := WalletAdminPageData{
+		PendingDeposits: []models.PendingDeposit{{
+			FarmerID: 7, FullName: "Bola Farms",
+			Amount: "5000.00", Currency: "NGN",
+			Reference: "WALLET-7-abc",
+			CreatedAt: time.Now().Add(-2 * time.Hour),
+		}},
+	}
+
+	recorder := httptest.NewRecorder()
+	if err := render.RenderTemplates(recorder, "wallet-admin.html", data); err != nil {
+		t.Fatalf("render wallet-admin.html: %v", err)
+	}
+	body := recorder.Body.String()
+
+	for _, want := range []string{
+		"Deposits awaiting confirmation",
+		"WALLET-7-abc",
+		"Bola Farms (#7)",
+		"2h",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the exception list did not render %q", want)
+		}
+	}
+}
+
+// The approvals page is an admin console, not a farmer page. It must not offer
+// the farmer navigation, and every money action has to name what it will do
+// before the form is sent so a mis-tap on a small phone is recoverable.
+func TestWalletAdminPageRendersTheAdminConsoleShell(t *testing.T) {
+	data := WalletAdminPageData{
+		AdminID:   7,
+		AdminName: "Bola Farms",
+		Withdrawals: []models.Withdrawal{{
+			ID: 3, FarmerID: 9, Amount: "5000", Currency: "NGN", Status: "pending",
+			BankName: "Access Bank", BankCode: "044", AccountName: "Ada Obi",
+			AccountNumber: "0690000032", Reference: "WITHDRAW-7-1", CreatedAt: time.Now(),
+		}},
+	}
+
+	recorder := httptest.NewRecorder()
+	if err := render.RenderTemplates(recorder, "wallet-admin.html", data); err != nil {
+		t.Fatalf("render wallet-admin.html: %v", err)
+	}
+	body := recorder.Body.String()
+
+	for _, want := range []string{
+		`class="wallet-admin-body"`,
+		"Admin console",
+		"Bola Farms",
+		`href="#overview"`,
+		`href="#admins"`,
+		`href="/logout"`,
+		`href="/profile"`,
+		"Login &amp; security",
+		`data-confirm="Approve payout of ₦5,000 NGN to Ada Obi?"`,
+		`data-copy="WITHDRAW-7-1"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the admin console did not render %q", want)
+		}
+	}
+
+	// A farmer's navigation here would compete with the admin sections and
+	// invite an admin to leave a money decision half-made.
+	for _, unwanted := range []string{
+		`class="navbar"`,
+		`href="/marketplace"`,
+		`href="/orders"`,
+		`href="/deliveries"`,
+		`href="/dashboard"`,
+	} {
+		if strings.Contains(body, unwanted) {
+			t.Errorf("the admin console still rendered %q", unwanted)
+		}
+	}
+}

@@ -830,3 +830,172 @@ func TestCancelTransferTranslatesStoreRefusals(t *testing.T) {
 		})
 	}
 }
+
+// fakeAdminStore answers the admin lookup with a fixed set of flagged accounts.
+type fakeAdminStore struct {
+	walletStore
+	flagged []int
+	err     error
+}
+
+func (f fakeAdminStore) ListAdminIDs(context.Context) ([]int, error) {
+	return f.flagged, f.err
+}
+
+// Flagging an account in the database is how an admin is created now. A refresh
+// must add those accounts without losing the ones configured in the environment,
+// which is what a deployment that still sets WALLET_ADMIN_USER_IDS relies on.
+func TestRefreshAdminIDsAddsFlaggedAccountsAndKeepsConfiguredOnes(t *testing.T) {
+	store := fakeAdminStore{flagged: []int{14}}
+	service := NewWalletService(store, nil, nil, nil, []int{2}, 0, nil)
+
+	if !service.IsAdmin(2) {
+		t.Fatal("the configured admin was dropped at construction")
+	}
+	if service.IsAdmin(14) {
+		t.Fatal("a flagged account counted as an admin before the first refresh")
+	}
+
+	if err := service.RefreshAdminIDs(context.Background()); err != nil {
+		t.Fatalf("RefreshAdminIDs() error = %v", err)
+	}
+	if !service.IsAdmin(14) {
+		t.Error("the flagged account was not picked up")
+	}
+	if !service.IsAdmin(2) {
+		t.Error("the configured admin was dropped by the refresh")
+	}
+
+	store.flagged = nil
+	service.repo = store
+	if err := service.RefreshAdminIDs(context.Background()); err != nil {
+		t.Fatalf("RefreshAdminIDs() error = %v", err)
+	}
+	if service.IsAdmin(14) {
+		t.Error("an un-flagged account still counts as an admin")
+	}
+	if !service.IsAdmin(2) {
+		t.Error("the configured admin did not survive a refresh that found no flags")
+	}
+}
+
+func TestRefreshAdminIDsReportsAReadFailureWithoutChangingTheSet(t *testing.T) {
+	service := NewWalletService(fakeAdminStore{err: errors.New("connection reset")}, nil, nil, nil, []int{2}, 0, nil)
+
+	if err := service.RefreshAdminIDs(context.Background()); err == nil {
+		t.Fatal("RefreshAdminIDs() hid a database failure")
+	}
+	if !service.IsAdmin(2) {
+		t.Error("a failed refresh emptied the admin set")
+	}
+}
+
+// fakeAdminChangeStore stands in for the account writes behind the admin list.
+type fakeAdminChangeStore struct {
+	walletStore
+	flagged  []models.AdminAccount
+	ids      []int
+	setFound bool
+	setErr   error
+}
+
+func (f *fakeAdminChangeStore) ListAdminIDs(context.Context) ([]int, error) { return f.ids, nil }
+func (f *fakeAdminChangeStore) ListAdminAccounts(context.Context) ([]models.AdminAccount, error) {
+	return f.flagged, nil
+}
+func (f *fakeAdminChangeStore) SetAdmin(context.Context, int, bool) (bool, error) {
+	return f.setFound, f.setErr
+}
+
+// fakeAdminFarmers resolves the accounts the page names by phone.
+type fakeAdminFarmers struct {
+	farmerStore
+	byPhone map[string]*models.Farmer
+	byID    map[int]*models.Farmer
+}
+
+func (f fakeAdminFarmers) GetByPhone(phone string) (*models.Farmer, error) {
+	return f.byPhone[phone], nil
+}
+func (f fakeAdminFarmers) GetByID(id int) (*models.Farmer, error) {
+	return f.byID[id], nil
+}
+
+func TestSetAdminRefusesAnyoneWhoIsNotAnAdmin(t *testing.T) {
+	store := &fakeAdminChangeStore{setFound: true}
+	service := NewWalletService(store, nil, nil, nil, nil, 0, nil)
+
+	if err := service.SetAdmin(context.Background(), 5, 9, true); !errors.Is(err, ErrNotAdmin) {
+		t.Errorf("SetAdmin() error = %v, want %v", err, ErrNotAdmin)
+	}
+}
+
+func TestSetAdminRefusesSelfRemovalAndConfiguredAdmins(t *testing.T) {
+	// Actor and target are flagged in the database, not configured.
+	store := &fakeAdminChangeStore{ids: []int{5}, setFound: true}
+	service := NewWalletService(store, nil, nil, nil, nil, 0, nil)
+	if err := service.RefreshAdminIDs(context.Background()); err != nil {
+		t.Fatalf("RefreshAdminIDs() error = %v", err)
+	}
+	if err := service.SetAdmin(context.Background(), 5, 5, false); !errors.Is(err, ErrAdminSelfRemoval) {
+		t.Errorf("removing yourself: error = %v, want %v", err, ErrAdminSelfRemoval)
+	}
+
+	// A role granted by the environment cannot be revoked from the page.
+	configured := NewWalletService(&fakeAdminChangeStore{setFound: true}, nil, nil, nil, []int{2, 3}, 0, nil)
+	if err := configured.SetAdmin(context.Background(), 2, 3, false); !errors.Is(err, ErrAdminFromConfig) {
+		t.Errorf("removing a configured admin: error = %v, want %v", err, ErrAdminFromConfig)
+	}
+}
+
+func TestSetAdminByPhoneNarrowsToTheAccount(t *testing.T) {
+	farmers := fakeAdminFarmers{byPhone: map[string]*models.Farmer{
+		"08012345678": {ID: 9, FullName: "Ada Obi", Phone: "08012345678"},
+	}}
+	store := &fakeAdminChangeStore{ids: []int{5}, setFound: true}
+	service := NewWalletService(store, farmers, nil, nil, nil, 0, nil)
+	if err := service.RefreshAdminIDs(context.Background()); err != nil {
+		t.Fatalf("RefreshAdminIDs() error = %v", err)
+	}
+
+	if err := service.SetAdminByPhone(context.Background(), 5, " 08012345678 ", true); err != nil {
+		t.Errorf("SetAdminByPhone() error = %v", err)
+	}
+	if err := service.SetAdminByPhone(context.Background(), 5, "", true); !errors.Is(err, ErrAdminPhoneRequired) {
+		t.Errorf("empty phone: error = %v, want %v", err, ErrAdminPhoneRequired)
+	}
+	if err := service.SetAdminByPhone(context.Background(), 5, "08000000000", true); !errors.Is(err, ErrAdminNotFound) {
+		t.Errorf("unknown phone: error = %v, want %v", err, ErrAdminNotFound)
+	}
+}
+
+// The page has to show an admin granted in the environment even though no
+// database row records it, and it has to mark that one as unremovable.
+func TestAdminAccountsListsFlaggedAndConfiguredAdmins(t *testing.T) {
+	store := &fakeAdminChangeStore{flagged: []models.AdminAccount{
+		{FarmerID: 7, FullName: "Bola Farms", Phone: "08099999999"},
+	}}
+	farmers := fakeAdminFarmers{byID: map[int]*models.Farmer{
+		2: {ID: 2, FullName: "Ada Obi", Phone: "08012345678"},
+	}}
+	service := NewWalletService(store, farmers, nil, nil, []int{2}, 0, nil)
+
+	accounts, err := service.AdminAccounts(context.Background())
+	if err != nil {
+		t.Fatalf("AdminAccounts() error = %v", err)
+	}
+	if len(accounts) != 2 {
+		t.Fatalf("AdminAccounts() returned %d accounts, want 2: %+v", len(accounts), accounts)
+	}
+
+	byID := make(map[int]models.AdminAccount, len(accounts))
+	for _, account := range accounts {
+		byID[account.FarmerID] = account
+	}
+	if byID[7].FullName != "Bola Farms" || byID[7].FromConfig {
+		t.Errorf("flagged admin = %+v, want the database account", byID[7])
+	}
+	if byID[2].FullName != "Ada Obi" || !byID[2].FromConfig {
+		t.Errorf("configured admin = %+v, want the configured account, marked", byID[2])
+	}
+}

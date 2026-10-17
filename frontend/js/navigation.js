@@ -148,3 +148,143 @@ document.addEventListener("DOMContentLoaded", () => {
         document.body.classList.add("has-tabbar");
     });
 });
+
+// ==========================================================
+// ADMIN CONSOLE
+//
+// The approvals page moves money, so the safety work happens
+// here rather than in the markup: a decision is named back to
+// the admin before it is sent, a form cannot be submitted
+// twice by a slow connection, and a reference can be lifted
+// without selecting a long string by hand. Everything is
+// scoped to .wallet-admin-body - no farmer page changes.
+// ==========================================================
+document.addEventListener("DOMContentLoaded", () => {
+    if (!document.body.classList.contains("wallet-admin-body")) return;
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!reduceMotion) {
+        document.documentElement.style.scrollBehavior = "smooth";
+    }
+
+    // ---- Name the decision before it is sent ----
+
+    document.querySelectorAll("form").forEach(form => {
+        form.addEventListener("submit", event => {
+            const question = form.dataset.confirm;
+            if (question && !window.confirm(question)) {
+                // Cancelling must leave the page exactly as it was, so the
+                // button is only disabled once the submit is really going.
+                event.preventDefault();
+                return;
+            }
+            // Disable on the next tick: the browser owns the form data and the
+            // submitter at this point, and changing either mid-event can make
+            // an old browser drop the submission altogether.
+            window.setTimeout(() => {
+                form.querySelectorAll('button[type="submit"], button:not([type])').forEach(button => {
+                    button.disabled = true;
+                    button.dataset.originalLabel = button.textContent;
+                    button.textContent = "Working…";
+                });
+            }, 0);
+        });
+    });
+
+    // If the admin comes back with the Back button, the browser may restore the
+    // page with the submit button still disabled. A form left saying "Working…"
+    // on a page that is no longer submitting reads as a broken console.
+    window.addEventListener("pageshow", event => {
+        if (!event.persisted) return;
+        document.querySelectorAll("form button[disabled]").forEach(button => {
+            button.disabled = false;
+            if (button.dataset.originalLabel) {
+                button.textContent = button.dataset.originalLabel;
+            }
+        });
+    });
+
+    // ---- Copy a reference without selecting it by hand ----
+
+    const writeClipboard = async text => {
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+                return true;
+            }
+        } catch (error) {
+            // Fall through to the selection path below. The admin may be on
+            // http:// on a local network, where the clipboard API is absent.
+        }
+        try {
+            const area = document.createElement("textarea");
+            area.value = text;
+            area.setAttribute("readonly", "");
+            area.style.position = "fixed";
+            area.style.top = "0";
+            area.style.left = "-9999px";
+            document.body.appendChild(area);
+            area.select();
+            const copied = document.execCommand("copy");
+            document.body.removeChild(area);
+            return copied;
+        } catch (error) {
+            return false;
+        }
+    };
+
+    document.querySelectorAll("[data-copy]").forEach(button => {
+        button.addEventListener("click", async () => {
+            const copied = await writeClipboard(button.dataset.copy || "");
+            const original = button.textContent;
+            button.textContent = copied ? "Copied" : "Select it";
+            button.setAttribute("aria-live", "polite");
+            window.setTimeout(() => {
+                button.textContent = original;
+            }, 1600);
+        });
+    });
+
+    // ---- Keep the sidebar in step with the section in view ----
+
+    const sections = Array.from(document.querySelectorAll(".admin-section[id]"));
+    const links = Array.from(document.querySelectorAll(".admin-nav-link"));
+    const nav = document.querySelector(".admin-nav");
+
+    const markActive = id => {
+        links.forEach(link => {
+            link.classList.toggle("is-active", link.getAttribute("href") === `#${id}`);
+            if (link.classList.contains("is-active")) {
+                link.setAttribute("aria-current", "location");
+            } else {
+                link.removeAttribute("aria-current");
+            }
+        });
+
+        // On a phone the nav is a horizontal strip. Slide the section you are
+        // reading into the middle of it so the tabs stay legible.
+        if (!nav || !window.matchMedia("(max-width: 900px)").matches) return;
+        const active = links.find(link => link.getAttribute("href") === `#${id}`);
+        if (!active) return;
+        const navRect = nav.getBoundingClientRect();
+        const linkRect = active.getBoundingClientRect();
+        nav.scrollBy({
+            left: linkRect.left - navRect.left - (navRect.width - linkRect.width) / 2,
+            behavior: reduceMotion ? "auto" : "smooth"
+        });
+    };
+
+    if (sections.length && "IntersectionObserver" in window) {
+        const observer = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) markActive(entry.target.id);
+            });
+        }, {
+            // A narrow band across the middle of the viewport: whichever
+            // section crosses it owns the highlight.
+            rootMargin: "-45% 0px -50% 0px",
+            threshold: 0
+        });
+        sections.forEach(section => observer.observe(section));
+    }
+});

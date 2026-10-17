@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"backend/internal/models"
 	"backend/internal/services"
@@ -24,6 +25,16 @@ type WalletHandler struct {
 
 func NewWalletHandler(wallet *services.WalletService, otp *services.OTPService, notification *services.NotificationService) *WalletHandler {
 	return &WalletHandler{wallet: wallet, otp: otp, notification: notification}
+}
+
+// refreshAdmins reloads the admin flags written in the database before a page or
+// action decides whether the viewer is one. A failed read is logged and the
+// cached set kept: the page must still open with the last known answer rather
+// than fail because the flags could not be re-read.
+func (h *WalletHandler) refreshAdmins(ctx context.Context) {
+	if err := h.wallet.RefreshAdminIDs(ctx); err != nil {
+		log.Printf("refresh wallet admins: %v", err)
+	}
 }
 
 type WalletPageData struct {
@@ -50,6 +61,9 @@ type WalletPageData struct {
 type WalletAdminPageData struct {
 	Withdrawals       []models.Withdrawal
 	Transfers         []models.Transfer
+	PendingDeposits   []models.PendingDeposit
+	Admins            []models.AdminAccount
+	AgedRequests      int
 	RevenueTotal      string
 	RevenueCount      int
 	CommissionEnabled bool
@@ -62,6 +76,10 @@ type WalletAdminPageData struct {
 	// refuse anyway - a control the admin cannot see the reason for reads as a
 	// broken button.
 	AdminID int
+
+	// AdminName is the viewer's name, shown in the admin console header so a
+	// shared phone always makes clear whose session is open.
+	AdminName string
 }
 
 func (h *WalletHandler) Page(w http.ResponseWriter, r *http.Request) {
@@ -70,6 +88,7 @@ func (h *WalletHandler) Page(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
+	h.refreshAdmins(r.Context())
 	wallet, transactions, err := h.wallet.Wallet(r.Context(), farmer.ID)
 	if err != nil {
 		log.Printf("load wallet for user %d: %v", farmer.ID, err)
@@ -313,6 +332,80 @@ func (h *WalletHandler) redirectTransferError(w http.ResponseWriter, r *http.Req
 	http.Redirect(w, r, "/wallet?error="+url.QueryEscape(walletUserMessage(err)), http.StatusSeeOther)
 }
 
+// cancelErrorMessage names the two outcomes a user can act on - a request that
+// no longer exists, and one that was already being paid - and replaces anything
+// else, so a driver failure never reaches the page as raw text.
+func cancelErrorMessage(err error) string {
+	switch {
+	case errors.Is(err, services.ErrRequestNotFound):
+		return "That request could not be found. Check your wallet history."
+	case errors.Is(err, services.ErrRequestNotPending):
+		return "That request is no longer pending, so it can no longer be cancelled."
+	default:
+		return "That could not be cancelled because of a technical issue. Check your wallet history before trying again."
+	}
+}
+
+// CancelWithdrawal releases the user's own pending withdrawal and returns the
+// reserved money to their balance. It is a POST so a link preview or a page
+// refresh cannot trigger it.
+func (h *WalletHandler) CancelWithdrawal(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	farmer, ok := middleware.FarmerFromContext(r)
+	if !ok || farmer == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form", http.StatusBadRequest)
+		return
+	}
+	withdrawalID, err := strconv.ParseInt(strings.TrimSpace(r.FormValue("withdrawal_id")), 10, 64)
+	if err != nil || withdrawalID <= 0 {
+		http.Redirect(w, r, "/wallet?error="+url.QueryEscape("Invalid request."), http.StatusSeeOther)
+		return
+	}
+	if err := h.wallet.CancelWithdrawal(r.Context(), farmer.ID, withdrawalID); err != nil {
+		log.Printf("cancel withdrawal %d for user %d: %v", withdrawalID, farmer.ID, err)
+		http.Redirect(w, r, "/wallet?error="+url.QueryEscape(cancelErrorMessage(err)), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/wallet?success="+url.QueryEscape(
+		"Withdrawal request cancelled. The reserved money is back in your wallet."), http.StatusSeeOther)
+}
+
+// CancelTransfer is the transfer half of CancelWithdrawal.
+func (h *WalletHandler) CancelTransfer(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	farmer, ok := middleware.FarmerFromContext(r)
+	if !ok || farmer == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form", http.StatusBadRequest)
+		return
+	}
+	transferID, err := strconv.ParseInt(strings.TrimSpace(r.FormValue("transfer_id")), 10, 64)
+	if err != nil || transferID <= 0 {
+		http.Redirect(w, r, "/wallet?error="+url.QueryEscape("Invalid request."), http.StatusSeeOther)
+		return
+	}
+	if err := h.wallet.CancelTransfer(r.Context(), farmer.ID, transferID); err != nil {
+		log.Printf("cancel transfer %d for user %d: %v", transferID, farmer.ID, err)
+		http.Redirect(w, r, "/wallet?error="+url.QueryEscape(cancelErrorMessage(err)), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/wallet?success="+url.QueryEscape(
+		"Transfer request cancelled. The money is back in your wallet."), http.StatusSeeOther)
+}
+
 func (h *WalletHandler) SaveBankDetails(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -405,7 +498,12 @@ func (h *WalletHandler) AdminPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	farmer, ok := middleware.FarmerFromContext(r)
-	if !ok || farmer == nil || !h.wallet.IsAdmin(farmer.ID) {
+	if !ok || farmer == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	h.refreshAdmins(r.Context())
+	if !h.wallet.IsAdmin(farmer.ID) {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -427,17 +525,104 @@ func (h *WalletHandler) AdminPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Could not load platform revenue", http.StatusInternalServerError)
 		return
 	}
+	// The exception list is supporting information, so a failed read must not
+	// take the approvals page down with it: the admin can still act on the
+	// withdrawals and transfers that did load.
+	pendingDeposits, err := h.wallet.PendingDepositsAwaitingProvider(r.Context())
+	if err != nil {
+		log.Printf("load pending deposits for admin %d: %v", farmer.ID, err)
+		pendingDeposits = nil
+	}
+	// The admin list is supporting information as well: not being able to read
+	// it must not stop the approvals themselves from being served.
+	admins, err := h.wallet.AdminAccounts(r.Context())
+	if err != nil {
+		log.Printf("load wallet admins for admin %d: %v", farmer.ID, err)
+		admins = nil
+	}
+	// The overview counts the same requests the reminder pass nudges, so the
+	// number on the page and the notification an admin receives cannot disagree.
+	agedCutoff := time.Now().Add(-services.ApprovalReminderAfter)
+	agedRequests := 0
+	for _, withdrawal := range withdrawals {
+		if (withdrawal.Status == models.WithdrawalPending || withdrawal.Status == models.WithdrawalProcessing) &&
+			withdrawal.CreatedAt.Before(agedCutoff) {
+			agedRequests++
+		}
+	}
+	for _, transfer := range transfers {
+		if transfer.Status == models.TransferPending && transfer.CreatedAt.Before(agedCutoff) {
+			agedRequests++
+		}
+	}
 	data := WalletAdminPageData{
-		Withdrawals: withdrawals, Transfers: transfers,
+		Withdrawals: withdrawals, Transfers: transfers, PendingDeposits: pendingDeposits,
+		Admins:       admins,
+		AgedRequests: agedRequests,
 		RevenueTotal: revenueTotal, RevenueCount: revenueCount,
 		CommissionEnabled: h.wallet.CommissionEnabled(), CommissionLabel: h.wallet.CommissionLabel(),
 		Error: r.URL.Query().Get("error"), Success: r.URL.Query().Get("success"),
-		AdminID: farmer.ID,
+		AdminID:   farmer.ID,
+		AdminName: farmer.FullName,
 	}
 	if err := render.RenderTemplates(w, "wallet-admin.html", data); err != nil {
 		log.Printf("render wallet admin page for admin %d: %v", farmer.ID, err)
 		http.Error(w, "Could not render withdrawal requests", http.StatusInternalServerError)
 	}
+}
+
+// SetWalletAdmin grants or revokes the admin role from the approvals page. The
+// role is an account property, so this is the UI side of the change an operator
+// would otherwise make with SQL; the first admin still comes from configuration,
+// and after that the page manages who else can see it.
+func (h *WalletHandler) SetWalletAdmin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	farmer, ok := middleware.FarmerFromContext(r)
+	h.refreshAdmins(r.Context())
+	if !ok || farmer == nil || !h.wallet.IsAdmin(farmer.ID) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form", http.StatusBadRequest)
+		return
+	}
+
+	var changeErr error
+	success := ""
+	switch r.FormValue("action") {
+	case "remove":
+		id, err := strconv.Atoi(strings.TrimSpace(r.FormValue("farmer_id")))
+		if err != nil || id <= 0 {
+			changeErr = services.ErrAdminNotFound
+			break
+		}
+		changeErr = h.wallet.SetAdmin(r.Context(), farmer.ID, id, false)
+		success = "Admin access removed."
+	default:
+		changeErr = h.wallet.SetAdminByPhone(r.Context(), farmer.ID, r.FormValue("phone"), true)
+		success = "Admin access granted."
+	}
+
+	if changeErr != nil {
+		log.Printf("admin %d change wallet admins: %v", farmer.ID, changeErr)
+		failure := changeErr.Error()
+		switch {
+		case errors.Is(changeErr, services.ErrNotAdmin),
+			errors.Is(changeErr, services.ErrAdminNotFound),
+			errors.Is(changeErr, services.ErrAdminPhoneRequired),
+			errors.Is(changeErr, services.ErrAdminSelfRemoval),
+			errors.Is(changeErr, services.ErrAdminFromConfig):
+		default:
+			failure = "Could not change admin access. Check the server log and try again."
+		}
+		http.Redirect(w, r, adminWalletPath+"?error="+url.QueryEscape(failure), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, adminWalletPath+"?success="+url.QueryEscape(success), http.StatusSeeOther)
 }
 
 // adminWalletPath is the shared approvals page. Withdrawals and transfers are
@@ -476,6 +661,7 @@ func (h *WalletHandler) runAdminWalletAction(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	farmer, ok := middleware.FarmerFromContext(r)
+	h.refreshAdmins(r.Context())
 	if !ok || farmer == nil || !h.wallet.IsAdmin(farmer.ID) {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return

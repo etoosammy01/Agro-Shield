@@ -30,6 +30,46 @@ type WalletDeposit struct {
 	CreatedAt time.Time
 }
 
+// Deposit statuses.
+//
+// Expired is deliberately not a synonym for failed. Failed means the payment
+// provider answered and the payment did not succeed; expired means the
+// reconciliation pass asked and the provider had no transaction for the
+// reference at all. Only that second answer may close an attempt nobody paid.
+const (
+	DepositPending    = "pending"
+	DepositSuccessful = "successful"
+	DepositFailed     = "failed"
+	DepositExpired    = "expired"
+)
+
+// PendingDeposit is an attempt that has been waiting on the payment provider
+// longer than the reconciliation window. The admin page lists these as its
+// exception list; the reconciliation pass re-checks the same rows with the
+// provider rather than letting them accumulate silently.
+type PendingDeposit struct {
+	FarmerID  int
+	FullName  string
+	Amount    string
+	Currency  string
+	Reference string
+	CreatedAt time.Time
+}
+
+// AdminAccount is one row of the admin list on the approvals page. The role
+// lives on the farmer account so it can be granted and revoked from the page
+// itself, without a database client or a restart.
+type AdminAccount struct {
+	FarmerID int
+	FullName string
+	Phone    string
+
+	// FromConfig marks an admin granted by WALLET_ADMIN_USER_IDS. That grant
+	// lives in the server environment, so the page can list it but must not
+	// offer a remove button that would not stick.
+	FromConfig bool
+}
+
 type Withdrawal struct {
 	ID            int64
 	FarmerID      int
@@ -60,8 +100,7 @@ type Withdrawal struct {
 	UpdatedAt time.Time
 }
 
-// Payout-details check verdicts.
-//
+// Payout-details check verdicts.//
 // They live here rather than in services because they are stored on the row and
 // rendered by the templates, both of which this package serves; services names
 // the same three values as PayoutVerified/PayoutMismatch/PayoutUnverified, so
@@ -70,6 +109,22 @@ const (
 	NameCheckVerified   = "verified"
 	NameCheckMismatch   = "mismatch"
 	NameCheckUnverified = "unverified"
+)
+
+// Withdrawal statuses.
+//
+// Cancelled and expired both return the reserved money to the wallet, but they
+// are recorded separately: cancelled is the farmer choosing to stop, expired is
+// the ageing pass releasing a request nobody acted on. Neither is a decision an
+// admin made, so neither reads as rejected.
+const (
+	WithdrawalPending    = "pending"
+	WithdrawalProcessing = "processing"
+	WithdrawalPaid       = "paid"
+	WithdrawalRejected   = "rejected"
+	WithdrawalFailed     = "failed"
+	WithdrawalCancelled  = "cancelled"
+	WithdrawalExpired    = "expired"
 )
 
 func (w Withdrawal) MaskedAccountNumber() string {
@@ -89,6 +144,8 @@ const (
 	TransferPending   = "pending"
 	TransferCompleted = "completed"
 	TransferRejected  = "rejected"
+	TransferCancelled = "cancelled"
+	TransferExpired   = "expired"
 )
 
 type Transfer struct {

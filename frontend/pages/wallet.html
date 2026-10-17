@@ -148,7 +148,9 @@
                             <tr>
                                 <td data-label="When">{{.CreatedAt.Format "02 Jan · 15:04"}}</td>
                                 <td data-label="Amount" class="wallet-table-amount">₦{{money .Amount}}</td>
-                                <td data-label="Status"><span class="wallet-status wallet-status-{{.Status}}">{{.Status}}</span></td>
+                                <td data-label="Status"><span class="wallet-status wallet-status-{{.Status}}">{{.Status}}</span>
+                                    {{if eq .Status "pending"}}<span class="wallet-pending-note">Pending since {{.CreatedAt.Format "15:04"}} — waiting for the payment provider</span>{{end}}
+                                </td>
                             </tr>
                             {{end}}
                         </tbody>
@@ -168,7 +170,15 @@
                             <tr>
                                 <td data-label="When">{{.CreatedAt.Format "02 Jan · 15:04"}}</td>
                                 <td data-label="Amount" class="wallet-table-amount">₦{{money .Amount}}</td>
-                                <td data-label="Status"><span class="wallet-status wallet-status-{{.Status}}">{{.Status}}</span></td>
+                                <td data-label="Status"><span class="wallet-status wallet-status-{{.Status}}">{{.Status}}</span>
+                                    {{if eq .Status "pending"}}
+                                    <span class="wallet-pending-note">Pending since {{.CreatedAt.Format "15:04"}} — waiting for admin approval</span>
+                                    <form method="POST" action="/wallet/withdraw/cancel" class="wallet-pending-action">
+                                        <input type="hidden" name="withdrawal_id" value="{{.ID}}">
+                                        <button class="wallet-button wallet-button-secondary" type="submit">Cancel request</button>
+                                    </form>
+                                    {{end}}
+                                </td>
                             </tr>
                             {{end}}
                         </tbody>
@@ -192,7 +202,15 @@
                                     {{if .Note}}<br><small>{{.Note}}</small>{{end}}
                                 </td>
                                 <td data-label="Amount" class="wallet-table-amount">₦{{money .Amount}}</td>
-                                <td data-label="Status"><span class="wallet-status wallet-status-{{.Status}}">{{.Status}}</span></td>
+                                <td data-label="Status"><span class="wallet-status wallet-status-{{.Status}}">{{.Status}}</span>
+                                    {{if and (eq .Status "pending") (eq .SenderID $.Wallet.FarmerID)}}
+                                    <span class="wallet-pending-note">Pending since {{.CreatedAt.Format "15:04"}} — waiting for admin approval</span>
+                                    <form method="POST" action="/wallet/transfer/cancel" class="wallet-pending-action">
+                                        <input type="hidden" name="transfer_id" value="{{.ID}}">
+                                        <button class="wallet-button wallet-button-secondary" type="submit">Cancel request</button>
+                                    </form>
+                                    {{end}}
+                                </td>
                             </tr>
                             {{end}}
                         </tbody>

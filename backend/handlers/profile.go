@@ -62,6 +62,11 @@ func (h *Profile) ProfileHandler(w http.ResponseWriter, r *http.Request) {
 		Farmer: farmer, IsOwner: r.URL.Query().Get("id") == "",
 		Error: r.URL.Query().Get("error"), Success: r.URL.Query().Get("success"),
 	}
+	// Re-read the admin flags so an account flagged in the database sees the
+	// approvals link on its next page view, without waiting for a restart.
+	if err := h.wallet.RefreshAdminIDs(r.Context()); err != nil {
+		log.Printf("refresh wallet admins: %v", err)
+	}
 	data.IsWalletAdmin = h.wallet.IsAdmin(farmer.ID)
 
 	if !data.IsOwner {

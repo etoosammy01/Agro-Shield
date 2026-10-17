@@ -72,6 +72,11 @@ CREATE INDEX IF NOT EXISTS idx_farmers_state_lga ON farmers(state, lga);
 	if _, err := db.Exec(`ALTER TABLE farmers ADD COLUMN IF NOT EXISTS bank_code TEXT`); err != nil {
 		return fmt.Errorf("farmer bank code migration: %w", err)
 	}
+	// Who may act on wallet approvals is a property of the account, so an admin
+	// can be added with a data change instead of a deployment and a restart.
+	if _, err := db.Exec(`ALTER TABLE farmers ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE`); err != nil {
+		return fmt.Errorf("farmer admin flag migration: %w", err)
+	}
 
 	// -------------------------------------------------------------------------
 	// 2. CROPS / MARKETPLACE PRODUCTS
@@ -454,7 +459,7 @@ CREATE TABLE IF NOT EXISTS wallet_deposits (
 	provider_transaction_id VARCHAR(100) UNIQUE,
 	amount NUMERIC(12,2) NOT NULL CHECK (amount > 0),
 	currency VARCHAR(3) NOT NULL,
-	status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','successful','failed')),
+	status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','successful','failed','expired')),
 	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT fk_wallet_deposit_wallet FOREIGN KEY (wallet_id) REFERENCES wallets(id) ON DELETE RESTRICT
@@ -484,8 +489,9 @@ CREATE TABLE IF NOT EXISTS wallet_withdrawals (
 	bank_code TEXT NOT NULL,
 	account_name TEXT NOT NULL,
 	account_number VARCHAR(10) NOT NULL,
-	status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','processing','paid','rejected','failed')),
+	status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','processing','paid','rejected','failed','cancelled','expired')),
 	approved_by INTEGER,
+	reminded_at TIMESTAMP,
 	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT fk_wallet_withdrawal_wallet FOREIGN KEY (wallet_id) REFERENCES wallets(id) ON DELETE RESTRICT,
@@ -507,8 +513,9 @@ CREATE TABLE IF NOT EXISTS wallet_transfers (
 	amount NUMERIC(12,2) NOT NULL CHECK (amount > 0),
 	currency VARCHAR(3) NOT NULL DEFAULT 'NGN',
 	note TEXT NOT NULL DEFAULT '',
-	status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','completed','rejected')),
+	status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','completed','rejected','cancelled','expired')),
 	approved_by INTEGER,
+	reminded_at TIMESTAMP,
 	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT fk_wallet_transfer_sender_wallet FOREIGN KEY (sender_wallet_id) REFERENCES wallets(id) ON DELETE RESTRICT,
@@ -561,6 +568,58 @@ ALTER TABLE wallet_withdrawals ADD COLUMN IF NOT EXISTS name_check_detail   TEXT
 ALTER TABLE wallet_withdrawals ADD COLUMN IF NOT EXISTS name_check_at       TIMESTAMP;
 `); err != nil {
 		return fmt.Errorf("withdrawal name check migration: %w", err)
+	}
+	// Requests that can be released without a provider.
+	//
+	// A status of its own is what lets a cancelled or expired request be told
+	// apart from one an admin rejected: the money came back in all three cases,
+	// but only two of them are what an admin decided. reminded_at records the
+	// single nudge an aged request gets, so a restart does not send it again.
+	//
+	// The status CHECK constraints are dropped and re-added rather than left as
+	// they were, because a deployed table was created with the old value list and
+	// CREATE TABLE IF NOT EXISTS will not change it. The guard keeps this a no-op
+	// on every start after the first.
+	if _, err := db.Exec(`
+ALTER TABLE wallet_withdrawals ADD COLUMN IF NOT EXISTS reminded_at TIMESTAMP;
+ALTER TABLE wallet_transfers ADD COLUMN IF NOT EXISTS reminded_at TIMESTAMP;
+`); err != nil {
+		return fmt.Errorf("wallet request ageing migration: %w", err)
+	}
+	if _, err := db.Exec(`
+DO $$
+DECLARE
+	constraint_row RECORD;
+BEGIN
+	IF NOT EXISTS (
+		SELECT 1
+		FROM pg_constraint
+		WHERE conrelid = 'wallet_withdrawals'::regclass
+			AND contype = 'c'
+			AND pg_get_constraintdef(oid) ILIKE '%cancelled%'
+	) THEN
+		FOR constraint_row IN
+			SELECT conrelid::regclass AS table_name, conname
+			FROM pg_constraint
+			WHERE conrelid IN ('wallet_deposits'::regclass, 'wallet_withdrawals'::regclass, 'wallet_transfers'::regclass)
+				AND contype = 'c'
+				AND pg_get_constraintdef(oid) ILIKE '%status%'
+		LOOP
+			EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', constraint_row.table_name, constraint_row.conname);
+		END LOOP;
+		ALTER TABLE wallet_deposits
+			ADD CONSTRAINT wallet_deposits_status_check
+			CHECK (status IN ('pending','successful','failed','expired'));
+		ALTER TABLE wallet_withdrawals
+			ADD CONSTRAINT wallet_withdrawals_status_check
+			CHECK (status IN ('pending','processing','paid','rejected','failed','cancelled','expired'));
+		ALTER TABLE wallet_transfers
+			ADD CONSTRAINT wallet_transfers_status_check
+			CHECK (status IN ('pending','completed','rejected','cancelled','expired'));
+	END IF;
+END $$;
+`); err != nil {
+		return fmt.Errorf("wallet status migration: %w", err)
 	}
 	if _, err := db.Exec(`
 DO $$

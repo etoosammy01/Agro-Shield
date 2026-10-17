@@ -4,138 +4,336 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
     <title>Wallet Approvals — Agro-Shield</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="/static/css/wallet.css">
 </head>
-<body class="wallet-body">
-    <header class="navbar">
-        <a class="logo" href="/dashboard"><img src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield"></a>
-        <nav aria-label="Main navigation">
-            <a href="/wallet">Wallet</a>
-            <a href="/orders">Orders</a>
-            <a href="/deliveries">Deliveries</a>
-            <a href="/admin/wallet-withdrawals" aria-current="page">Wallet approvals</a>
-            <a href="/profile">Profile</a>
-            <a href="/logout">Logout</a>
-        </nav>
-    </header>
-    <main class="wallet-admin-page">
-        <h1>Wallet approvals</h1>
-        {{if .Error}}<p role="alert">{{.Error}}</p>{{end}}
-        {{if .Success}}<p role="status">{{.Success}}</p>{{end}}
+<body class="wallet-admin-body">
+    <a class="admin-skip" href="#admin-main">Skip to content</a>
+    <div class="admin-shell">
+        <aside class="admin-sidebar">
+            <div class="admin-brand-row">
+                <a class="admin-brand" href="/admin/wallet-withdrawals">
+                    <span class="admin-brand-mark" aria-hidden="true">AS</span>
+                    <span class="admin-brand-copy">
+                        <strong>Agro-Shield</strong>
+                        <small>Admin console</small>
+                    </span>
+                </a>
+                <a class="admin-signout" href="/logout" aria-label="Sign out" title="Sign out">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3v9"/><path d="M7.5 6.5a7 7 0 1 0 9 0"/></svg>
+                </a>
+            </div>
+            <nav class="admin-nav" aria-label="Admin sections">
+                <a class="admin-nav-link is-active" href="#overview">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+                    <span>Overview</span>
+                </a>
+                <a class="admin-nav-link" href="#withdrawals">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M5 21V10l7-5 7 5v11"/><path d="M9 21v-6h6v6"/></svg>
+                    <span>Withdrawals</span>
+                    <span class="admin-nav-count">{{len .Withdrawals}}</span>
+                </a>
+                <a class="admin-nav-link" href="#transfers">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h13"/><path d="m14 4 3 3-3 3"/><path d="M20 17H7"/><path d="m10 14-3 3 3 3"/></svg>
+                    <span>Transfers</span>
+                    <span class="admin-nav-count">{{len .Transfers}}</span>
+                </a>
+                <a class="admin-nav-link" href="#deposits">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg>
+                    <span>Deposits</span>
+                    <span class="admin-nav-count">{{len .PendingDeposits}}</span>
+                </a>
+                <a class="admin-nav-link" href="#admins">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v5c0 5 3 8 7 10 4-2 7-5 7-10V6z"/><path d="m9 12 2 2 4-4"/></svg>
+                    <span>Admins</span>
+                    <span class="admin-nav-count">{{len .Admins}}</span>
+                </a>
+                <a class="admin-nav-link" href="#revenue">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg>
+                    <span>Revenue</span>
+                </a>
+            </nav>
+            <div class="admin-account">
+                <div>
+                    <strong>{{if .AdminName}}{{.AdminName}}{{else}}Admin{{end}}</strong>
+                    <small>Signed in · #{{.AdminID}}</small>
+                </div>
+                <div class="admin-account-actions">
+                    <a href="/profile">My account</a>
+                    <a href="/logout">Sign out</a>
+                </div>
+            </div>
+        </aside>
 
-        <section class="admin-revenue">
-            <h2>Platform revenue</h2>
-            {{if .CommissionEnabled}}
-            <p>Commission is set to <strong>{{.CommissionLabel}}%</strong> of each sale, taken from the seller’s payout.</p>
-            {{else}}
-            <p>Commission is switched off, so sellers receive the full sale amount. Set <code>COMMISSION_PERCENT</code> to start collecting.</p>
-            {{end}}
-            <p><strong>₦{{money .RevenueTotal}}</strong> collected across {{.RevenueCount}} {{if eq .RevenueCount 1}}sale{{else}}sales{{end}}.</p>
-            <p>This is a ledger only — it is not credited to any wallet, so it does not count towards a user’s balance or a transfer.</p>
-        </section>
+        <main class="wallet-admin-page" id="admin-main">
+            {{if .Error}}<p role="alert">{{.Error}}</p>{{end}}
+            {{if .Success}}<p role="status">{{.Success}}</p>{{end}}
 
-        <h2>Withdrawal requests</h2>
-        {{if .Withdrawals}}
-        <div class="table-wrap">
-            <table class="table-cards">
-                <thead>
-                    <tr><th>User</th><th>Amount</th><th>Bank account</th><th>Reference</th><th>Status</th><th>Action</th></tr>
-                </thead>
-                <tbody>
-                    {{range .Withdrawals}}
-                    <tr>
-                        <td data-label="User">{{.FullName}} (#{{.FarmerID}})</td>
-                        <td data-label="Amount">{{money .Amount}} {{.Currency}}</td>
-                        <td data-label="Bank account">
-                            {{.BankName}} ({{.BankCode}})<br>{{.AccountName}}<br>{{.MaskedAccountNumber}}
-                            <span class="wallet-name-check {{if eq .NameCheckStatus "verified"}}wallet-name-check-ok{{else if eq .NameCheckStatus "mismatch"}}wallet-name-check-bad{{else if eq .NameCheckStatus "unverified"}}wallet-name-check-warn{{else}}wallet-name-check-unknown{{end}}">{{if eq .NameCheckStatus "verified"}}Bank details checked{{else if eq .NameCheckStatus "mismatch"}}Bank details do not match{{else if eq .NameCheckStatus "unverified"}}Not confirmed with the bank{{else}}Never checked{{end}}</span>
-                            {{if .NameCheckDetail}}<br><span class="wallet-name-check-detail">{{.NameCheckDetail}}</span>{{end}}
-                        </td>
-                        <td data-label="Reference">{{.Reference}}</td>
-                        <td data-label="Status">{{.Status}}</td>
-                        <td data-label="Action">
-                            {{if eq .Status "pending"}}
-                            {{if eq .FarmerID $.AdminID}}
-                            <span class="wallet-name-check-detail">Another admin has to approve this one: you requested it.</span>
-                            {{else}}
-                            <form method="POST" action="/admin/wallet-withdrawals/approve">
-                                <input type="hidden" name="withdrawal_id" value="{{.ID}}">
-                                <button type="submit">Approve &amp; pay</button>
-                            </form>
+            <section id="overview" class="admin-section admin-overview">
+                <div class="admin-section-head">
+                    <div>
+                        <p class="admin-eyebrow">Admin console</p>
+                        <h1>Wallet approvals</h1>
+                        <p class="admin-sub">Every request waiting on a decision, and every deposit the provider has not confirmed.</p>
+                    </div>
+                    <span class="admin-session">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+                        Secure admin session
+                    </span>
+                </div>
+
+                <div class="wallet-admin-overview" aria-label="Overview">
+                    <a class="wallet-admin-stat" href="#withdrawals">
+                        <span class="wallet-admin-stat-label">Withdrawals waiting</span>
+                        <strong>{{len .Withdrawals}}</strong>
+                        <span class="wallet-admin-stat-note">review and pay out</span>
+                    </a>
+                    <a class="wallet-admin-stat" href="#transfers">
+                        <span class="wallet-admin-stat-label">Transfers waiting</span>
+                        <strong>{{len .Transfers}}</strong>
+                        <span class="wallet-admin-stat-note">credit the recipient</span>
+                    </a>
+                    <a class="wallet-admin-stat" href="#deposits">
+                        <span class="wallet-admin-stat-label">Deposits unconfirmed</span>
+                        <strong>{{len .PendingDeposits}}</strong>
+                        <span class="wallet-admin-stat-note">provider has not reported</span>
+                    </a>
+                    <a class="wallet-admin-stat{{if .AgedRequests}} wallet-admin-stat-warn{{end}}" href="#withdrawals">
+                        <span class="wallet-admin-stat-label">Waiting over 4h</span>
+                        <strong>{{.AgedRequests}}</strong>
+                        <span class="wallet-admin-stat-note">needs a decision</span>
+                    </a>
+                </div>
+            </section>
+
+            <section id="revenue" class="admin-section admin-revenue">
+                <div class="admin-section-head">
+                    <h2>Platform revenue</h2>
+                </div>
+                {{if .CommissionEnabled}}
+                <p>Commission is set to <strong>{{.CommissionLabel}}%</strong> of each sale, taken from the seller’s payout.</p>
+                {{else}}
+                <p>Commission is switched off, so sellers receive the full sale amount. Set <code>COMMISSION_PERCENT</code> to start collecting.</p>
+                {{end}}
+                <p class="admin-revenue-total"><strong>₦{{money .RevenueTotal}}</strong> collected across {{.RevenueCount}} {{if eq .RevenueCount 1}}sale{{else}}sales{{end}}.</p>
+                <p>This is a ledger only — it is not credited to any wallet, so it does not count towards a user’s balance or a transfer.</p>
+            </section>
+
+            <section id="withdrawals" class="admin-section">
+                <div class="admin-section-head">
+                    <div>
+                        <h2>Withdrawal requests</h2>
+                        <p class="admin-section-note">Approving starts a bank payout. Rejecting returns the reserved funds to the farmer.</p>
+                    </div>
+                    <span class="admin-section-count">{{len .Withdrawals}} waiting</span>
+                </div>
+                {{if .Withdrawals}}
+                <div class="table-wrap">
+                    <table class="table-cards">
+                        <thead>
+                            <tr><th>User</th><th>Amount</th><th>Bank account</th><th>Reference</th><th>Status</th><th>Action</th></tr>
+                        </thead>
+                        <tbody>
+                            {{range .Withdrawals}}
+                            <tr>
+                                <td data-label="User">{{.FullName}} (#{{.FarmerID}})</td>
+                                <td data-label="Amount" class="wallet-table-amount">{{money .Amount}} <span class="admin-currency">{{.Currency}}</span></td>
+                                <td data-label="Bank account">
+                                    {{.BankName}} ({{.BankCode}})<br>{{.AccountName}}<br>{{.MaskedAccountNumber}}
+                                    <span class="wallet-name-check {{if eq .NameCheckStatus "verified"}}wallet-name-check-ok{{else if eq .NameCheckStatus "mismatch"}}wallet-name-check-bad{{else if eq .NameCheckStatus "unverified"}}wallet-name-check-warn{{else}}wallet-name-check-unknown{{end}}">{{if eq .NameCheckStatus "verified"}}Bank details checked{{else if eq .NameCheckStatus "mismatch"}}Bank details do not match{{else if eq .NameCheckStatus "unverified"}}Not confirmed with the bank{{else}}Never checked{{end}}</span>
+                                    {{if .NameCheckDetail}}<br><span class="wallet-name-check-detail">{{.NameCheckDetail}}</span>{{end}}
+                                </td>
+                                <td data-label="Reference">
+                                    <span class="admin-ref">{{.Reference}}</span>
+                                    <button type="button" class="admin-copy" data-copy="{{.Reference}}" aria-label="Copy reference {{.Reference}}">Copy</button>
+                                </td>
+                                <td data-label="Status">
+                                    <span class="wallet-status wallet-status-{{.Status}}">{{.Status}}</span>
+                                    {{if or (eq .Status "pending") (eq .Status "processing")}}<br><span class="wallet-name-check-detail">Waiting {{since .CreatedAt}}</span>{{end}}
+                                </td>
+                                <td data-label="Action">
+                                    <div class="admin-actions">
+                                        {{if eq .Status "pending"}}
+                                        {{if eq .FarmerID $.AdminID}}
+                                        <span class="wallet-name-check-detail">Another admin has to approve this one: you requested it.</span>
+                                        {{else}}
+                                        <form method="POST" action="/admin/wallet-withdrawals/approve" data-confirm="Approve payout of ₦{{money .Amount}} {{.Currency}} to {{.AccountName}}?">
+                                            <input type="hidden" name="withdrawal_id" value="{{.ID}}">
+                                            <button class="admin-btn admin-btn-primary" type="submit">Approve &amp; pay</button>
+                                        </form>
+                                        {{end}}
+                                        <form method="POST" action="/admin/wallet-withdrawals/reject" data-confirm="Reject this request and return ₦{{money .Amount}} {{.Currency}} to {{.FullName}}?">
+                                            <input type="hidden" name="withdrawal_id" value="{{.ID}}">
+                                            <button class="admin-btn admin-btn-danger" type="submit">Reject &amp; refund</button>
+                                        </form>
+                                        {{else if and (eq .Status "processing") .TransferID.Valid}}
+                                        <form method="POST" action="/admin/wallet-withdrawals/reconcile">
+                                            <input type="hidden" name="withdrawal_id" value="{{.ID}}">
+                                            <button class="admin-btn admin-btn-ghost" type="submit">Check provider status</button>
+                                        </form>
+                                        <span class="admin-action-note">Funds remain reserved until the provider confirms success or failure.</span>
+                                        {{else if eq .Status "processing"}}
+                                        <span class="admin-action-note">Check Flutterwave using the reference above before doing anything.</span>
+                                        <form method="POST" action="/admin/wallet-withdrawals/record-transfer">
+                                            <input type="hidden" name="withdrawal_id" value="{{.ID}}">
+                                            <label class="admin-field-label" for="provider-transfer-{{.ID}}">Flutterwave transfer id</label>
+                                            <input class="admin-input" id="provider-transfer-{{.ID}}" type="text" name="provider_transfer_id" inputmode="numeric" autocomplete="off">
+                                            <button class="admin-btn admin-btn-ghost" type="submit">Record transfer</button>
+                                        </form>
+                                        <span class="admin-action-note">If a transfer exists there, record its id so this payout can be settled or refunded. If none does, return the request to the queue and reject it.</span>
+                                        <form method="POST" action="/admin/wallet-withdrawals/return-to-queue" data-confirm="Return this payout to the queue for another attempt?">
+                                            <input type="hidden" name="withdrawal_id" value="{{.ID}}">
+                                            <button class="admin-btn admin-btn-ghost" type="submit">Return to queue</button>
+                                        </form>
+                                        {{else}}
+                                        <span class="admin-action-note">No action available.</span>
+                                        {{end}}
+                                    </div>
+                                </td>
+                            </tr>
                             {{end}}
-                            <form method="POST" action="/admin/wallet-withdrawals/reject">
-                                <input type="hidden" name="withdrawal_id" value="{{.ID}}">
-                                <button type="submit">Reject &amp; refund</button>
-                            </form>
-                            {{else if and (eq .Status "processing") .TransferID.Valid}}
-                            <form method="POST" action="/admin/wallet-withdrawals/reconcile">
-                                <input type="hidden" name="withdrawal_id" value="{{.ID}}">
-                                <button type="submit">Check provider status</button>
-                            </form>
-                            Funds remain reserved until the provider confirms success or failure.
-                            {{else if eq .Status "processing"}}
-                            Check Flutterwave using the reference above before doing anything.
-                            <form method="POST" action="/admin/wallet-withdrawals/record-transfer">
-                                <input type="hidden" name="withdrawal_id" value="{{.ID}}">
-                                <label for="provider-transfer-{{.ID}}">Flutterwave transfer id</label>
-                                <input id="provider-transfer-{{.ID}}" type="text" name="provider_transfer_id" inputmode="numeric" autocomplete="off">
-                                <button type="submit">Record transfer</button>
-                            </form>
-                            If a transfer exists there, record its id so this payout can be settled or refunded. If none does, return the request to the queue and reject it.
-                            <form method="POST" action="/admin/wallet-withdrawals/return-to-queue">
-                                <input type="hidden" name="withdrawal_id" value="{{.ID}}">
-                                <button type="submit">Return to queue</button>
-                            </form>
-                            {{else}}
-                            No action available.
+                        </tbody>
+                    </table>
+                </div>
+                {{else}}<p class="wallet-empty">No withdrawal requests need review.</p>{{end}}
+            </section>
+
+            <section id="transfers" class="admin-section">
+                <div class="admin-section-head">
+                    <div>
+                        <h2>Wallet-to-wallet transfers</h2>
+                        <p class="admin-section-note">Approving credits the recipient. The sender’s balance was already reduced when the transfer was requested, so a transfer you have not approved has not reached anyone.</p>
+                    </div>
+                    <span class="admin-section-count">{{len .Transfers}} waiting</span>
+                </div>
+                {{if .Transfers}}
+                <div class="table-wrap">
+                    <table class="table-cards">
+                        <thead>
+                            <tr><th>From</th><th>To</th><th>Amount</th><th>Note</th><th>Reference</th><th>Action</th></tr>
+                        </thead>
+                        <tbody>
+                            {{range .Transfers}}
+                            <tr>
+                                <td data-label="From">{{.SenderName}} (#{{.SenderID}})</td>
+                                <td data-label="To">{{.RecipientName}} (#{{.RecipientID}})<br>{{.RecipientPhone}}</td>
+                                <td data-label="Amount" class="wallet-table-amount">{{money .Amount}} <span class="admin-currency">{{.Currency}}</span></td>
+                                <td data-label="Note">{{if .Note}}{{.Note}}{{else}}—{{end}}</td>
+                                <td data-label="Reference">
+                                    <span class="admin-ref">{{.Reference}}</span><br>
+                                    <button type="button" class="admin-copy" data-copy="{{.Reference}}" aria-label="Copy reference {{.Reference}}">Copy</button>
+                                    <br><span class="wallet-name-check-detail">Waiting {{since .CreatedAt}}</span>
+                                </td>
+                                <td data-label="Action">
+                                    <div class="admin-actions">
+                                        {{if eq .SenderID $.AdminID}}
+                                        <span class="wallet-name-check-detail">Another admin has to approve this one: you sent it.</span>
+                                        {{else}}
+                                        <form method="POST" action="/admin/wallet-transfers/approve" data-confirm="Approve transfer of ₦{{money .Amount}} {{.Currency}} from {{.SenderName}} to {{.RecipientName}}?">
+                                            <input type="hidden" name="transfer_id" value="{{.ID}}">
+                                            <button class="admin-btn admin-btn-primary" type="submit">Approve &amp; credit</button>
+                                        </form>
+                                        {{end}}
+                                        <form method="POST" action="/admin/wallet-transfers/reject" data-confirm="Reject this transfer and return ₦{{money .Amount}} {{.Currency}} to {{.SenderName}}?">
+                                            <input type="hidden" name="transfer_id" value="{{.ID}}">
+                                            <button class="admin-btn admin-btn-danger" type="submit">Reject &amp; refund sender</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
                             {{end}}
-                        </td>
-                    </tr>
+                        </tbody>
+                    </table>
+                </div>
+                {{else}}<p class="wallet-empty">No transfers need review.</p>{{end}}
+            </section>
+
+            <section id="deposits" class="admin-section">
+                <div class="admin-section-head">
+                    <div>
+                        <h2>Deposits awaiting confirmation</h2>
+                        <p class="admin-section-note">These deposits have been pending for more than 15 minutes. The provider’s webhook remains the source of truth; the reconciliation pass re-checks each of them by reference, and only closes one the provider confirms it has no record of.</p>
+                    </div>
+                    <span class="admin-section-count">{{len .PendingDeposits}} unconfirmed</span>
+                </div>
+                {{if .PendingDeposits}}
+                <div class="table-wrap">
+                    <table class="table-cards">
+                        <thead>
+                            <tr><th>User</th><th>Amount</th><th>Reference</th><th>Waiting</th></tr>
+                        </thead>
+                        <tbody>
+                            {{range .PendingDeposits}}
+                            <tr>
+                                <td data-label="User">{{.FullName}} (#{{.FarmerID}})</td>
+                                <td data-label="Amount" class="wallet-table-amount">{{money .Amount}} <span class="admin-currency">{{.Currency}}</span></td>
+                                <td data-label="Reference">
+                                    <span class="admin-ref">{{.Reference}}</span>
+                                    <button type="button" class="admin-copy" data-copy="{{.Reference}}" aria-label="Copy reference {{.Reference}}">Copy</button>
+                                </td>
+                                <td data-label="Waiting">{{since .CreatedAt}}</td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                </div>
+                {{else}}<p class="wallet-empty">No deposit is waiting on the payment provider.</p>{{end}}
+            </section>
+
+            <section id="admins" class="admin-section">
+                <div class="admin-section-head">
+                    <div>
+                        <h2>Wallet admins</h2>
+                        <p class="admin-section-note">Everyone listed here can open this page and approve requests. An admin needs one other admin to remove them, and a name marked “configured” comes from the server settings, so it can only be removed there.</p>
+                    </div>
+                    <span class="admin-section-count">{{len .Admins}} accounts</span>
+                </div>
+                {{if .Admins}}
+                <ul class="wallet-admin-list">
+                    {{range .Admins}}
+                    <li>
+                        <div>
+                            <strong>{{.FullName}}</strong>
+                            <span class="wallet-name-check-detail">(#{{.FarmerID}})</span>
+                            {{if .Phone}}<br><span class="wallet-name-check-detail">{{.Phone}}</span>{{end}}
+                        </div>
+                        {{if .FromConfig}}
+                        <span class="wallet-status">Configured</span>
+                        {{else if eq .FarmerID $.AdminID}}
+                        <span class="wallet-status">You</span>
+                        {{else}}
+                        <form method="POST" action="/admin/wallet-admins" data-confirm="Remove admin access for {{.FullName}}?">
+                            <input type="hidden" name="action" value="remove">
+                            <input type="hidden" name="farmer_id" value="{{.FarmerID}}">
+                            <button class="admin-btn admin-btn-danger" type="submit">Remove</button>
+                        </form>
+                        {{end}}
+                    </li>
                     {{end}}
-                </tbody>
-            </table>
-        </div>
-        {{else}}<p>No withdrawal requests need review.</p>{{end}}
+                </ul>
+                {{else}}<p class="wallet-empty">No admin accounts are listed.</p>{{end}}
+                <form method="POST" action="/admin/wallet-admins" class="wallet-admin-add">
+                    <input type="hidden" name="action" value="add">
+                    <label for="admin-phone">Phone number of the account to make an admin</label>
+                    <input id="admin-phone" type="tel" name="phone" inputmode="tel" autocomplete="off" placeholder="08012345678">
+                    <button class="admin-btn admin-btn-primary" type="submit">Make admin</button>
+                </form>
 
-        <h2>Wallet-to-wallet transfers</h2>
-        <p>Approving credits the recipient. The sender’s balance was already reduced when the transfer was requested, so a transfer you have not approved has not reached anyone.</p>
-        {{if .Transfers}}
-        <div class="table-wrap">
-            <table class="table-cards">
-                <thead>
-                    <tr><th>From</th><th>To</th><th>Amount</th><th>Note</th><th>Reference</th><th>Action</th></tr>
-                </thead>
-                <tbody>
-                    {{range .Transfers}}
-                    <tr>
-                        <td data-label="From">{{.SenderName}} (#{{.SenderID}})</td>
-                        <td data-label="To">{{.RecipientName}} (#{{.RecipientID}})<br>{{.RecipientPhone}}</td>
-                        <td data-label="Amount">{{money .Amount}} {{.Currency}}</td>
-                        <td data-label="Note">{{if .Note}}{{.Note}}{{else}}—{{end}}</td>
-                        <td data-label="Reference">{{.Reference}}</td>
-                        <td data-label="Action">
-                            {{if eq .SenderID $.AdminID}}
-                            <span class="wallet-name-check-detail">Another admin has to approve this one: you sent it.</span>
-                            {{else}}
-                            <form method="POST" action="/admin/wallet-transfers/approve">
-                                <input type="hidden" name="transfer_id" value="{{.ID}}">
-                                <button type="submit">Approve &amp; credit</button>
-                            </form>
-                            {{end}}
-                            <form method="POST" action="/admin/wallet-transfers/reject">
-                                <input type="hidden" name="transfer_id" value="{{.ID}}">
-                                <button type="submit">Reject &amp; refund sender</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {{end}}
-                </tbody>
-            </table>
-        </div>
-        {{else}}<p>No transfers need review.</p>{{end}}
-    </main>
+                <div class="admin-settings">
+                    <div class="admin-settings-block">
+                        <h3>Login &amp; security</h3>
+                        <p>This console uses the same login as your Agro-Shield account. Change the password from the reset flow, or update the name and phone number on your profile.</p>
+                        <div class="admin-settings-actions">
+                            <a class="admin-btn admin-btn-ghost" href="/forgot-password">Change password</a>
+                            <a class="admin-btn admin-btn-ghost" href="/profile">My account</a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
     <script src="/static/js/navigation.js"></script>
 </body>
 </html>

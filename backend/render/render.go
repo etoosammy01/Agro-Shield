@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // groupThousands inserts separators into a string of digits, e.g. "1250000"
@@ -108,6 +109,29 @@ func hasCoordinates(latitude, longitude float64) bool {
 	return latitude != 0 && longitude != 0
 }
 
+// Since renders how long ago t was, for queues where ageing is the point. A
+// bare "pending" tells an admin nothing about whether a request arrived a
+// minute or a week ago; "4h 12m" does.
+func Since(t time.Time) string {
+	if t.IsZero() {
+		return "unknown"
+	}
+	elapsed := time.Since(t)
+	if elapsed < 0 {
+		elapsed = 0
+	}
+	switch {
+	case elapsed < time.Minute:
+		return "just now"
+	case elapsed < time.Hour:
+		return fmt.Sprintf("%dm", int(elapsed.Minutes()))
+	case elapsed < 24*time.Hour:
+		return fmt.Sprintf("%dh %dm", int(elapsed.Hours()), int(elapsed.Minutes())%60)
+	default:
+		return fmt.Sprintf("%dd %dh", int(elapsed.Hours())/24, int(elapsed.Hours())%24)
+	}
+}
+
 func loadTemplates() *template.Template {
 	funcs := template.FuncMap{
 		"money": Money,
@@ -117,6 +141,7 @@ func loadTemplates() *template.Template {
 		"money0":         Money,
 		"comma":          func(v int) string { return commaNumber(float64(v), 0) },
 		"hasCoordinates": hasCoordinates,
+		"since":          Since,
 	}
 	for _, pattern := range []string{"../frontend/pages/*.html", "../../frontend/pages/*.html", "frontend/pages/*.html"} {
 		if matches, err := os.ReadDir("."); err == nil && matches != nil {

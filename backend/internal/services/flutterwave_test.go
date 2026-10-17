@@ -289,6 +289,9 @@ func TestNotFoundMessageRecognisesOnlyAnswersAboutTheAccount(t *testing.T) {
 		"  invalid account  ",
 		"Account not found",
 		"account does not exist",
+		// The verify-by-reference answer seen in the logs, which arrives as a
+		// 400 and is how an abandoned deposit is finally closed.
+		"No transaction was found for this id",
 	}
 	failed := []string{
 		"",
