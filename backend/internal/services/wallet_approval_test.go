@@ -770,3 +770,63 @@ func TestTheAdminWhoMadeTheRequestIsNotToldItIsWaitingForThem(t *testing.T) {
 		t.Errorf("the other admin was not told about the request: %v", notifier.sent)
 	}
 }
+
+// fakeCancelStore answers the cancel methods from a configured error, so these
+// tests exercise the service's translation rather than a database. The
+// distinction matters: "not found", "already being paid" and "the database is
+// down" are three different things to tell a user.
+type fakeCancelStore struct {
+	walletStore
+	withdrawalErr error
+	transferErr   error
+}
+
+func (f fakeCancelStore) CancelWithdrawal(context.Context, int64, int) error { return f.withdrawalErr }
+func (f fakeCancelStore) CancelTransfer(context.Context, int64, int) error   { return f.transferErr }
+
+func TestCancelWithdrawalTranslatesStoreRefusals(t *testing.T) {
+	tests := []struct {
+		name    string
+		store   error
+		want    error
+		wantNot error
+	}{
+		{"missing request", repository.ErrWithdrawalNotFound, ErrRequestNotFound, nil},
+		{"already being paid", repository.ErrRequestNotPending, ErrRequestNotPending, nil},
+		{"database failure", errors.New("connection reset"), ErrWalletUnavailable, ErrRequestNotPending},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			service := &WalletService{repo: fakeCancelStore{withdrawalErr: tc.store}}
+			err := service.CancelWithdrawal(context.Background(), 7, 1)
+			if !errors.Is(err, tc.want) {
+				t.Fatalf("CancelWithdrawal() error = %v, want %v", err, tc.want)
+			}
+			if tc.wantNot != nil && errors.Is(err, tc.wantNot) {
+				t.Errorf("a database failure was reported as %v, which the user can read as a status", tc.wantNot)
+			}
+		})
+	}
+}
+
+func TestCancelTransferTranslatesStoreRefusals(t *testing.T) {
+	tests := []struct {
+		name  string
+		store error
+		want  error
+	}{
+		{"missing request", repository.ErrTransferNotFound, ErrRequestNotFound},
+		{"already settled", repository.ErrRequestNotPending, ErrRequestNotPending},
+		{"database failure", errors.New("connection reset"), ErrTransferUnavailable},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			service := &WalletService{repo: fakeCancelStore{transferErr: tc.store}}
+			if err := service.CancelTransfer(context.Background(), 7, 1); !errors.Is(err, tc.want) {
+				t.Errorf("CancelTransfer() error = %v, want %v", err, tc.want)
+			}
+		})
+	}
+}

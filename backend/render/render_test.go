@@ -1,6 +1,36 @@
 package render
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
+
+// Ageing is what tells an admin whether a request arrived a minute or a week
+// ago. The boundaries are pinned because the page has no other clock.
+func TestSinceRendersElapsedTime(t *testing.T) {
+	now := time.Now()
+	tests := []struct {
+		name string
+		when time.Time
+		want string
+	}{
+		{"under a minute", now.Add(-30 * time.Second), "just now"},
+		{"minutes", now.Add(-12 * time.Minute), "12m"},
+		{"hours and minutes", now.Add(-4*time.Hour - 12*time.Minute), "4h 12m"},
+		{"days", now.Add(-(2*24*time.Hour + 3*time.Hour)), "2d 3h"},
+		// A clock that is slightly ahead must not render a negative age.
+		{"future", now.Add(time.Minute), "just now"},
+		{"zero", time.Time{}, "unknown"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := Since(tc.when); got != tc.want {
+				t.Errorf("Since(%v) = %q, want %q", tc.when, got, tc.want)
+			}
+		})
+	}
+}
 
 // The kobo rule is the part worth pinning: a whole amount must lose its ".00"
 // while any amount that actually has kobo must keep both digits. Getting the
