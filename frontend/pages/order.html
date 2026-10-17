@@ -12,10 +12,32 @@
   <link rel="manifest" href="static/assets/favicon_io/site.webmanifest">
 
   <title>Orders — Agro-Shield</title>
-  <link rel="stylesheet" href="/static/assets/css/style.css">
+  <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-  {{template "navbar" .}}
+  <!-- Was a call to a shared "navbar" template, which no file in
+       frontend/pages defines. Go parses that silently and then fails at
+       execution with "no such template", so this page returned a 500. Every
+       other page in the app carries its own inline header, so this follows that
+       convention. The links are the same set profile.html shows. -->
+  <header class="navbar">
+    <a class="logo" href="/dashboard"><img src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield"></a>
+
+    <nav aria-label="Main navigation">
+      <a href="/dashboard">Dashboard</a>
+      {{if not .IsBuyer}}<a href="/storage">Storage</a>{{end}}
+      <a href="/marketplace">Marketplace</a>
+      <a href="/chat">Chat</a>
+      {{if not .IsBuyer}}<a href="/ai-assistant">AI Assistant</a>{{end}}
+      <a href="/cart">Cart</a>
+      <a href="/orders" aria-current="page">Orders</a>
+      <a href="/deliveries">Deliveries</a>
+      <a href="/wallet">Wallet</a>
+      <a href="/notifications">Notifications</a>
+      <a href="/profile">Profile</a>
+      <a href="/logout">Logout</a>
+    </nav>
+  </header>
 
   <main class="container">
     <div class="page-header">
@@ -27,7 +49,7 @@
 
     {{if .Orders}}
     <div class="table-wrap">
-      <table class="table">
+      <table class="table table-cards">
         <thead>
           <tr>
             <th>#</th>
@@ -43,24 +65,24 @@
         <tbody>
           {{range .Orders}}
           <tr>
-            <td>{{.ID}}</td>
-            <td>
+            <td data-label="#">{{.ID}}</td>
+            <td data-label="Produce">
               {{if .ImageURL}}
                 <img src="{{.ImageURL}}" alt="" class="thumb">
               {{end}}
               {{.CropName}}
             </td>
-            <td>{{.Quantity}} {{.CropUnit}}</td>
-            <td>₦{{money .TotalPrice}}</td>
-            <td>
+            <td data-label="Quantity">{{.Quantity}} {{.CropUnit}}</td>
+            <td data-label="Total">₦{{money .TotalPrice}}</td>
+            <td data-label="{{if $.IsBuyer}}Seller{{else}}Buyer{{end}}">
               {{if $.IsBuyer}}{{.SellerName}}{{else}}{{.BuyerName}}{{end}}
             </td>
-            <td><span class="badge">{{.Status}}</span></td>
-            <td>{{.CreatedAt.Format "02 Jan 2006"}}</td>
+            <td data-label="Status"><span class="badge">{{.Status}}</span></td>
+            <td data-label="Date">{{.CreatedAt.Format "02 Jan 2006"}}</td>
             <td>
               <a href="/order?id={{.ID}}" class="btn btn-sm">View</a>
               {{if $.IsBuyer}}
-                <a href="/deliveries/create?order_id={{.ID}}" class="btn btn-sm btn-outline">Request Delivery</a>
+                <a href="/order?id={{.ID}}#request-delivery" class="btn btn-sm btn-outline">Request Delivery</a>
               {{end}}
             </td>
           </tr>
@@ -77,6 +99,119 @@
     </div>
     {{end}}
   </main>
+
+  <script src="/static/js/navigation.js"></script>
+</body>
+</html>
+{{end}}
+
+{{define "order.html"}}
+<!-- Single order detail. The list above defines "orders.html"; this block
+     defines "order.html", the name handlers/order.go renders for /order?id=N.
+     Both live in this file so the two views stay together. Kept inside the
+     define because text between two defines becomes part of the file's own
+     template body, and a non-empty body collides with a define of the same
+     name. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="static/assets/favicon_io/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="static/assets/favicon_io/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="static/assets/favicon_io/favicon-16x16.png">
+  <link rel="manifest" href="static/assets/favicon_io/site.webmanifest">
+
+  <title>Order #{{.Order.ID}} — Agro-Shield</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="navbar">
+    <a class="logo" href="/dashboard"><img src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield"></a>
+
+    <nav aria-label="Main navigation">
+      <a href="/dashboard">Dashboard</a>
+      {{if not .IsBuyer}}<a href="/storage">Storage</a>{{end}}
+      <a href="/marketplace">Marketplace</a>
+      <a href="/chat">Chat</a>
+      {{if not .IsBuyer}}<a href="/ai-assistant">AI Assistant</a>{{end}}
+      <a href="/cart">Cart</a>
+      <a href="/orders" aria-current="page">Orders</a>
+      <a href="/deliveries">Deliveries</a>
+      <a href="/wallet">Wallet</a>
+      <a href="/notifications">Notifications</a>
+      <a href="/profile">Profile</a>
+      <a href="/logout">Logout</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="page-header">
+      <a href="/orders" class="back-link">← Back to orders</a>
+      <h1>Order #{{.Order.ID}}</h1>
+      <span class="badge status-{{.Order.Status}}">{{.Order.Status}}</span>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <h3>Produce</h3>
+        {{if .Order.ImageURL}}
+          <img src="{{.Order.ImageURL}}" alt="{{.Order.CropName}}" class="product-img">
+        {{end}}
+        <p><strong>{{.Order.CropName}}</strong></p>
+        <p>{{.Order.Quantity}} {{.Order.CropUnit}}</p>
+
+        <h3>Total</h3>
+        <p>₦{{money .Order.TotalPrice}}</p>
+
+        <h3>Status</h3>
+        <p><span class="badge status-{{.Order.Status}}">{{.Order.Status}}</span></p>
+
+        <h3>Ordered</h3>
+        <p>{{.Order.CreatedAt.Format "02 Jan 2006"}}</p>
+
+        <h3>Parties</h3>
+        <p>Buyer: {{.Order.BuyerName}}</p>
+        <p>Seller: {{.Order.SellerName}}</p>
+      </div>
+    </div>
+
+    {{if .IsBuyer}}
+    {{if .DeliveryError}}
+    <p role="alert" style="color:#991b1b;background:#fee2e2;border:1px solid #fecaca;padding:14px 16px;border-radius:10px;">{{.DeliveryError}}</p>
+    {{end}}
+    <div class="card" id="request-delivery">
+      <div class="card-body">
+        <h3>Request Delivery</h3>
+
+        <form method="POST" action="/deliveries/create" class="stack">
+          <input type="hidden" name="order_id" value="{{.Order.ID}}">
+
+          <label for="address">Delivery address</label>
+          <input type="text" id="address" name="address" required>
+
+          <label for="lga">LGA</label>
+          <input type="text" id="lga" name="lga">
+
+          <label for="state">State</label>
+          <input type="text" id="state" name="state">
+
+          <label for="country">Country</label>
+          <input type="text" id="country" name="country" value="Nigeria">
+
+          <label for="quantity">Quantity ({{.Order.CropUnit}})</label>
+          <input type="number" id="quantity" name="quantity" step="any" min="0.01"
+                 max="{{.Order.Quantity}}" value="{{.Order.Quantity}}" required>
+
+          <button type="submit" class="btn">Request Delivery</button>
+        </form>
+      </div>
+    </div>
+    {{end}}
+  </main>
+
+  <script src="/static/js/navigation.js"></script>
 </body>
 </html>
 {{end}}

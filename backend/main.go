@@ -105,6 +105,14 @@ func main() {
 	walletRepo := repository.NewWalletRepository(db)
 
 	// ------------------------------------------------------------
+	// BANK LOOKUP REPOSITORY          ← added
+	// Caches which bank an account number belongs to, and the name
+	// registered on it, so a number is swept against the bank
+	// shortlist at most once.
+	// ------------------------------------------------------------
+	bankLookupRepo := repository.NewBankLookupRepository(db)
+
+	// ------------------------------------------------------------
 	// ONE-TIME PASSCODE REPOSITORY          ← added
 	// Backs password resets and wallet payout verification.
 	// ------------------------------------------------------------
@@ -244,6 +252,7 @@ func main() {
 		// Payments          ← added
 		paymentRepo,
 		walletRepo,
+		bankLookupRepo,
 		otpRepo,
 		smsSender,
 		flutterwaveClient,

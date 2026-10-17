@@ -56,6 +56,12 @@ type WalletAdminPageData struct {
 	CommissionLabel   string
 	Error             string
 	Success           string
+
+	// AdminID is the viewer's own farmer id. The page uses it to withhold the
+	// approve button on requests they made themselves, which the service would
+	// refuse anyway - a control the admin cannot see the reason for reads as a
+	// broken button.
+	AdminID int
 }
 
 func (h *WalletHandler) Page(w http.ResponseWriter, r *http.Request) {
@@ -119,10 +125,31 @@ func (h *WalletHandler) Deposit(w http.ResponseWriter, r *http.Request) {
 	result, err := h.wallet.InitiateDeposit(r.Context(), farmer, r.FormValue("amount"))
 	if err != nil {
 		log.Printf("wallet deposit initiation for user %d: %v", farmer.ID, err)
-		http.Redirect(w, r, "/wallet?error="+url.QueryEscape("We could not confirm the payment setup because of a technical issue. Check your deposit history before retrying; if you completed a payment, do not pay again while its status is pending."), http.StatusSeeOther)
+		http.Redirect(w, r, "/wallet?error="+url.QueryEscape(depositErrorMessage(err)), http.StatusSeeOther)
 		return
 	}
 	http.Redirect(w, r, result.CheckoutURL, http.StatusSeeOther)
+}
+
+// depositErrorMessage separates an amount the user can correct from a failure
+// that happened after the attempt was already recorded.
+//
+// Only a rejected amount is shown verbatim in spirit. Everything else keeps the
+// payment warning, because by then a deposit row may exist and a delayed
+// webhook could still credit it - so "do not pay again while pending" is the
+// correct advice.
+func depositErrorMessage(err error) string {
+	switch err.Error() {
+	case "amount is required":
+		return "Enter how much you would like to add."
+	case "enter a valid positive amount",
+		"enter a valid positive amount with up to two decimal places":
+		return "Enter a valid amount using digits only, like 5000 or 5000.50."
+	case "amount exceeds wallet limits":
+		return "That amount is too large. Enter a smaller amount."
+	default:
+		return "We could not confirm the payment setup because of a technical issue. Check your deposit history before retrying; if you completed a payment, do not pay again while its status is pending."
+	}
 }
 
 // SendOTP issues a one-time passcode for a wallet action.
@@ -201,6 +228,16 @@ func (h *WalletHandler) Withdraw(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.wallet.RequestWithdrawal(r.Context(), farmer.ID, r.FormValue("amount")); err != nil {
 		log.Printf("wallet withdrawal request for user %d: %v", farmer.ID, err)
+
+		// A mismatch is the one failure on this path the farmer can fix, so it
+		// gets an instruction instead of the raw wrapped error. The detail is
+		// kept because "which name does the bank hold?" is exactly what they need
+		// to correct an account name.
+		if errors.Is(err, services.ErrPayoutDetailsMismatch) {
+			http.Redirect(w, r, "/wallet?error="+url.QueryEscape(
+				err.Error()+". Update your bank payout details and try again."), http.StatusSeeOther)
+			return
+		}
 		http.Redirect(w, r, "/wallet?error="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
@@ -291,6 +328,7 @@ func (h *WalletHandler) SaveBankDetails(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	err := h.wallet.UpdateBankDetails(
+		r.Context(),
 		farmer.ID,
 		r.FormValue("bank_name"),
 		r.FormValue("bank_code"),
@@ -303,6 +341,43 @@ func (h *WalletHandler) SaveBankDetails(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	http.Redirect(w, r, "/wallet?success="+url.QueryEscape("Bank payout details saved."), http.StatusSeeOther)
+}
+
+// LookupAccount finds which banks an account number belongs to and the name
+// registered on it, so the payout form can fill in a verified name instead of
+// asking the user to type one.
+//
+// This is a POST, not a GET: the account number is a sensitive identifier, and
+// a GET would put it in access logs, browser history and any Referer header
+// sent from the page.
+func (h *WalletHandler) LookupAccount(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	farmer, ok := middleware.FarmerFromContext(r)
+	if !ok || farmer == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form", http.StatusBadRequest)
+		return
+	}
+	accountNumber := r.FormValue("account_number")
+
+	matches, err := h.wallet.LookupAccountBanks(r.Context(), accountNumber)
+	if err != nil {
+		// A malformed account number is the user's to fix and is worth saying so;
+		// anything else is ours, and is logged rather than shown.
+		log.Printf("bank lookup for user %d: %v", farmer.ID, err)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	if matches == nil {
+		matches = []services.BankMatch{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"banks": matches})
 }
 
 func (h *WalletHandler) Banks(w http.ResponseWriter, r *http.Request) {
@@ -357,6 +432,7 @@ func (h *WalletHandler) AdminPage(w http.ResponseWriter, r *http.Request) {
 		RevenueTotal: revenueTotal, RevenueCount: revenueCount,
 		CommissionEnabled: h.wallet.CommissionEnabled(), CommissionLabel: h.wallet.CommissionLabel(),
 		Error: r.URL.Query().Get("error"), Success: r.URL.Query().Get("success"),
+		AdminID: farmer.ID,
 	}
 	if err := render.RenderTemplates(w, "wallet-admin.html", data); err != nil {
 		log.Printf("render wallet admin page for admin %d: %v", farmer.ID, err)
@@ -379,8 +455,19 @@ type adminWalletAction struct {
 	idField      string
 	redirectPath string
 	failure      string
-	success      string
-	run          func(ctx context.Context, id int64, adminID int) error
+
+	// failureFor derives the banner from the error itself, for failures the admin
+	// has to act on differently. Returning "" falls back to failure, which is
+	// deliberately vague about cause and explicit about where the money is.
+	failureFor func(error) string
+
+	success string
+	run     func(ctx context.Context, id int64, adminID int) error
+
+	// runForm replaces run for an action that needs a second field from the
+	// submitted form, which is the Flutterwave transfer id an admin copied out
+	// of the provider's dashboard. The form is parsed before either is called.
+	runForm func(ctx context.Context, id int64, adminID int, form url.Values) error
 }
 
 func (h *WalletHandler) runAdminWalletAction(w http.ResponseWriter, r *http.Request, action adminWalletAction) {
@@ -402,12 +489,51 @@ func (h *WalletHandler) runAdminWalletAction(w http.ResponseWriter, r *http.Requ
 		http.Redirect(w, r, action.redirectPath+"?error="+url.QueryEscape("Invalid request."), http.StatusSeeOther)
 		return
 	}
-	if err := action.run(r.Context(), id, farmer.ID); err != nil {
-		log.Printf("admin %d %s: %v", farmer.ID, action.idField, err)
-		http.Redirect(w, r, action.redirectPath+"?error="+url.QueryEscape(action.failure), http.StatusSeeOther)
+	var runErr error
+	if action.runForm != nil {
+		runErr = action.runForm(r.Context(), id, farmer.ID, r.PostForm)
+	} else {
+		runErr = action.run(r.Context(), id, farmer.ID)
+	}
+	if runErr != nil {
+		log.Printf("admin %d %s: %v", farmer.ID, action.idField, runErr)
+
+		failure := action.failure
+		if action.failureFor != nil {
+			if specific := action.failureFor(runErr); specific != "" {
+				failure = specific
+			}
+		}
+		http.Redirect(w, r, action.redirectPath+"?error="+url.QueryEscape(failure), http.StatusSeeOther)
 		return
 	}
 	http.Redirect(w, r, action.redirectPath+"?success="+url.QueryEscape(action.success), http.StatusSeeOther)
+}
+
+// approvalFailureFor explains the refusals an admin can act on differently.
+//
+// The generic failure text tells them to check the status and retry, which is
+// right for a status race and wrong for these: retrying changes nothing. Each
+// one needs its own instruction instead. Returning "" falls back to the generic
+// text.
+func approvalFailureFor(err error) string {
+	switch {
+	case errors.Is(err, services.ErrPayoutDetailsMismatch):
+		// A refused payout leaves the withdrawal pending, so the funds are still
+		// reserved and Reject is what releases them.
+		return "Payout blocked: " + err.Error() + "."
+	case errors.Is(err, services.ErrSelfApproval):
+		return "Not approved: " + err.Error() + "."
+	case errors.Is(err, services.ErrPayoutSubmitted):
+		// The dangerous one: the row looks like a payout that never started, but
+		// money is on its way. Neither Reject nor the way back to the queue is
+		// safe, and reconciling needs the transfer id this failure did not save -
+		// so the admin has to bring that id back from Flutterwave first.
+		return "Do not reject or return this request to the queue. " + err.Error() + ". Find that transfer in Flutterwave, record its id below, then check the provider status to settle or refund it."
+	case errors.Is(err, services.ErrTransferNotCreated):
+		return "Flutterwave refused the payout and the request is back in the queue. Reject it to release the reserved funds."
+	}
+	return ""
 }
 
 func (h *WalletHandler) ApproveWithdrawal(w http.ResponseWriter, r *http.Request) {
@@ -415,6 +541,7 @@ func (h *WalletHandler) ApproveWithdrawal(w http.ResponseWriter, r *http.Request
 		idField:      "withdrawal_id",
 		redirectPath: adminWalletPath,
 		failure:      "Could not confirm the payout action due to a technical issue or status change. Check the withdrawal status before retrying; funds remain reserved while a payout is processing.",
+		failureFor:   approvalFailureFor,
 		success:      "Payout started with Flutterwave.",
 		run: func(ctx context.Context, id int64, adminID int) error {
 			return h.wallet.ApproveWithdrawal(ctx, id, adminID)
@@ -447,6 +574,35 @@ func (h *WalletHandler) ReconcileWithdrawal(w http.ResponseWriter, r *http.Reque
 	})
 }
 
+// ReturnWithdrawalToQueue puts a payout that never reached Flutterwave back in
+// the approval queue, so it can be rejected and the reserved funds released.
+func (h *WalletHandler) ReturnWithdrawalToQueue(w http.ResponseWriter, r *http.Request) {
+	h.runAdminWalletAction(w, r, adminWalletAction{
+		idField:      "withdrawal_id",
+		redirectPath: adminWalletPath,
+		failure:      "Could not return the request to the queue. It has a saved Flutterwave transfer, so a payout may be on its way - check the provider before doing anything else. Funds remain reserved.",
+		success:      "Request returned to the queue. Reject it to release the reserved funds.",
+		run: func(ctx context.Context, id int64, adminID int) error {
+			return h.wallet.ReturnWithdrawalToQueue(ctx, id, adminID)
+		},
+	})
+}
+
+// RecordTransferID takes the Flutterwave transfer id an admin found in the
+// provider's dashboard and stores it against a payout that never recorded its
+// own, so that payout can then be reconciled.
+func (h *WalletHandler) RecordTransferID(w http.ResponseWriter, r *http.Request) {
+	h.runAdminWalletAction(w, r, adminWalletAction{
+		idField:      "withdrawal_id",
+		redirectPath: adminWalletPath,
+		failure:      "Could not record the Flutterwave transfer id. Check the number against the provider's dashboard and try again; funds remain reserved.",
+		success:      "Flutterwave transfer recorded. Check the provider status to settle or refund this payout.",
+		runForm: func(ctx context.Context, id int64, adminID int, form url.Values) error {
+			return h.wallet.RecordProviderTransferID(ctx, id, adminID, form.Get("provider_transfer_id"))
+		},
+	})
+}
+
 // notifyTransfer is best-effort. The money has already moved by the time it is
 // called, so a notification failure is logged rather than surfaced as an error
 // the admin would read as "the transfer did not happen".
@@ -464,6 +620,7 @@ func (h *WalletHandler) ApproveTransfer(w http.ResponseWriter, r *http.Request) 
 		idField:      "transfer_id",
 		redirectPath: adminWalletPath,
 		failure:      "Could not approve the transfer due to a technical issue or a status change. Check the transfer status before retrying; a transfer that is still pending has not been credited.",
+		failureFor:   approvalFailureFor,
 		success:      "Transfer approved and the recipient has been credited.",
 		run: func(ctx context.Context, id int64, adminID int) error {
 			settled, err := h.wallet.ApproveTransfer(ctx, id, adminID)

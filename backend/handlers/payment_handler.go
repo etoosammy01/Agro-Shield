@@ -129,6 +129,19 @@ func (h *PaymentHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 	_, err = h.payment.ProcessWebhook(r.Context(), body, receivedHash)
 	if err != nil {
 		if errors.Is(err, services.ErrUnauthorizedWebhook) {
+			// Record that a delivery was rejected, but not why, and never
+			// either hash: the header on this request is attacker-controlled,
+			// and naming the expected value would hand over the secret.
+			// Whether the header arrived at all is the one fact worth keeping,
+			// and it is what separates the two causes - an absent header means
+			// Flutterwave isn't sending one, a present one means what the
+			// dashboard holds isn't what we hold.
+			hashState := "missing"
+			if receivedHash != "" {
+				hashState = "present"
+			}
+			log.Printf("webhook rejected: verif-hash %s, from %s", hashState, r.RemoteAddr)
+
 			// Do not reveal WHY it failed - just reject.
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return

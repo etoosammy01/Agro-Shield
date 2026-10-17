@@ -13,6 +13,8 @@
         <a class="logo" href="/dashboard"><img src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield"></a>
         <nav aria-label="Main navigation">
             <a href="/wallet">Wallet</a>
+            <a href="/orders">Orders</a>
+            <a href="/deliveries">Deliveries</a>
             <a href="/admin/wallet-withdrawals" aria-current="page">Wallet approvals</a>
             <a href="/profile">Profile</a>
             <a href="/logout">Logout</a>
@@ -30,31 +32,39 @@
             {{else}}
             <p>Commission is switched off, so sellers receive the full sale amount. Set <code>COMMISSION_PERCENT</code> to start collecting.</p>
             {{end}}
-            <p><strong>₦{{.RevenueTotal}}</strong> collected across {{.RevenueCount}} {{if eq .RevenueCount 1}}sale{{else}}sales{{end}}.</p>
+            <p><strong>₦{{money .RevenueTotal}}</strong> collected across {{.RevenueCount}} {{if eq .RevenueCount 1}}sale{{else}}sales{{end}}.</p>
             <p>This is a ledger only — it is not credited to any wallet, so it does not count towards a user’s balance or a transfer.</p>
         </section>
 
         <h2>Withdrawal requests</h2>
         {{if .Withdrawals}}
         <div class="table-wrap">
-            <table>
+            <table class="table-cards">
                 <thead>
                     <tr><th>User</th><th>Amount</th><th>Bank account</th><th>Reference</th><th>Status</th><th>Action</th></tr>
                 </thead>
                 <tbody>
                     {{range .Withdrawals}}
                     <tr>
-                        <td>{{.FullName}} (#{{.FarmerID}})</td>
-                        <td>{{.Amount}} {{.Currency}}</td>
-                        <td>{{.BankName}} ({{.BankCode}})<br>{{.AccountName}}<br>{{.MaskedAccountNumber}}</td>
-                        <td>{{.Reference}}</td>
-                        <td>{{.Status}}</td>
-                        <td>
+                        <td data-label="User">{{.FullName}} (#{{.FarmerID}})</td>
+                        <td data-label="Amount">{{money .Amount}} {{.Currency}}</td>
+                        <td data-label="Bank account">
+                            {{.BankName}} ({{.BankCode}})<br>{{.AccountName}}<br>{{.MaskedAccountNumber}}
+                            <span class="wallet-name-check {{if eq .NameCheckStatus "verified"}}wallet-name-check-ok{{else if eq .NameCheckStatus "mismatch"}}wallet-name-check-bad{{else if eq .NameCheckStatus "unverified"}}wallet-name-check-warn{{else}}wallet-name-check-unknown{{end}}">{{if eq .NameCheckStatus "verified"}}Bank details checked{{else if eq .NameCheckStatus "mismatch"}}Bank details do not match{{else if eq .NameCheckStatus "unverified"}}Not confirmed with the bank{{else}}Never checked{{end}}</span>
+                            {{if .NameCheckDetail}}<br><span class="wallet-name-check-detail">{{.NameCheckDetail}}</span>{{end}}
+                        </td>
+                        <td data-label="Reference">{{.Reference}}</td>
+                        <td data-label="Status">{{.Status}}</td>
+                        <td data-label="Action">
                             {{if eq .Status "pending"}}
+                            {{if eq .FarmerID $.AdminID}}
+                            <span class="wallet-name-check-detail">Another admin has to approve this one: you requested it.</span>
+                            {{else}}
                             <form method="POST" action="/admin/wallet-withdrawals/approve">
                                 <input type="hidden" name="withdrawal_id" value="{{.ID}}">
                                 <button type="submit">Approve &amp; pay</button>
                             </form>
+                            {{end}}
                             <form method="POST" action="/admin/wallet-withdrawals/reject">
                                 <input type="hidden" name="withdrawal_id" value="{{.ID}}">
                                 <button type="submit">Reject &amp; refund</button>
@@ -66,7 +76,18 @@
                             </form>
                             Funds remain reserved until the provider confirms success or failure.
                             {{else if eq .Status "processing"}}
-                            Check Flutterwave using the reference above. Do not approve again; funds remain reserved.
+                            Check Flutterwave using the reference above before doing anything.
+                            <form method="POST" action="/admin/wallet-withdrawals/record-transfer">
+                                <input type="hidden" name="withdrawal_id" value="{{.ID}}">
+                                <label for="provider-transfer-{{.ID}}">Flutterwave transfer id</label>
+                                <input id="provider-transfer-{{.ID}}" type="text" name="provider_transfer_id" inputmode="numeric" autocomplete="off">
+                                <button type="submit">Record transfer</button>
+                            </form>
+                            If a transfer exists there, record its id so this payout can be settled or refunded. If none does, return the request to the queue and reject it.
+                            <form method="POST" action="/admin/wallet-withdrawals/return-to-queue">
+                                <input type="hidden" name="withdrawal_id" value="{{.ID}}">
+                                <button type="submit">Return to queue</button>
+                            </form>
                             {{else}}
                             No action available.
                             {{end}}
@@ -82,23 +103,27 @@
         <p>Approving credits the recipient. The sender’s balance was already reduced when the transfer was requested, so a transfer you have not approved has not reached anyone.</p>
         {{if .Transfers}}
         <div class="table-wrap">
-            <table>
+            <table class="table-cards">
                 <thead>
                     <tr><th>From</th><th>To</th><th>Amount</th><th>Note</th><th>Reference</th><th>Action</th></tr>
                 </thead>
                 <tbody>
                     {{range .Transfers}}
                     <tr>
-                        <td>{{.SenderName}} (#{{.SenderID}})</td>
-                        <td>{{.RecipientName}} (#{{.RecipientID}})<br>{{.RecipientPhone}}</td>
-                        <td>{{.Amount}} {{.Currency}}</td>
-                        <td>{{if .Note}}{{.Note}}{{else}}—{{end}}</td>
-                        <td>{{.Reference}}</td>
-                        <td>
+                        <td data-label="From">{{.SenderName}} (#{{.SenderID}})</td>
+                        <td data-label="To">{{.RecipientName}} (#{{.RecipientID}})<br>{{.RecipientPhone}}</td>
+                        <td data-label="Amount">{{money .Amount}} {{.Currency}}</td>
+                        <td data-label="Note">{{if .Note}}{{.Note}}{{else}}—{{end}}</td>
+                        <td data-label="Reference">{{.Reference}}</td>
+                        <td data-label="Action">
+                            {{if eq .SenderID $.AdminID}}
+                            <span class="wallet-name-check-detail">Another admin has to approve this one: you sent it.</span>
+                            {{else}}
                             <form method="POST" action="/admin/wallet-transfers/approve">
                                 <input type="hidden" name="transfer_id" value="{{.ID}}">
                                 <button type="submit">Approve &amp; credit</button>
                             </form>
+                            {{end}}
                             <form method="POST" action="/admin/wallet-transfers/reject">
                                 <input type="hidden" name="transfer_id" value="{{.ID}}">
                                 <button type="submit">Reject &amp; refund sender</button>
@@ -111,6 +136,7 @@
         </div>
         {{else}}<p>No transfers need review.</p>{{end}}
     </main>
+    <script src="/static/js/navigation.js"></script>
 </body>
 </html>
 {{end}}

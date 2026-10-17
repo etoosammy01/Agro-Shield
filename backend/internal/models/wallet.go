@@ -43,9 +43,34 @@ type Withdrawal struct {
 	Reference     string
 	TransferID    sql.NullString
 	Status        string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+
+	// The payout-details check recorded when this withdrawal was requested and
+	// again when it was approved. Empty means it was never checked - every row
+	// written before this check existed, which is why the admin page must treat
+	// empty as "not checked" rather than as a pass.
+	//
+	// NameCheckResolved holds the holder the bank reported, and is only worth
+	// showing when it differs from the claimed AccountName.
+	NameCheckStatus   string
+	NameCheckResolved string
+	NameCheckDetail   string
+	NameCheckAt       sql.NullTime
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
+
+// Payout-details check verdicts.
+//
+// They live here rather than in services because they are stored on the row and
+// rendered by the templates, both of which this package serves; services names
+// the same three values as PayoutVerified/PayoutMismatch/PayoutUnverified, so
+// there is one definition of each string.
+const (
+	NameCheckVerified   = "verified"
+	NameCheckMismatch   = "mismatch"
+	NameCheckUnverified = "unverified"
+)
 
 func (w Withdrawal) MaskedAccountNumber() string {
 	if len(w.AccountNumber) <= 4 {

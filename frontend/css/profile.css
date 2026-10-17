@@ -215,8 +215,15 @@
     height: 100%;
     background: rgba(0, 0, 0, 0.5);
     justify-content: center;
-    align-items: center;
-    z-index: 100;
+    /* flex-start, not center. With `center`, a form taller than the screen is
+       laid out partly above the scroll area and that part cannot be reached.
+       The form's own `margin: auto` still centres it whenever there is room,
+       because auto margins win over align-items. */
+    align-items: flex-start;
+    /* The navbar is z-index 9999 and the mobile tab bar 9998, both fixed. At
+       100 the modal painted underneath them, which is why the top of the
+       Edit Profile form was covered by the header. */
+    z-index: 10000;
     padding: 20px;
     overflow-y: auto;
 }

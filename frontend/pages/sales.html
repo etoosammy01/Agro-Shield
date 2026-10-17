@@ -22,6 +22,8 @@
 
     <nav aria-label="Main navigation">
         <a href="/marketplace">Marketplace</a>
+        <a href="/orders">Orders</a>
+        <a href="/deliveries">Deliveries</a>
         <a href="/chat">Chat</a>
         <a href="/sales" aria-current="page">Sales</a>
         <a href="/ai-assistant">AI Assistant</a>
@@ -65,7 +67,7 @@
         {{if .Sales}}
 
         <div class="sales-table">
-            <table>
+            <table class="table-cards">
 
                 <thead>
                     <tr>
@@ -83,18 +85,18 @@
                     {{range .Sales}}
 
                     <tr>
-                        <td>{{.CropName}}</td>
-                        <td>{{.BuyerName}}</td>
-                        <td>{{printf "%.0f" .Quantity}}</td>
-                        <td>₦{{money .TotalPrice}}</td>
+                        <td data-label="Product">{{.CropName}}</td>
+                        <td data-label="Buyer">{{.BuyerName}}</td>
+                        <td data-label="Quantity">{{printf "%.0f" .Quantity}}</td>
+                        <td data-label="Total">₦{{money .TotalPrice}}</td>
 
-                        <td>
+                        <td data-label="Status">
                             <span class="sale-status">
                                 {{.Status}}
                             </span>
                         </td>
 
-                        <td>
+                        <td data-label="Date">
                             {{.CreatedAt.Format "02 Jan 2006"}}
                         </td>
                     </tr>

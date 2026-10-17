@@ -14,6 +14,8 @@
         <nav aria-label="Main navigation">
             <a href="/dashboard">Dashboard</a>
             <a href="/marketplace">Marketplace</a>
+            <a href="/orders">Orders</a>
+            <a href="/deliveries">Deliveries</a>
             <a href="/wallet" aria-current="page">Wallet</a>
             {{if .IsAdmin}}<a href="/admin/wallet-withdrawals">Wallet approvals</a>{{end}}
             <a href="/profile">Profile</a>
@@ -29,14 +31,14 @@
                 <p>One simple place to add funds, pay for produce, and manage payouts.</p>
                 <div class="wallet-balance">
                     <span>Available balance</span>
-                    <strong><span class="wallet-currency">₦</span>{{.Wallet.Balance}}</strong>
+                    <strong><span class="wallet-currency">₦</span>{{money .Wallet.Balance}}</strong>
                     <small>{{.Wallet.Currency}} · ready to use</small>
                 </div>
             </div>
             <div class="wallet-hero-art" aria-hidden="true">
                 <span class="wallet-art-sparkle">✦</span>
                 <span class="wallet-art-leaf">✿</span>
-                <div class="wallet-art-card"><span>AGRO-SHIELD</span><strong>₦ {{.Wallet.Balance}}</strong><small>WALLET · {{.Wallet.Currency}}</small></div>
+                <div class="wallet-art-card"><span>AGRO-SHIELD</span><strong>₦ {{money .Wallet.Balance}}</strong><small>WALLET · {{.Wallet.Currency}}</small></div>
                 <span class="wallet-art-dot"></span>
             </div>
         </section>
@@ -65,16 +67,21 @@
                 <h2>Bank account</h2>
                 <p>Save the account where you’d like approved withdrawals to land.</p>
                 <form method="POST" action="/wallet/bank">
-                    <label class="wallet-label" for="bank-name">Choose your bank</label>
-                    <select id="bank-name" name="bank_name" data-selected="{{.BankName}}" data-selected-code="{{.BankCode}}" required>
-                        <option value="">Loading supported banks…</option>
-                    </select>
-                    <input id="bank-code" name="bank_code" type="hidden" value="{{.BankCode}}">
+                    <label class="wallet-label" for="account-number">Account number</label>
+                    <input id="account-number" name="account_number" value="{{.AccountNumber}}" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" autocomplete="off" placeholder="10 digits" required>
+
                     <p class="wallet-inline-status" id="bank-status" role="status" aria-live="polite"></p>
+                    <div class="wallet-bank-suggestions" id="bank-suggestions" hidden></div>
+
+                    <label class="wallet-label" for="bank-search">Bank Name</label>
+                    <input id="bank-search" name="bank_name" value="{{.BankName}}" list="bank-options" autocomplete="off" placeholder="Type to search your bank" required>
+                    <datalist id="bank-options"></datalist>
+                    <input id="bank-code" name="bank_code" type="hidden" value="{{.BankCode}}">
+
                     <label class="wallet-label" for="account-name">Account name</label>
                     <input id="account-name" name="account_name" value="{{.AccountName}}" placeholder="Name on your account" required>
-                    <label class="wallet-label" for="account-number">Account number</label>
-                    <input id="account-number" name="account_number" value="{{.AccountNumber}}" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" placeholder="10 digits" required>
+                    <p class="wallet-inline-status" id="account-name-status" role="status" aria-live="polite"></p>
+
                     <button class="wallet-button wallet-button-secondary" type="submit">Save payout details</button>
                 </form>
             </article>
@@ -134,14 +141,14 @@
                     <h3><span class="wallet-history-icon">↗</span> Deposits</h3>
                 {{if .Deposits}}
                 <div class="table-wrap">
-                    <table>
+                    <table class="table-cards">
                         <thead><tr><th>When</th><th>Amount</th><th>Status</th></tr></thead>
                         <tbody>
                             {{range .Deposits}}
                             <tr>
-                                <td>{{.CreatedAt.Format "02 Jan · 15:04"}}</td>
-                                <td class="wallet-table-amount">₦{{.Amount}}</td>
-                                <td><span class="wallet-status wallet-status-{{.Status}}">{{.Status}}</span></td>
+                                <td data-label="When">{{.CreatedAt.Format "02 Jan · 15:04"}}</td>
+                                <td data-label="Amount" class="wallet-table-amount">₦{{money .Amount}}</td>
+                                <td data-label="Status"><span class="wallet-status wallet-status-{{.Status}}">{{.Status}}</span></td>
                             </tr>
                             {{end}}
                         </tbody>
@@ -154,14 +161,14 @@
                     <h3><span class="wallet-history-icon wallet-history-pink">↓</span> Withdrawals</h3>
                 {{if .Withdrawals}}
                 <div class="table-wrap">
-                    <table>
+                    <table class="table-cards">
                         <thead><tr><th>When</th><th>Amount</th><th>Status</th></tr></thead>
                         <tbody>
                             {{range .Withdrawals}}
                             <tr>
-                                <td>{{.CreatedAt.Format "02 Jan · 15:04"}}</td>
-                                <td class="wallet-table-amount">₦{{.Amount}}</td>
-                                <td><span class="wallet-status wallet-status-{{.Status}}">{{.Status}}</span></td>
+                                <td data-label="When">{{.CreatedAt.Format "02 Jan · 15:04"}}</td>
+                                <td data-label="Amount" class="wallet-table-amount">₦{{money .Amount}}</td>
+                                <td data-label="Status"><span class="wallet-status wallet-status-{{.Status}}">{{.Status}}</span></td>
                             </tr>
                             {{end}}
                         </tbody>
@@ -174,18 +181,18 @@
                     <h3><span class="wallet-history-icon">⇄</span> Transfers</h3>
                 {{if .Transfers}}
                 <div class="table-wrap">
-                    <table>
+                    <table class="table-cards">
                         <thead><tr><th>When</th><th>With</th><th>Amount</th><th>Status</th></tr></thead>
                         <tbody>
                             {{range .Transfers}}
                             <tr>
-                                <td>{{.CreatedAt.Format "02 Jan · 15:04"}}</td>
-                                <td>
+                                <td data-label="When">{{.CreatedAt.Format "02 Jan · 15:04"}}</td>
+                                <td data-label="With">
                                     {{if .IsIncoming $.Wallet.FarmerID}}from {{.SenderName}}{{else}}to {{.RecipientName}}{{end}}
                                     {{if .Note}}<br><small>{{.Note}}</small>{{end}}
                                 </td>
-                                <td class="wallet-table-amount">₦{{.Amount}}</td>
-                                <td><span class="wallet-status wallet-status-{{.Status}}">{{.Status}}</span></td>
+                                <td data-label="Amount" class="wallet-table-amount">₦{{money .Amount}}</td>
+                                <td data-label="Status"><span class="wallet-status wallet-status-{{.Status}}">{{.Status}}</span></td>
                             </tr>
                             {{end}}
                         </tbody>
@@ -198,15 +205,15 @@
                     <h3><span class="wallet-history-icon wallet-history-gold">✦</span> Wallet activity</h3>
                 {{if .Transactions}}
                 <div class="table-wrap">
-                    <table>
+                    <table class="table-cards">
                         <thead><tr><th>When</th><th>Activity</th><th>Amount</th><th>Reference</th></tr></thead>
                         <tbody>
                             {{range .Transactions}}
                             <tr>
-                                <td>{{.CreatedAt.Format "02 Jan · 15:04"}}</td>
-                                <td>{{.Type}}</td>
-                                <td class="wallet-table-amount">₦{{.Amount}}</td>
-                                <td>{{.Reference}}</td>
+                                <td data-label="When">{{.CreatedAt.Format "02 Jan · 15:04"}}</td>
+                                <td data-label="Activity">{{.Type}}</td>
+                                <td data-label="Amount" class="wallet-table-amount">₦{{money .Amount}}</td>
+                                <td data-label="Reference">{{.Reference}}</td>
                             </tr>
                             {{end}}
                         </tbody>
@@ -218,6 +225,7 @@
         </section>
     </main>
     <script src="/static/js/wallet.js"></script>
+    <script src="/static/js/navigation.js"></script>
 </body>
 </html>
 {{end}}

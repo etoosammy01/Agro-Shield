@@ -230,8 +230,9 @@
 
 @media (max-width: 600px){
     .negotiations,.negotiation-thread{padding:28px 16px;}
-    .negotiations{overflow-x:auto;}
-    .negotiations table{min-width:680px;}
+    /* The table now stacks into labelled cards - see .table-cards in style.css.
+       That replaces the old min-width:680px plus a sideways scroll, which made
+       the farmer drag each row across to read it. */
     .thread-header{align-items:flex-start;flex-direction:column;gap:14px;}
     .offer-form,.chat-form{flex-wrap:wrap;}
     .offer-form input[name="message"],.chat-form input{min-width:100%;}
@@ -245,7 +246,6 @@
 @media (max-width: 600px) {
     .negotiations {
         padding: 25px 15px;
-        overflow-x: auto;
     }
 
     .negotiations h1 {
@@ -254,10 +254,6 @@
 
     .negotiations > p {
         font-size: 14px;
-    }
-
-    .negotiations table {
-        min-width: 580px;
     }
 
     .negotiation-thread {

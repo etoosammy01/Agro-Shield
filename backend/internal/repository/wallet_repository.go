@@ -22,6 +22,16 @@ var (
 	ErrInsufficientBalance         = errors.New("insufficient wallet balance")
 	ErrSelfTransfer                = errors.New("you cannot transfer to your own wallet")
 	ErrInvalidTransferParticipants = errors.New("invalid transfer participants")
+
+	// ErrSelfApproval means an admin tried to approve a request they made
+	// themselves.
+	//
+	// It sits here rather than only in the service because the approving
+	// transaction is where the requester's id is unambiguous: the SELECT above
+	// the check has already locked the row, so no caller can slip past the rule
+	// by reading the request somewhere else first. The service translates it
+	// into its own sentinel for the page.
+	ErrSelfApproval = errors.New("an admin cannot approve their own request")
 )
 
 // --- money helpers ---------------------------------------------------------
@@ -446,7 +456,9 @@ func (r *WalletRepository) ListWithdrawals(ctx context.Context, pendingOnly bool
 	query := `
 		SELECT x.id, x.farmer_id, f.full_name, x.amount::text, x.currency,
 			x.bank_name, x.bank_code, x.account_name, x.account_number,
-			x.reference, x.provider_transfer_id, x.status, x.created_at, x.updated_at
+			x.reference, x.provider_transfer_id, x.status,
+			x.name_check_status, x.name_check_resolved, x.name_check_detail, x.name_check_at,
+			x.created_at, x.updated_at
 		FROM wallet_withdrawals x
 		JOIN farmers f ON f.id = x.farmer_id`
 	if pendingOnly {
@@ -466,7 +478,9 @@ func (r *WalletRepository) ListWithdrawals(ctx context.Context, pendingOnly bool
 		if err := rows.Scan(
 			&withdrawal.ID, &withdrawal.FarmerID, &withdrawal.FullName, &withdrawal.Amount, &withdrawal.Currency,
 			&withdrawal.BankName, &withdrawal.BankCode, &withdrawal.AccountName, &withdrawal.AccountNumber,
-			&withdrawal.Reference, &withdrawal.TransferID, &withdrawal.Status, &withdrawal.CreatedAt, &withdrawal.UpdatedAt,
+			&withdrawal.Reference, &withdrawal.TransferID, &withdrawal.Status,
+			&withdrawal.NameCheckStatus, &withdrawal.NameCheckResolved, &withdrawal.NameCheckDetail, &withdrawal.NameCheckAt,
+			&withdrawal.CreatedAt, &withdrawal.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -503,14 +517,18 @@ func (r *WalletRepository) GetWithdrawal(ctx context.Context, withdrawalID int64
 	err := r.db.QueryRowContext(ctx, `
 		SELECT x.id, x.farmer_id, f.full_name, x.amount::text, x.currency,
 			x.bank_name, x.bank_code, x.account_name, x.account_number,
-			x.reference, x.provider_transfer_id, x.status, x.created_at, x.updated_at
+			x.reference, x.provider_transfer_id, x.status,
+			x.name_check_status, x.name_check_resolved, x.name_check_detail, x.name_check_at,
+			x.created_at, x.updated_at
 		FROM wallet_withdrawals x
 		JOIN farmers f ON f.id = x.farmer_id
 		WHERE x.id = $1`, withdrawalID,
 	).Scan(
 		&withdrawal.ID, &withdrawal.FarmerID, &withdrawal.FullName, &withdrawal.Amount, &withdrawal.Currency,
 		&withdrawal.BankName, &withdrawal.BankCode, &withdrawal.AccountName, &withdrawal.AccountNumber,
-		&withdrawal.Reference, &withdrawal.TransferID, &withdrawal.Status, &withdrawal.CreatedAt, &withdrawal.UpdatedAt,
+		&withdrawal.Reference, &withdrawal.TransferID, &withdrawal.Status,
+		&withdrawal.NameCheckStatus, &withdrawal.NameCheckResolved, &withdrawal.NameCheckDetail, &withdrawal.NameCheckAt,
+		&withdrawal.CreatedAt, &withdrawal.UpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrWithdrawalNotFound
@@ -521,11 +539,79 @@ func (r *WalletRepository) GetWithdrawal(ctx context.Context, withdrawalID int64
 	return &withdrawal, nil
 }
 
+// RecordWithdrawalVerification stores the payout-details verdict against the
+// withdrawal it was reached for.
+//
+// It is keyed by reference because that is the one identifier both callers hold:
+// the request path generates it before the row exists, and it is UNIQUE, so it
+// names exactly one withdrawal. A verdict for a withdrawal that has since been
+// deleted matches nothing and is reported as such rather than silently dropped.
+//
+// A later verdict replaces an earlier one. That is deliberate: the approval-time
+// check is the one made moments before money moves, so it should be what the
+// admin page shows.
+func (r *WalletRepository) RecordWithdrawalVerification(ctx context.Context, reference, status, resolvedName, detail string) error {
+	result, err := r.db.ExecContext(ctx, `
+		UPDATE wallet_withdrawals
+		SET name_check_status = $1, name_check_resolved = $2,
+			name_check_detail = $3, name_check_at = $4
+		WHERE reference = $5`,
+		status, resolvedName, detail, time.Now(), reference,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return ErrWithdrawalNotFound
+	}
+	return nil
+}
+
 func (r *WalletRepository) SetTransferID(ctx context.Context, reference, transferID string) error {
 	result, err := r.db.ExecContext(ctx, `
 		UPDATE wallet_withdrawals SET provider_transfer_id = $1, updated_at = $2
 		WHERE reference = $3 AND status = 'processing'`,
 		transferID, time.Now(), reference,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return ErrWithdrawalNotFound
+	}
+	return nil
+}
+
+// RevertWithdrawalToPending returns a withdrawal to the approval queue after a
+// payout failed to start, so an admin can reject it and release the reserved
+// funds.
+//
+// BeginWithdrawal is the point of no return: it flips the row to 'processing'
+// and RejectWithdrawal only matches 'pending', so a payout that fails before the
+// provider is reached would otherwise sit with the farmer's money reserved and
+// nothing able to release it. This is the way back.
+//
+// It is deliberately narrow. Only a row that is still 'processing' AND has no
+// saved provider transfer id can be returned. If a transfer id was stored, a
+// real transfer may exist at Flutterwave, and moving the row back to 'pending'
+// would let it be rejected and refunded while the provider also paid it out -
+// the one way this path could lose money twice over. Refusing is the safe
+// answer: that row stays reserved for ReconcileWithdrawal and a human reading
+// the provider's dashboard.
+func (r *WalletRepository) RevertWithdrawalToPending(ctx context.Context, reference string) error {
+	result, err := r.db.ExecContext(ctx, `
+		UPDATE wallet_withdrawals
+		SET status = 'pending', approved_by = NULL, updated_at = $1
+		WHERE reference = $2 AND status = 'processing' AND provider_transfer_id IS NULL`,
+		time.Now(), reference,
 	)
 	if err != nil {
 		return err
@@ -581,10 +667,18 @@ func (r *WalletRepository) RejectWithdrawal(ctx context.Context, withdrawalID in
 	return tx.Commit()
 }
 
-func (r *WalletRepository) CompleteTransfer(ctx context.Context, reference, transferID, status string, amount int64, currency string) error {
+// CompleteTransfer settles a payout on the provider's word, refunding the wallet
+// when the transfer failed or was reversed.
+//
+// The bool reports whether this call is the one that moved the row out of
+// 'processing'. It is a claim about the transition, not about the argument: a
+// second call for an already-settled row writes nothing and returns false, which
+// is what lets a caller tell the farmer once - webhooks are retried, and being
+// told twice that your money came back reads as a second refund.
+func (r *WalletRepository) CompleteTransfer(ctx context.Context, reference, transferID, status string, amount int64, currency string) (bool, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer tx.Rollback()
 
@@ -597,16 +691,16 @@ func (r *WalletRepository) CompleteTransfer(ctx context.Context, reference, tran
 		FROM wallet_withdrawals WHERE reference = $1 FOR UPDATE`, reference,
 	).Scan(&walletID, &withdrawalAmount, &currentStatus, &storedTransferID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return ErrWithdrawalNotFound
+		return false, ErrWithdrawalNotFound
 	}
 	if err != nil {
-		return err
+		return false, err
 	}
 	if currentStatus == "paid" || currentStatus == "failed" {
-		return nil
+		return false, nil
 	}
 	if currentStatus != "processing" || !storedTransferID.Valid || storedTransferID.String != transferID {
-		return fmt.Errorf("transfer does not match a processing withdrawal")
+		return false, fmt.Errorf("transfer does not match a processing withdrawal")
 	}
 
 	var result sql.Result
@@ -624,10 +718,10 @@ func (r *WalletRepository) CompleteTransfer(ctx context.Context, reference, tran
 		if err == nil {
 			affected, rowsErr := result.RowsAffected()
 			if rowsErr != nil {
-				return rowsErr
+				return false, rowsErr
 			}
 			if affected != 1 {
-				return fmt.Errorf("verified transfer amount or currency does not match withdrawal")
+				return false, fmt.Errorf("verified transfer amount or currency does not match withdrawal")
 			}
 			_, err = tx.ExecContext(ctx, `
 				UPDATE wallets SET balance = balance + $1::numeric, updated_at = $2 WHERE id = $3`,
@@ -640,19 +734,52 @@ func (r *WalletRepository) CompleteTransfer(ctx context.Context, reference, tran
 				walletID, "transfer-refund:"+reference, withdrawalAmount)
 		}
 	default:
-		return fmt.Errorf("transfer has non-terminal status %q", status)
+		return false, fmt.Errorf("transfer has non-terminal status %q", status)
 	}
 	if err != nil {
-		return err
+		return false, err
 	}
 	affected, err := result.RowsAffected()
 	if err != nil {
-		return err
+		return false, err
 	}
 	if affected != 1 {
-		return fmt.Errorf("verified transfer amount or currency does not match withdrawal")
+		return false, fmt.Errorf("verified transfer amount or currency does not match withdrawal")
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// GetWithdrawalByReference reads one withdrawal by its reference, which is how
+// the webhook path knows whose payout it just settled - the payload carries the
+// reference and nothing else that names a farmer.
+func (r *WalletRepository) GetWithdrawalByReference(ctx context.Context, reference string) (*models.Withdrawal, error) {
+	var withdrawal models.Withdrawal
+	err := r.db.QueryRowContext(ctx, `
+		SELECT x.id, x.farmer_id, f.full_name, x.amount::text, x.currency,
+			x.bank_name, x.bank_code, x.account_name, x.account_number,
+			x.reference, x.provider_transfer_id, x.status,
+			x.name_check_status, x.name_check_resolved, x.name_check_detail, x.name_check_at,
+			x.created_at, x.updated_at
+		FROM wallet_withdrawals x
+		JOIN farmers f ON f.id = x.farmer_id
+		WHERE x.reference = $1`, reference,
+	).Scan(
+		&withdrawal.ID, &withdrawal.FarmerID, &withdrawal.FullName, &withdrawal.Amount, &withdrawal.Currency,
+		&withdrawal.BankName, &withdrawal.BankCode, &withdrawal.AccountName, &withdrawal.AccountNumber,
+		&withdrawal.Reference, &withdrawal.TransferID, &withdrawal.Status,
+		&withdrawal.NameCheckStatus, &withdrawal.NameCheckResolved, &withdrawal.NameCheckDetail, &withdrawal.NameCheckAt,
+		&withdrawal.CreatedAt, &withdrawal.UpdatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrWithdrawalNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &withdrawal, nil
 }
 
 // --- wallet-to-wallet transfers -------------------------------------------
@@ -831,6 +958,11 @@ func (r *WalletRepository) ApproveTransfer(ctx context.Context, transferID int64
 	}
 	if transfer.Status != models.TransferPending {
 		return nil, fmt.Errorf("this transfer has already been %s", transfer.Status)
+	}
+	// The sender must not be the approver. Checked before the UPDATE below so a
+	// refused self-approval leaves the transfer untouched and still pending.
+	if transfer.SenderID == adminID {
+		return nil, ErrSelfApproval
 	}
 
 	if _, err := tx.ExecContext(ctx, `

@@ -11,10 +11,32 @@
   <link rel="manifest" href="static/assets/favicon_io/site.webmanifest">
 
   <title>Deliveries — Agro-Shield</title>
-  <link rel="stylesheet" href="/static/assets/css/style.css">
+  <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-  {{template "navbar" .}}
+  <!-- Was a call to a shared "navbar" template, which no file in
+       frontend/pages defines. Go parses that silently and then fails at
+       execution with "no such template", so this page returned a 500. Every
+       other page in the app carries its own inline header, so this follows that
+       convention. The links are the same set profile.html shows. -->
+  <header class="navbar">
+    <a class="logo" href="/dashboard"><img src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield"></a>
+
+    <nav aria-label="Main navigation">
+      <a href="/dashboard">Dashboard</a>
+      {{if not .IsBuyer}}<a href="/storage">Storage</a>{{end}}
+      <a href="/marketplace">Marketplace</a>
+      <a href="/chat">Chat</a>
+      {{if not .IsBuyer}}<a href="/ai-assistant">AI Assistant</a>{{end}}
+      <a href="/cart">Cart</a>
+      <a href="/orders">Orders</a>
+      <a href="/deliveries" aria-current="page">Deliveries</a>
+      <a href="/wallet">Wallet</a>
+      <a href="/notifications">Notifications</a>
+      <a href="/profile">Profile</a>
+      <a href="/logout">Logout</a>
+    </nav>
+  </header>
 
   <main class="container">
     <div class="page-header">
@@ -26,7 +48,7 @@
 
     {{if .Deliveries}}
     <div class="table-wrap">
-      <table class="table">
+      <table class="table table-cards">
         <thead>
           <tr>
             <th>#</th>
@@ -42,22 +64,22 @@
         <tbody>
           {{range .Deliveries}}
           <tr>
-            <td>{{.ID}}</td>
-            <td>
+            <td data-label="#">{{.ID}}</td>
+            <td data-label="Produce">
               {{if .ImageURL}}
                 <img src="{{.ImageURL}}" alt="" class="thumb">
               {{end}}
               {{.CropName}}
             </td>
-            <td>{{.Quantity}} {{.CropUnit}}</td>
-            <td>
+            <td data-label="Qty">{{.Quantity}} {{.CropUnit}}</td>
+            <td data-label="{{if $.IsBuyer}}Seller{{else}}Buyer{{end}}">
               {{if $.IsBuyer}}{{.SellerName}}{{else}}{{.BuyerName}}{{end}}
             </td>
-            <td>
+            <td data-label="Address">
               {{.DeliveryAddress}}{{if .LGA}}, {{.LGA}}{{end}}{{if .State}}, {{.State}}{{end}}
             </td>
-            <td><span class="badge status-{{.Status}}">{{.Status}}</span></td>
-            <td>{{.CreatedAt.Format "02 Jan 2006"}}</td>
+            <td data-label="Status"><span class="badge status-{{.Status}}">{{.Status}}</span></td>
+            <td data-label="Date">{{.CreatedAt.Format "02 Jan 2006"}}</td>
             <td>
               <a href="/delivery?id={{.ID}}" class="btn btn-sm">View</a>
             </td>
@@ -75,6 +97,8 @@
     </div>
     {{end}}
   </main>
+
+  <script src="/static/js/navigation.js"></script>
 </body>
 </html>
 {{end}}

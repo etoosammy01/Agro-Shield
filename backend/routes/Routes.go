@@ -896,6 +896,10 @@ func RegisterRoutes(container *app.Container) {
 		"/wallet/banks",
 		middleware.RequireAuth(container.FarmerRepo, walletHandler.Banks),
 	))
+	http.HandleFunc("/wallet/lookup-account", middleware.OnlyPath(
+		"/wallet/lookup-account",
+		middleware.RequireAuth(container.FarmerRepo, walletHandler.LookupAccount),
+	))
 	http.HandleFunc("/admin/wallet-withdrawals", middleware.OnlyPath(
 		"/admin/wallet-withdrawals",
 		middleware.OnlyGet(middleware.RequireAuth(container.FarmerRepo, walletHandler.AdminPage)),
@@ -911,6 +915,20 @@ func RegisterRoutes(container *app.Container) {
 	http.HandleFunc("/admin/wallet-withdrawals/reconcile", middleware.OnlyPath(
 		"/admin/wallet-withdrawals/reconcile",
 		middleware.RequireAuth(container.FarmerRepo, walletHandler.ReconcileWithdrawal),
+	))
+	// The way back for a payout that never reached Flutterwave: the row is
+	// 'processing' with funds reserved and no way to release them, because
+	// Reject only matches 'pending'.
+	http.HandleFunc("/admin/wallet-withdrawals/return-to-queue", middleware.OnlyPath(
+		"/admin/wallet-withdrawals/return-to-queue",
+		middleware.RequireAuth(container.FarmerRepo, walletHandler.ReturnWithdrawalToQueue),
+	))
+	// For a payout that reached Flutterwave but never recorded its transfer id:
+	// the id is what settlement matches on, so without it neither the webhook nor
+	// reconcile can pay or refund the row.
+	http.HandleFunc("/admin/wallet-withdrawals/record-transfer", middleware.OnlyPath(
+		"/admin/wallet-withdrawals/record-transfer",
+		middleware.RequireAuth(container.FarmerRepo, walletHandler.RecordTransferID),
 	))
 	// Wallet-to-wallet transfers are reviewed on the same approvals page, so
 	// they need no listing route of their own.

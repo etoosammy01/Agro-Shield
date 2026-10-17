@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -254,6 +255,41 @@ type transferResponse struct {
 	} `json:"data"`
 }
 
+// ErrTransferNotCreated means the provider refused the transfer outright, so no
+// payout exists at Flutterwave for it.
+//
+// It is deliberately distinct from the other errors CreateTransfer returns, and
+// the distinction is about money rather than wording. A caller that has already
+// reserved the farmer's balance can safely hand the request back for rejection
+// only when it knows no transfer was created. A timeout, a 429 or a 500 may well
+// have created one, and treating those as a refusal would refund the farmer
+// while the provider also pays them - the same money out twice.
+//
+// So this is raised only where the provider's own answer rules out a transfer
+// having been made, and everything ambiguous stays an ordinary error.
+var ErrTransferNotCreated = errors.New("the provider refused the transfer")
+
+// transferRefused reports whether a non-2xx answer proves the transfer was never
+// created.
+//
+// Only 401 and 403 qualify: a rejected credential stops the request before
+// Flutterwave does any work with it. Everything else stays an ordinary error on
+// purpose, including answers that look like refusals:
+//
+//   - 400 carries both real validation failures and the provider's catch-all
+//     "please try again", and the two are not reliably told apart from the
+//     message. The resolve endpoint taught the same lesson - see notFoundMessage.
+//   - 408 and 429 say nothing about whether the request was processed.
+//   - 5xx is a server that failed while handling the call, which may have
+//     created the transfer first.
+//
+// Guessing wrong here refunds money the provider may also be paying out, so the
+// unknown answer is left unknown and a failed payout with no transfer id gets
+// resolved by an admin through RevertWithdrawalToPending instead.
+func transferRefused(status int) bool {
+	return status == http.StatusUnauthorized || status == http.StatusForbidden
+}
+
 func (c *FlutterwaveClient) CreateTransfer(req CreateTransferRequest) (string, error) {
 	payload := struct {
 		AccountBank   string `json:"account_bank"`
@@ -286,6 +322,9 @@ func (c *FlutterwaveClient) CreateTransfer(req CreateTransferRequest) (string, e
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
+		// A request that got no answer may still have been processed, so this
+		// stays an ordinary error: the caller must not read it as "no transfer
+		// exists".
 		return "", fmt.Errorf("call flutterwave transfer: %w", err)
 	}
 	defer resp.Body.Close()
@@ -295,14 +334,27 @@ func (c *FlutterwaveClient) CreateTransfer(req CreateTransferRequest) (string, e
 		return "", err
 	}
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		if transferRefused(resp.StatusCode) {
+			return "", fmt.Errorf("%w: %s", ErrTransferNotCreated, http.StatusText(resp.StatusCode))
+		}
 		return "", fmt.Errorf("flutterwave transfer returned %d: %s", resp.StatusCode, string(respBody))
 	}
 	var parsed transferResponse
 	if err := json.Unmarshal(respBody, &parsed); err != nil {
+		// A 2xx we could not parse is not a refusal - the transfer may exist and
+		// simply be unreadable from here.
 		return "", fmt.Errorf("unmarshal transfer response: %w", err)
 	}
-	if parsed.Status != "success" || parsed.Data.ID <= 0 {
-		return "", fmt.Errorf("flutterwave rejected transfer: %s", parsed.Message)
+	if parsed.Status != "success" {
+		// The provider answered with a rejection object rather than a created
+		// transfer, which is it saying no.
+		return "", fmt.Errorf("%w: %s", ErrTransferNotCreated, parsed.Message)
+	}
+	if parsed.Data.ID <= 0 {
+		// Contradictory rather than a refusal: a success carrying no id may
+		// describe a transfer that exists and cannot be named from this
+		// response, so it must not be read as "nothing was created".
+		return "", fmt.Errorf("flutterwave transfer response is missing its id")
 	}
 	return fmt.Sprintf("%d", parsed.Data.ID), nil
 }
@@ -371,6 +423,158 @@ func (c *FlutterwaveClient) ListBanks(country string) ([]Bank, error) {
 	c.bankCacheAt = time.Now()
 	c.bankCountry = country
 	return banks, nil
+}
+
+// ErrAccountNotResolved means the bank answered and does not hold this account
+// number.
+//
+// It is deliberately distinct from every other error ResolveAccount returns. A
+// caller checking whether payout details are correct has to tell "this account
+// does not exist at this bank" - so the account's owner is wrong - apart from
+// "we could not ask", which is a dead key, a timeout or a rate limit. Reading
+// the second as the first would tell a farmer their own account details are
+// wrong because our credentials expired.
+var ErrAccountNotResolved = errors.New("account not found at this bank")
+
+// notFoundMessage reports whether a provider message says the account does not
+// exist, as opposed to the request merely failing.
+//
+// The wording is observed rather than guessed: against the live API with the
+// test key, a number the provider does not hold answers with HTTP 400 and
+// "invalid account". The two other failures seen on the same endpoint answer
+// differently - a rejected key is 401 "Invalid authorization key", and a missing
+// bank code is 400 "destbankcode is not allowed to be empty" - so this message
+// is specific to the account, and the other two stay infrastructure errors.
+// That distinction is what keeps a credential problem from reading as every
+// farmer having the wrong account number.
+//
+// Flutterwave's catch-all "cannot resolve account number, please try again" is
+// deliberately NOT treated as a miss: a provider hiccup produces the same words,
+// and calling it a miss would hard-block a legitimate payout on a bad network
+// minute. Anything unrecognised falls through to a plain error, which callers
+// read as "could not verify" - the safe direction, since it never accuses a
+// farmer of wrong details.
+func notFoundMessage(message string) bool {
+	lowered := strings.ToLower(strings.TrimSpace(message))
+	if lowered == "" {
+		return false
+	}
+	if strings.Contains(lowered, "invalid account") {
+		return true
+	}
+	return strings.Contains(lowered, "not found") || strings.Contains(lowered, "does not exist")
+}
+
+// providerMessage extracts the human-readable "message" from a provider body, so
+// a failure can be classified by what Flutterwave said rather than by the status
+// code alone - the not-found case arrives as a 400, not the 404 the
+// documentation implies. An unparseable body yields "".
+func providerMessage(body []byte) string {
+	var parsed struct {
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(parsed.Message)
+}
+
+type ResolvedAccount struct {
+	AccountNumber string
+	AccountName   string
+}
+
+type resolveAccountResponse struct {
+	Status  string `json:"status"`
+	Message string `json:"message"`
+	Data    struct {
+		AccountNumber string `json:"account_number"`
+		AccountName   string `json:"account_name"`
+	} `json:"data"`
+}
+
+// ResolveAccount asks Flutterwave for the registered holder of one bank
+// account.
+//
+// The provider offers no reverse lookup: a bank code is always required, and
+// the only thing it answers with is the holder's name. Mapping an account
+// number to its bank is therefore done by calling this against several banks
+// and keeping the ones that resolve — see WalletService.LookupAccountBanks.
+//
+// An account that does not exist at the given bank is reported as
+// ErrAccountNotResolved, which callers doing a sweep treat as "not this bank".
+// Every other error means the question could not be asked, and must not be read
+// as an answer about the account.
+//
+// The method holds no state, so callers may run it concurrently.
+func (c *FlutterwaveClient) ResolveAccount(accountNumber, bankCode string) (*ResolvedAccount, error) {
+	accountNumber = strings.TrimSpace(accountNumber)
+	bankCode = strings.TrimSpace(bankCode)
+	if accountNumber == "" || bankCode == "" {
+		return nil, fmt.Errorf("account number and bank code are required")
+	}
+
+	payload := struct {
+		AccountNumber string `json:"account_number"`
+		AccountBank   string `json:"account_bank"`
+	}{AccountNumber: accountNumber, AccountBank: bankCode}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal resolve payload: %w", err)
+	}
+
+	httpReq, err := http.NewRequest(http.MethodPost, flutterwaveBaseURL+"/accounts/resolve", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("build resolve request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+c.SecretKey)
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("call flutterwave resolve: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := readFlutterwaveResponse(resp)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		// The not-found answer arrives as 400 "invalid account", not the 404 the
+		// API documentation implies, so the body decides. A 404 with no readable
+		// message is the same answer by status.
+		detail := providerMessage(respBody)
+		if resp.StatusCode == http.StatusNotFound || notFoundMessage(detail) {
+			if detail == "" {
+				detail = fmt.Sprintf("provider returned %d", resp.StatusCode)
+			}
+			return nil, fmt.Errorf("%w: %s", ErrAccountNotResolved, detail)
+		}
+		return nil, fmt.Errorf("flutterwave resolve returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var parsed resolveAccountResponse
+	if err := json.Unmarshal(respBody, &parsed); err != nil {
+		return nil, fmt.Errorf("unmarshal resolve response: %w", err)
+	}
+	if parsed.Status != "success" {
+		if notFoundMessage(parsed.Message) {
+			return nil, fmt.Errorf("%w: %s", ErrAccountNotResolved, parsed.Message)
+		}
+		return nil, fmt.Errorf("flutterwave could not resolve account: %s", parsed.Message)
+	}
+	accountName := strings.TrimSpace(parsed.Data.AccountName)
+	if accountName == "" {
+		// A success with no name is not proof the account exists, so it counts
+		// as no match rather than a match with a blank name. It is not a
+		// ErrAccountNotResolved either: the provider said the request
+		// succeeded, so this is an unusable answer, not a "no such account".
+		return nil, fmt.Errorf("flutterwave resolve response is missing the account name")
+	}
+
+	return &ResolvedAccount{AccountNumber: accountNumber, AccountName: accountName}, nil
 }
 
 type VerifiedTransfer struct {

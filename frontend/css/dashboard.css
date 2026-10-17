@@ -1794,6 +1794,17 @@ button.action-card {
     font-size: 0.88rem;
 }
 
+/* Always-visible route from the guide hub to the public /learning page. */
+.learn-hub-ai {
+    margin: 0 0 20px;
+    font-size: 0.85rem;
+}
+
+.learn-hub-ai a {
+    color: #1f7a4d;
+    font-weight: 700;
+}
+
 .learn-search input {
     width: 100%;
     padding: 12px 16px;

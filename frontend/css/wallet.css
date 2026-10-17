@@ -428,6 +428,67 @@
     font-size: 0.8rem;
 }
 
+/* Confirmation and warning tones for the inline status lines. The default pink
+   reads as an error, which is wrong for a name we successfully verified. */
+.wallet-inline-status[data-tone="ok"] {
+    color: #2f7a4a;
+}
+
+.wallet-inline-status[data-tone="warn"] {
+    color: #9a6a13;
+}
+
+.wallet-bank-suggestions {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0.6rem 0 1rem;
+}
+
+.wallet-bank-suggestions-label {
+    margin: 0;
+    color: #5c6660;
+    font-size: 0.8rem;
+}
+
+.wallet-bank-suggestion {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.7rem 0.9rem;
+    border: 1px solid #dcebdc;
+    border-radius: 14px;
+    background: #f7fcf6;
+    color: #1f2a23;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.wallet-bank-suggestion:hover,
+.wallet-bank-suggestion:focus-visible {
+    border-color: #b6ddb4;
+    background: #effaed;
+}
+
+.wallet-bank-suggestion-name {
+    font-weight: 600;
+}
+
+.wallet-bank-suggestion-holder {
+    color: #2f7a4a;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+/* A name the provider gave us is not editable, so it should not look like a
+   field waiting for input. */
+.wallet-input-verified {
+    background: #f2f8f2;
+    color: #2f7a4a;
+}
+
 .wallet-history {
     margin-top: 2.5rem;
 }
@@ -552,6 +613,49 @@
 .wallet-status-rejected {
     background: #fff0f4;
     color: #a23f62;
+}
+
+/* Payout-details check verdict, shown beside the bank account on a withdrawal
+   request. It sits under the details rather than beside the status so an admin
+   reads "what was claimed" and "was it checked" together before approving. */
+.wallet-name-check {
+    display: inline-block;
+    margin-top: 0.4rem;
+    padding: 0.2rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.66rem;
+    font-weight: 700;
+}
+
+.wallet-name-check-ok {
+    background: #e9f7eb;
+    color: #28663a;
+}
+
+.wallet-name-check-bad {
+    background: #fff0f4;
+    color: #a23f62;
+}
+
+.wallet-name-check-warn {
+    background: #fff5df;
+    color: #8a6418;
+}
+
+/* Never checked: neither a pass nor a failure, so it reads as absent rather
+   than borrowing the colour of either. */
+.wallet-name-check-unknown {
+    background: #f2f5f2;
+    color: #77847a;
+}
+
+.wallet-name-check-detail {
+    display: inline-block;
+    margin-top: 0.25rem;
+    max-width: 28ch;
+    color: #77847a;
+    font-size: 0.72rem;
+    line-height: 1.4;
 }
 
 .wallet-empty {

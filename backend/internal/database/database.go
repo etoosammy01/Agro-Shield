@@ -544,6 +544,24 @@ CREATE INDEX IF NOT EXISTS idx_platform_revenue_order ON platform_revenue(order_
 `); err != nil {
 		return fmt.Errorf("wallet migration: %w", err)
 	}
+	// The payout-details check, recorded per withdrawal.
+	//
+	// Added by ALTER rather than folded into the CREATE TABLE above because
+	// wallet_withdrawals already exists in deployed databases, where CREATE TABLE
+	// IF NOT EXISTS is a no-op that would leave the columns missing and every
+	// read of a withdrawal failing.
+	//
+	// An empty name_check_status means "never checked", which is what every row
+	// written before this check existed carries - so nothing may read the default
+	// as a pass.
+	if _, err := db.Exec(`
+ALTER TABLE wallet_withdrawals ADD COLUMN IF NOT EXISTS name_check_status   TEXT NOT NULL DEFAULT '';
+ALTER TABLE wallet_withdrawals ADD COLUMN IF NOT EXISTS name_check_resolved TEXT NOT NULL DEFAULT '';
+ALTER TABLE wallet_withdrawals ADD COLUMN IF NOT EXISTS name_check_detail   TEXT NOT NULL DEFAULT '';
+ALTER TABLE wallet_withdrawals ADD COLUMN IF NOT EXISTS name_check_at       TIMESTAMP;
+`); err != nil {
+		return fmt.Errorf("withdrawal name check migration: %w", err)
+	}
 	if _, err := db.Exec(`
 DO $$
 DECLARE
@@ -684,7 +702,36 @@ CREATE INDEX IF NOT EXISTS idx_otp_codes_created_at ON otp_codes(created_at);
 	}
 
 	// -------------------------------------------------------------------------
-	// 14. FINAL SAFETY INDEXES
+	// 14. BANK ACCOUNT LOOKUPS
+	//
+	// Mapping an account number to its bank means asking the provider about the
+	// number at each bank in turn and keeping the ones that answer, because the
+	// provider has no reverse lookup. That is expensive enough that the answer
+	// is kept: a number resolving to a bank barely ever changes, so each number
+	// is probed once and every later lookup is a local read.
+	//
+	// A row with an empty bank_code records "this number was probed and no bank
+	// answered", so a mistyped number does not re-run the sweep on every
+	// attempt. bank_name and account_name are empty on those rows by
+	// construction, which is what marks them as a miss.
+	// -------------------------------------------------------------------------
+	if _, err := db.Exec(`
+CREATE TABLE IF NOT EXISTS bank_account_lookups (
+	account_number VARCHAR(10) NOT NULL,
+	bank_code      TEXT NOT NULL,
+	bank_name      TEXT NOT NULL DEFAULT '',
+	account_name   TEXT NOT NULL DEFAULT '',
+	probed_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	PRIMARY KEY (account_number, bank_code)
+);
+CREATE INDEX IF NOT EXISTS idx_bank_account_lookups_number ON bank_account_lookups(account_number);
+CREATE INDEX IF NOT EXISTS idx_bank_account_lookups_probed_at ON bank_account_lookups(probed_at);
+`); err != nil {
+		return fmt.Errorf("bank account lookup migration: %w", err)
+	}
+
+	// -------------------------------------------------------------------------
+	// 15. FINAL SAFETY INDEXES
 	// -------------------------------------------------------------------------
 	if _, err := db.Exec(`
 CREATE INDEX IF NOT EXISTS idx_crops_farmer_listed ON crops(farmer_id, listed_for_sale, created_at DESC);

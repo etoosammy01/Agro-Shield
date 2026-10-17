@@ -75,6 +75,7 @@ func NewContainer(
 
 	paymentRepo *repository.PaymentRepository,
 	walletRepo *repository.WalletRepository,
+	bankLookupRepo *repository.BankLookupRepository,
 	otpRepo *repository.OTPRepository,
 	smsSender services.SMSSender,
 	flutterwaveClient *services.FlutterwaveClient,
@@ -144,7 +145,7 @@ func NewContainer(
 	// Flutterwave API.
 	// ========================================================
 
-	walletService := services.NewWalletService(walletRepo, farmerRepo, flutterwaveClient, walletAdminIDs, commissionBasisPoints)
+	walletService := services.NewWalletService(walletRepo, farmerRepo, flutterwaveClient, bankLookupRepo, walletAdminIDs, commissionBasisPoints, notificationService)
 	paymentService := services.NewPaymentService(paymentRepo, orderRepo, farmerRepo, flutterwaveClient, walletService)
 
 	// One-time passcodes guard password resets and wallet payouts. The

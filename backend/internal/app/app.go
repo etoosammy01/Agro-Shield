@@ -74,6 +74,7 @@ func NewContainer(
 
 	paymentRepo *repository.PaymentRepository,
 	walletRepo *repository.WalletRepository,
+	bankLookupRepo *repository.BankLookupRepository,
 	flutterwaveClient *services.FlutterwaveClient,
 	feedbackRepo *repository.FeedbackRepository,
 	walletAdminIDs []int,
@@ -141,7 +142,7 @@ func NewContainer(
 	// Flutterwave API.
 	// ========================================================
 
-	walletService := services.NewWalletService(walletRepo, farmerRepo, flutterwaveClient, walletAdminIDs, commissionBasisPoints)
+	walletService := services.NewWalletService(walletRepo, farmerRepo, flutterwaveClient, bankLookupRepo, walletAdminIDs, commissionBasisPoints, notificationService)
 	paymentService := services.NewPaymentService(paymentRepo, orderRepo, farmerRepo, flutterwaveClient, walletService)
 
 	feedbackService := services.NewFeedbackService(
