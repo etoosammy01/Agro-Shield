@@ -61,9 +61,8 @@ type WalletPageData struct {
 type WalletAdminPageData struct {
 	Withdrawals       []models.Withdrawal
 	Transfers         []models.Transfer
-	PendingDeposits   []models.PendingDeposit
-	Admins            []models.AdminAccount
-	AgedRequests      int
+	StalePending      []models.WalletDeposit
+	StaleAfterHours   int
 	RevenueTotal      string
 	RevenueCount      int
 	CommissionEnabled bool
@@ -525,40 +524,17 @@ func (h *WalletHandler) AdminPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Could not load platform revenue", http.StatusInternalServerError)
 		return
 	}
-	// The exception list is supporting information, so a failed read must not
-	// take the approvals page down with it: the admin can still act on the
-	// withdrawals and transfers that did load.
-	pendingDeposits, err := h.wallet.PendingDepositsAwaitingProvider(r.Context())
+	// Read-only operational signal: funding attempts no provider has settled.
+	// Nothing here credits or expires anything.
+	stalePending, err := h.wallet.StalePendingDeposits(r.Context())
 	if err != nil {
-		log.Printf("load pending deposits for admin %d: %v", farmer.ID, err)
-		pendingDeposits = nil
-	}
-	// The admin list is supporting information as well: not being able to read
-	// it must not stop the approvals themselves from being served.
-	admins, err := h.wallet.AdminAccounts(r.Context())
-	if err != nil {
-		log.Printf("load wallet admins for admin %d: %v", farmer.ID, err)
-		admins = nil
-	}
-	// The overview counts the same requests the reminder pass nudges, so the
-	// number on the page and the notification an admin receives cannot disagree.
-	agedCutoff := time.Now().Add(-services.ApprovalReminderAfter)
-	agedRequests := 0
-	for _, withdrawal := range withdrawals {
-		if (withdrawal.Status == models.WithdrawalPending || withdrawal.Status == models.WithdrawalProcessing) &&
-			withdrawal.CreatedAt.Before(agedCutoff) {
-			agedRequests++
-		}
-	}
-	for _, transfer := range transfers {
-		if transfer.Status == models.TransferPending && transfer.CreatedAt.Before(agedCutoff) {
-			agedRequests++
-		}
+		log.Printf("load stale pending deposits for admin %d: %v", farmer.ID, err)
+		http.Error(w, "Could not load pending deposits", http.StatusInternalServerError)
+		return
 	}
 	data := WalletAdminPageData{
-		Withdrawals: withdrawals, Transfers: transfers, PendingDeposits: pendingDeposits,
-		Admins:       admins,
-		AgedRequests: agedRequests,
+		Withdrawals: withdrawals, Transfers: transfers,
+		StalePending: stalePending, StaleAfterHours: int(h.wallet.StaleDepositAfter().Hours()),
 		RevenueTotal: revenueTotal, RevenueCount: revenueCount,
 		CommissionEnabled: h.wallet.CommissionEnabled(), CommissionLabel: h.wallet.CommissionLabel(),
 		Error: r.URL.Query().Get("error"), Success: r.URL.Query().Get("success"),
@@ -760,31 +736,21 @@ func (h *WalletHandler) ReconcileWithdrawal(w http.ResponseWriter, r *http.Reque
 	})
 }
 
-// ReturnWithdrawalToQueue puts a payout that never reached Flutterwave back in
-// the approval queue, so it can be rejected and the reserved funds released.
-func (h *WalletHandler) ReturnWithdrawalToQueue(w http.ResponseWriter, r *http.Request) {
+// RepairWallet recreates a missing wallet for an existing account.
+//
+// This is a repair, not a funding operation: it creates an empty NGN wallet and
+// never touches a balance. It exists for accounts that predate the wallets table
+// or were restored from a backup, which would otherwise be stuck on a 500 with no
+// way back. The service logs the operator and the target account.
+func (h *WalletHandler) RepairWallet(w http.ResponseWriter, r *http.Request) {
 	h.runAdminWalletAction(w, r, adminWalletAction{
-		idField:      "withdrawal_id",
+		idField:      "user_id",
 		redirectPath: adminWalletPath,
-		failure:      "Could not return the request to the queue. It has a saved Flutterwave transfer, so a payout may be on its way - check the provider before doing anything else. Funds remain reserved.",
-		success:      "Request returned to the queue. Reject it to release the reserved funds.",
+		failure:      "Could not repair that wallet. Check the user id and whether the account exists; no balance was changed.",
+		success:      "Wallet repair completed. The account now has an empty NGN wallet.",
 		run: func(ctx context.Context, id int64, adminID int) error {
-			return h.wallet.ReturnWithdrawalToQueue(ctx, id, adminID)
-		},
-	})
-}
-
-// RecordTransferID takes the Flutterwave transfer id an admin found in the
-// provider's dashboard and stores it against a payout that never recorded its
-// own, so that payout can then be reconciled.
-func (h *WalletHandler) RecordTransferID(w http.ResponseWriter, r *http.Request) {
-	h.runAdminWalletAction(w, r, adminWalletAction{
-		idField:      "withdrawal_id",
-		redirectPath: adminWalletPath,
-		failure:      "Could not record the Flutterwave transfer id. Check the number against the provider's dashboard and try again; funds remain reserved.",
-		success:      "Flutterwave transfer recorded. Check the provider status to settle or refund this payout.",
-		runForm: func(ctx context.Context, id int64, adminID int, form url.Values) error {
-			return h.wallet.RecordProviderTransferID(ctx, id, adminID, form.Get("provider_transfer_id"))
+			_, err := h.wallet.RepairWallet(ctx, int(id), adminID)
+			return err
 		},
 	})
 }

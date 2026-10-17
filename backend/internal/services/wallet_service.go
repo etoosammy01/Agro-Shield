@@ -12,7 +12,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 	"unicode"
 
@@ -50,21 +49,13 @@ type WalletService struct {
 	// hundredths of a percent: 2.5% is 250. Zero means no commission.
 	commissionBasisPoints int64
 
-	// notify is the notification store, held as a narrow interface so the wallet
-	// does not depend on the whole notification stack - and so a wallet test can
-	// assert on what a farmer was told without one. Nil means notifications are
-	// switched off, which every caller tolerates: telling somebody about their
-	// money must never be what stops the money moving.
-	notify notifier
+	// staleDepositAfter is how long a funding attempt may stay unsettled before
+	// it is listed for an operator to investigate. Reporting only.
+	staleDepositAfter time.Duration
 }
 
-// notifier is the one method the wallet needs from NotificationService.
-type notifier interface {
-	CreateNotification(userID int, title, message, notificationType string) error
-}
-
-func NewWalletService(repo walletStore, farmers farmerStore, flutter *FlutterwaveClient, lookups *repository.BankLookupRepository, adminIDs []int, commissionBasisPoints int64, notify notifier) *WalletService {
-	configured := make(map[int]struct{}, len(adminIDs))
+func NewWalletService(repo *repository.WalletRepository, farmers *repository.FarmerRepository, flutter *FlutterwaveClient, adminIDs []int, commissionBasisPoints int64, staleDepositAfter time.Duration) *WalletService {
+	adminSet := make(map[int]struct{}, len(adminIDs))
 	for _, id := range adminIDs {
 		if id > 0 {
 			configured[id] = struct{}{}
@@ -84,281 +75,23 @@ func NewWalletService(repo walletStore, farmers farmerStore, flutter *Flutterwav
 		adminIDs:              adminSet,
 		configuredAdminIDs:    configured,
 		commissionBasisPoints: commissionBasisPoints,
-		notify:                notify,
+		staleDepositAfter:     staleDepositAfter,
 	}
 }
 
-// AdminIDs lists the wallet admins, so a new request can be put in front of the
-// people who have to act on it. Sorted so the order a notification fan-out
-// happens in is not left to Go's map iteration.
-func (s *WalletService) AdminIDs() []int {
-	s.adminMu.RLock()
-	defer s.adminMu.RUnlock()
-
-	ids := make([]int, 0, len(s.adminIDs))
-	for id := range s.adminIDs {
-		ids = append(ids, id)
+// ParseStaleDepositAfter converts WALLET_STALE_DEPOSIT_HOURS into the age at
+// which an unsettled funding attempt is listed for an operator to investigate.
+// An empty value means the 24-hour default.
+func ParseStaleDepositAfter(value string) (time.Duration, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		value = "24"
 	}
-	sort.Ints(ids)
-	return ids
-}
-
-// RefreshAdminIDs reloads the accounts flagged as admins in the database and
-// merges them with the ones configured in the environment. It is called at
-// startup, on every reconciliation pass, and before an admin page or action is
-// served, so flagging an account takes effect without a restart.
-func (s *WalletService) RefreshAdminIDs(ctx context.Context) error {
-	flagged, err := s.repo.ListAdminIDs(ctx)
-	if err != nil {
-		return err
+	hours, err := strconv.Atoi(value)
+	if err != nil || hours <= 0 {
+		return 0, fmt.Errorf("invalid WALLET_STALE_DEPOSIT_HOURS %q: enter a whole number of hours greater than zero", value)
 	}
-
-	merged := make(map[int]struct{}, len(s.configuredAdminIDs)+len(flagged))
-	for id := range s.configuredAdminIDs {
-		merged[id] = struct{}{}
-	}
-	for _, id := range flagged {
-		if id > 0 {
-			merged[id] = struct{}{}
-		}
-	}
-
-	s.adminMu.Lock()
-	s.adminIDs = merged
-	s.adminMu.Unlock()
-	return nil
-}
-
-// isConfiguredAdmin reports whether the environment granted the role. That set
-// is immutable after construction, so it needs no lock.
-func (s *WalletService) isConfiguredAdmin(farmerID int) bool {
-	_, ok := s.configuredAdminIDs[farmerID]
-	return ok
-}
-
-// AdminAccounts lists everyone who can review wallet requests: the accounts
-// flagged in the database plus anyone granted the role by configuration. The
-// page needs both, because a configured admin cannot be removed from it.
-func (s *WalletService) AdminAccounts(ctx context.Context) ([]models.AdminAccount, error) {
-	flagged, err := s.repo.ListAdminAccounts(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	seen := make(map[int]struct{}, len(flagged))
-	accounts := make([]models.AdminAccount, 0, len(flagged))
-	for _, account := range flagged {
-		account.FromConfig = s.isConfiguredAdmin(account.FarmerID)
-		seen[account.FarmerID] = struct{}{}
-		accounts = append(accounts, account)
-	}
-
-	// An ID granted only by configuration has no row in the flagged list, so its
-	// name has to be read from the account itself.
-	for _, id := range s.AdminIDs() {
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		account := models.AdminAccount{FarmerID: id, FromConfig: true}
-		if s.farmers != nil {
-			if farmer, err := s.farmers.GetByID(id); err == nil && farmer != nil {
-				account.FullName = farmer.FullName
-				account.Phone = farmer.Phone
-			}
-		}
-		if account.FullName == "" {
-			account.FullName = fmt.Sprintf("Account #%d", id)
-		}
-		accounts = append(accounts, account)
-	}
-
-	sort.Slice(accounts, func(i, j int) bool {
-		if accounts[i].FullName == accounts[j].FullName {
-			return accounts[i].FarmerID < accounts[j].FarmerID
-		}
-		return accounts[i].FullName < accounts[j].FullName
-	})
-	return accounts, nil
-}
-
-// SetAdmin grants or revokes the wallet admin role on one account.
-//
-// An admin cannot remove themselves: if they were the only DB-flagged admin,
-// the page would lock everyone out of itself. Removing another admin is
-// allowed, because the actor remains.
-func (s *WalletService) SetAdmin(ctx context.Context, actorID, targetID int, admin bool) error {
-	if !s.IsAdmin(actorID) {
-		return ErrNotAdmin
-	}
-	if targetID <= 0 {
-		return ErrAdminNotFound
-	}
-	if !admin {
-		if s.isConfiguredAdmin(targetID) {
-			return ErrAdminFromConfig
-		}
-		if targetID == actorID {
-			return ErrAdminSelfRemoval
-		}
-	}
-
-	found, err := s.repo.SetAdmin(ctx, targetID, admin)
-	if err != nil {
-		return err
-	}
-	if !found {
-		return ErrAdminNotFound
-	}
-	if err := s.RefreshAdminIDs(ctx); err != nil {
-		// The write succeeded; the cache catches up on the next page or pass.
-		log.Printf("refresh wallet admins after change: %v", err)
-	}
-	return nil
-}
-
-// SetAdminByPhone is how the page names a person: an admin knows the phone
-// number an account registered with, not its numeric id.
-func (s *WalletService) SetAdminByPhone(ctx context.Context, actorID int, phone string, admin bool) error {
-	if !s.IsAdmin(actorID) {
-		return ErrNotAdmin
-	}
-	phone = strings.TrimSpace(phone)
-	if phone == "" {
-		return ErrAdminPhoneRequired
-	}
-	if s.farmers == nil {
-		return ErrAdminNotFound
-	}
-	farmer, err := s.farmers.GetByPhone(phone)
-	if err != nil {
-		return err
-	}
-	if farmer == nil {
-		return ErrAdminNotFound
-	}
-	return s.SetAdmin(ctx, actorID, farmer.ID, admin)
-}
-
-// notifyUser delivers one notification, best-effort.
-//
-// Every caller has already moved money or recorded a decision, so a failure to
-// tell somebody about it is logged and swallowed: an admin's payout must not be
-// reported as failed because a notification row could not be written.
-func (s *WalletService) notifyUser(userID int, title, message, kind string) {
-	if s.notify == nil || userID <= 0 {
-		return
-	}
-	if err := s.notify.CreateNotification(userID, title, message, kind); err != nil {
-		log.Printf("notify user %d (%s): %v", userID, kind, err)
-	}
-}
-
-// notifyAdmins tells every configured admin that a request is waiting for them.
-//
-// Without this a request is only found by somebody opening the approvals page,
-// which is how a payout could sit untouched for days with the farmer's balance
-// already reduced.
-func (s *WalletService) notifyAdmins(title, message, kind string) {
-	s.notifyAdminsExcept(0, title, message, kind)
-}
-
-// notifyAdminsExcept skips one admin, the one whose own request this is.
-//
-// An admin who is also a member can request a payout, and the self-approval rule
-// means they cannot approve it - so "waiting for you" would be false for exactly
-// the person most likely to open the page and act on it.
-func (s *WalletService) notifyAdminsExcept(requesterID int, title, message, kind string) {
-	for _, adminID := range s.AdminIDs() {
-		if adminID == requesterID {
-			continue
-		}
-		s.notifyUser(adminID, title, message, kind)
-	}
-}
-
-// accountResolver resolves an account number at one specific bank. Flutterwave
-// exposes no reverse lookup, so callers wishing to find which bank a number
-// belongs to must ask this repeatedly, once per candidate bank.
-type accountResolver interface {
-	ResolveAccount(accountNumber, bankCode string) (*ResolvedAccount, error)
-}
-
-// bankDirectory is the bank-list half of the Flutterwave client. Verification
-// needs it to turn a stored bank code into the name the provider uses for that
-// code, which is the only way to check a bank name against its code - resolving
-// an account tells us the holder, never the bank.
-type bankDirectory interface {
-	ListBanks(country string) ([]Bank, error)
-}
-
-// bankLookupStore is the persistence the bank fan-out needs: a cache of which
-// banks have answered for a number, plus the negative rows that stop a number
-// resolving nowhere from being swept again on every attempt.
-type bankLookupStore interface {
-	Find(ctx context.Context, accountNumber string) ([]repository.BankLookup, error)
-	HasAny(ctx context.Context, accountNumber string) (bool, error)
-	FindOne(ctx context.Context, accountNumber, bankCode string) (*repository.BankLookup, error)
-	SaveMatches(ctx context.Context, accountNumber string, matches []repository.BankLookup) error
-	SaveMiss(ctx context.Context, accountNumber string) error
-}
-
-// walletStore is everything this service asks of the wallet repository.
-//
-// It is an interface rather than the repository itself so the money paths can be
-// exercised without a database. A withdrawal is read, verified, and only then
-// begun - and that order is the whole reason a payout with details that do not
-// match never reserves funds, which is not something a test can assert while the
-// repository is a struct bound to a live connection.
-type walletStore interface {
-	GetWallet(ctx context.Context, farmerID int) (*models.Wallet, error)
-	CreateDeposit(ctx context.Context, farmerID int, reference, amount string) error
-	CompleteDeposit(ctx context.Context, reference, transactionID, amount, currency string) (bool, error)
-	FailDeposit(ctx context.Context, reference string) error
-	ListDeposits(ctx context.Context, farmerID int) ([]models.WalletDeposit, error)
-	ListPendingDepositsOlderThan(ctx context.Context, cutoff time.Time) ([]models.PendingDeposit, error)
-	ExpireDeposit(ctx context.Context, reference string) error
-
-	CreateWithdrawal(ctx context.Context, farmerID int, reference, amount string) error
-	ListFarmerWithdrawals(ctx context.Context, farmerID int) ([]models.Withdrawal, error)
-	ListWithdrawals(ctx context.Context, pendingOnly bool) ([]models.Withdrawal, error)
-	GetWithdrawal(ctx context.Context, withdrawalID int64) (*models.Withdrawal, error)
-	BeginWithdrawal(ctx context.Context, withdrawalID int64, adminID int) (*models.Withdrawal, error)
-	RejectWithdrawal(ctx context.Context, withdrawalID int64, adminID int) error
-	CancelWithdrawal(ctx context.Context, withdrawalID int64, farmerID int) error
-	ExpireStaleWithdrawals(ctx context.Context, cutoff time.Time) ([]models.Withdrawal, error)
-	ClaimWithdrawalReminder(ctx context.Context, withdrawalID int64, cutoff time.Time) (bool, error)
-	SetTransferID(ctx context.Context, reference, transferID string) error
-	CompleteTransfer(ctx context.Context, reference, transferID, status string, amount int64, currency string) (bool, error)
-	GetWithdrawalByReference(ctx context.Context, reference string) (*models.Withdrawal, error)
-	RecordWithdrawalVerification(ctx context.Context, reference, status, resolvedName, detail string) error
-	RevertWithdrawalToPending(ctx context.Context, reference string) error
-
-	CreateTransfer(ctx context.Context, senderID, recipientID int, reference, amount, note string) error
-	ListFarmerTransfers(ctx context.Context, farmerID int) ([]models.Transfer, error)
-	ListPendingTransfers(ctx context.Context) ([]models.Transfer, error)
-	ApproveTransfer(ctx context.Context, transferID int64, adminID int) (*models.Transfer, error)
-	RejectTransfer(ctx context.Context, transferID int64, adminID int) (*models.Transfer, error)
-	CancelTransfer(ctx context.Context, transferID int64, senderID int) error
-	ExpireStaleTransfers(ctx context.Context, cutoff time.Time) ([]models.Transfer, error)
-	ClaimTransferReminder(ctx context.Context, transferID int64, cutoff time.Time) (bool, error)
-
-	ListTransactions(ctx context.Context, farmerID int) ([]models.WalletTransaction, error)
-	ListAdminIDs(ctx context.Context) ([]int, error)
-	ListAdminAccounts(ctx context.Context) ([]models.AdminAccount, error)
-	SetAdmin(ctx context.Context, farmerID int, admin bool) (bool, error)
-	PayForOrder(ctx context.Context, buyerID, cropID int, quantity float64, commissionBasisPoints int64) (int64, error)
-	PlatformRevenueTotal(ctx context.Context) (string, int, error)
-}
-
-// farmerStore is the account half of the farmer repository: reading where a
-// payout would go, and writing the details a farmer saves. Narrow for the same
-// reason as walletStore - a withdrawal requested against details that do not
-// match must not reach the repository at all, and that is only provable with a
-// stand-in for the repository.
-type farmerStore interface {
-	GetByID(id int) (*models.Farmer, error)
-	GetByPhone(phone string) (*models.Farmer, error)
-	UpdateBankDetails(id int, bankName, bankCode, accountName, accountNumber string) error
+	return time.Duration(hours) * time.Hour, nil
 }
 
 // ParseCommissionPercent converts a percentage such as "2.5" into basis points
@@ -446,6 +179,14 @@ func (s *WalletService) IsAdmin(farmerID int) bool {
 
 func (s *WalletService) Wallet(ctx context.Context, farmerID int) (*models.Wallet, []models.WalletTransaction, error) {
 	wallet, err := s.repo.GetWallet(ctx, farmerID)
+	if errors.Is(err, repository.ErrWalletNotFound) {
+		// Every account is meant to own a wallet — FarmerRepository.Create inserts
+		// one inside the registration transaction. If one is somehow missing,
+		// rebuild it for the authenticated owner here rather than leaving them on a
+		// permanent error with no way back. This is the owner's own wallet, so it is
+		// not creation on behalf of an arbitrary user.
+		wallet, err = s.repo.EnsureWallet(ctx, farmerID)
+	}
 	if err != nil {
 		return nil, nil, err
 	}
@@ -454,6 +195,48 @@ func (s *WalletService) Wallet(ctx context.Context, farmerID int) (*models.Walle
 		return nil, nil, err
 	}
 	return wallet, transactions, nil
+}
+
+// RepairWallet rebuilds a user's wallet if their account has none. Admin only.
+//
+// This is deliberately an explicit operation rather than something the funding
+// path does silently: creating a wallet during an arbitrary funding request would
+// let a request invent an account's financial state.
+func (s *WalletService) RepairWallet(ctx context.Context, farmerID, adminID int) (*models.Wallet, error) {
+	if !s.IsAdmin(adminID) {
+		return nil, errors.New("admin access required")
+	}
+	wallet, err := s.repo.EnsureWallet(ctx, farmerID)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("wallet repair: admin %d ensured a wallet for user %d", adminID, farmerID)
+	return wallet, nil
+}
+
+// IsWalletDeposit reports whether the reference belongs to a wallet funding
+// attempt, and which provider owns it. Routing reads the recorded provider rather
+// than the shape of the reference string.
+func (s *WalletService) IsWalletDeposit(ctx context.Context, reference string) (provider string, found bool, err error) {
+	provider, err = s.repo.DepositProvider(ctx, reference)
+	if errors.Is(err, repository.ErrWalletNotFound) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("%w: read deposit provider: %v", ErrWalletUnavailable, err)
+	}
+	return provider, true, nil
+}
+
+// StalePendingDeposits is a read-only operational report for an admin: funding
+// attempts a provider has not settled within the configured age. It never moves money.
+func (s *WalletService) StalePendingDeposits(ctx context.Context) ([]models.WalletDeposit, error) {
+	return s.repo.StalePendingDeposits(ctx, s.staleDepositAfter, 100)
+}
+
+// StaleDepositAfter exposes the configured reporting threshold for display.
+func (s *WalletService) StaleDepositAfter() time.Duration {
+	return s.staleDepositAfter
 }
 
 func (s *WalletService) Withdrawals(ctx context.Context, farmerID int) ([]models.Withdrawal, error) {
@@ -572,7 +355,7 @@ func (s *WalletService) InitiateDeposit(ctx context.Context, farmer *models.Farm
 	if err != nil {
 		return nil, fmt.Errorf("generate deposit reference: %w", err)
 	}
-	if err := s.repo.CreateDeposit(ctx, farmer.ID, reference, amount); err != nil {
+	if err := s.repo.CreateDeposit(ctx, farmer.ID, models.ProviderFlutterwave, reference, amount); err != nil {
 		return nil, fmt.Errorf("create wallet deposit: %w", err)
 	}
 	checkoutURL, err := s.flutter.InitializePayment(InitializePaymentRequest{
@@ -627,8 +410,15 @@ func (s *WalletService) confirmDeposit(ctx context.Context, reference, transacti
 	if currency != "NGN" {
 		return false, errors.New("wallet deposits must be paid in NGN")
 	}
-	if transactionID == "" || !strings.HasPrefix(reference, "WALLET-") {
-		return false, errors.New("invalid wallet deposit verification")
+	if transactionID == "" {
+		return errors.New("invalid wallet deposit verification")
+	}
+	// The recorded provider is authoritative, not the reference's shape: a
+	// reference that belongs to no wallet funding attempt must never be credited.
+	if _, err := s.repo.DepositProvider(ctx, reference); errors.Is(err, repository.ErrWalletNotFound) {
+		return errors.New("invalid wallet deposit verification")
+	} else if err != nil {
+		return fmt.Errorf("%w: read deposit provider: %v", ErrWalletUnavailable, err)
 	}
 	return s.repo.CompleteDeposit(ctx, reference, transactionID, verifiedAmount, currency)
 }

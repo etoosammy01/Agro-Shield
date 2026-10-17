@@ -205,6 +205,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	staleDepositAfter, err := services.ParseStaleDepositAfter(cfg.WalletStaleDepositHours)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// ============================================================
 	// CREATE SMS SENDER          ← added
@@ -260,6 +264,7 @@ func main() {
 		feedbackRepo,
 		walletAdminIDs,
 		commissionBasisPoints,
+		staleDepositAfter,
 	)
 
 	// ============================================================

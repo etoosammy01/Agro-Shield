@@ -1,6 +1,8 @@
 package app
 
 import (
+	"time"
+
 	"backend/internal/repository"
 	"backend/internal/services"
 )
@@ -82,6 +84,7 @@ func NewContainer(
 	feedbackRepo *repository.FeedbackRepository,
 	walletAdminIDs []int,
 	commissionBasisPoints int64,
+	staleDepositAfter time.Duration,
 ) *Container {
 
 	// ========================================================
@@ -145,7 +148,7 @@ func NewContainer(
 	// Flutterwave API.
 	// ========================================================
 
-	walletService := services.NewWalletService(walletRepo, farmerRepo, flutterwaveClient, bankLookupRepo, walletAdminIDs, commissionBasisPoints, notificationService)
+	walletService := services.NewWalletService(walletRepo, farmerRepo, flutterwaveClient, walletAdminIDs, commissionBasisPoints, staleDepositAfter)
 	paymentService := services.NewPaymentService(paymentRepo, orderRepo, farmerRepo, flutterwaveClient, walletService)
 
 	// One-time passcodes guard password resets and wallet payouts. The
