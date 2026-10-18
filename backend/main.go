@@ -2,8 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	app "backend/internal"
 	"backend/internal/config"
@@ -11,6 +16,7 @@ import (
 	"backend/internal/repository"
 	"backend/internal/services"
 	learningproviders "backend/internal/services/learning"
+	"backend/middleware"
 	"backend/routes"
 )
 
@@ -273,16 +279,76 @@ func main() {
 
 	routes.RegisterRoutes(container)
 
-	// Pending payments and approvals need an owner even when nobody opens the
-	// page. This pass re-checks deposits by reference, reminds admins about aged
-	// requests, and releases only money the provider cannot have paid.
-	go container.Wallet.RunReconciliation(context.Background(), services.DefaultReconciliationInterval)
+	// Health checks are deliberately outside the application router so they
+	// remain cheap and are not affected by page-level middleware decisions.
+	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok\n"))
+	})
+	http.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		if err := db.PingContext(ctx); err != nil {
+			log.Printf("readiness check failed: %v", err)
+			http.Error(w, "not ready", http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ready\n"))
+	})
+
+	middleware.SetTrustedProxies(cfg.TrustedProxyCIDRs)
 
 	// ============================================================
 	// 7. START HTTP SERVER
 	// ============================================================
 
-	if err = http.ListenAndServe(":"+cfg.Port, http.DefaultServeMux); err != nil {
+	// The reconciliation loop must stop when the server is shutting down, but
+	// in-flight HTTP requests are allowed to finish under srv.Shutdown.
+	reconcileCtx, stopReconciliation := context.WithCancel(context.Background())
+	defer stopReconciliation()
+	go container.Wallet.RunReconciliation(reconcileCtx, services.DefaultReconciliationInterval)
+
+	server := &http.Server{
+		Addr:              ":" + cfg.Port,
+		Handler:           middleware.RequestLogger(middleware.Compression(middleware.Recoverer(middleware.RequestGuard(http.DefaultServeMux)))),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       5 * time.Minute,
+		WriteTimeout:      5 * time.Minute,
+		IdleTimeout:       2 * time.Minute,
+		MaxHeaderBytes:    1 << 20,
+	}
+
+	shutdownComplete := make(chan struct{})
+	go func() {
+		defer close(shutdownComplete)
+		signalCtx, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stopSignals()
+		<-signalCtx.Done()
+
+		log.Println("shutdown requested; draining HTTP connections")
+		stopReconciliation()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.Printf("graceful shutdown failed: %v", err)
+			_ = server.Close()
+		}
+	}()
+
+	log.Printf("HTTP server listening on :%s", cfg.Port)
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
+	<-shutdownComplete
 }

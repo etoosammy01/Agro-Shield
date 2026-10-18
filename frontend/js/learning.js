@@ -121,9 +121,15 @@ const messages = [
 
 // Reject an oversized new question before sending it.
 if (Array.from(question.trim()).length > MAX_MESSAGE_LENGTH) {
-    showError("Your question must not exceed 1,200 characters.");
-    return;
+    throw new Error("Your question must not exceed 1,200 characters.");
 }
+
+const response = await fetch("/learning/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ farmingType: category, messages })
+});
+
             if (!response.ok) {
                 const detail = await response.text();
                 throw new Error(detail.trim() || "The assistant could not answer right now.");

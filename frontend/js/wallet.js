@@ -261,3 +261,187 @@ document.querySelectorAll("[data-otp-purpose]").forEach((button) => {
       });
   });
 });
+
+// Permanent funding account: copy the account number without a round trip.
+// The clipboard API is unavailable on some older mobile browsers, so fall back
+// to selecting a temporary field. Neither path changes any server state.
+document.querySelectorAll("[data-copy-target]").forEach((button) => {
+  button.addEventListener("click", async () => {
+    const source = document.getElementById(button.dataset.copyTarget);
+    const status = document.getElementById("funding-copy-status");
+    if (!source) return;
+
+    const value = source.textContent.trim();
+    const setStatus = (text) => {
+      if (!status) return;
+      status.textContent = text;
+      window.setTimeout(() => {
+        if (status.textContent === text) status.textContent = "";
+      }, 4000);
+    };
+
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const field = document.createElement("textarea");
+        field.value = value;
+        field.setAttribute("readonly", "");
+        field.style.position = "fixed";
+        field.style.opacity = "0";
+        document.body.appendChild(field);
+        field.select();
+        const copied = document.execCommand("copy");
+        document.body.removeChild(field);
+        if (!copied) throw new Error("copy failed");
+      }
+      setStatus("Account number copied.");
+    } catch (error) {
+      setStatus("Could not copy automatically. Select the number and copy it.");
+    }
+  });
+});
+
+// Identity forms submit as a normal POST so the server can redirect back with
+// an honest result. Disabling the button only prevents a double tap; the form
+// data is already being sent.
+document.querySelectorAll("[data-virtual-account-form]").forEach((form) => {
+  form.addEventListener("submit", () => {
+    const submit = form.querySelector("[data-va-submit]");
+    const status = document.getElementById("virtual-account-status");
+    if (submit) {
+      submit.disabled = true;
+      submit.dataset.label = submit.textContent;
+      submit.textContent = "Contacting Flutterwave…";
+    }
+    if (status) status.textContent = "Sending your verification details…";
+  });
+});
+
+// Status checks are read-only but can be slow; keep the button from firing
+// twice while the provider lookup is in flight.
+document.querySelectorAll(".wallet-check-form").forEach((form) => {
+  form.addEventListener("submit", () => {
+    const submit = form.querySelector("button[type=submit]");
+    if (submit) {
+      submit.disabled = true;
+      submit.textContent = "Checking…";
+    }
+  });
+});
+
+// ---------- Committed wallet refresh ----------
+//
+// A transfer can be confirmed after this page was rendered: the webhook
+// verifies it with Flutterwave, commits the ledger entry and balance, and the
+// page the farmer is looking at still shows the old number. Poll a read-only
+// status endpoint and reload only when the server's committed state has
+// actually moved. Nothing here credits, computes, or trusts a provider body -
+// the endpoint reports what the database already holds.
+//
+// The poll runs only while the tab is visible, stops on pagehide, and each
+// request is aborted after ten seconds so a stalled network cannot pile up
+// requests. Returning to the tab checks immediately.
+(() => {
+  const page = document.querySelector(".wallet-page[data-latest-transaction-id]");
+  if (!page) return;
+
+  const POLL_INTERVAL_MS = 30000;
+  const REQUEST_TIMEOUT_MS = 10000;
+
+  const known = {
+    balance: page.dataset.walletBalance ?? "",
+    transactionID: page.dataset.latestTransactionId ?? "0",
+    depositID: page.dataset.latestDepositId ?? "0",
+    depositStatus: page.dataset.latestDepositStatus ?? "",
+  };
+
+  const note = document.getElementById("connection-status");
+  const setNote = (text) => {
+    if (!note) return;
+    note.textContent = text;
+    note.hidden = text === "";
+  };
+
+  let timer = null;
+  let inFlight = false;
+  let reloading = false;
+
+  const stopPolling = () => {
+    if (timer !== null) {
+      window.clearInterval(timer);
+      timer = null;
+    }
+  };
+
+  const startPolling = () => {
+    stopPolling();
+    timer = window.setInterval(() => checkStatus(false), POLL_INTERVAL_MS);
+  };
+
+  const checkStatus = async (announce) => {
+    if (inFlight || reloading || document.hidden) return;
+    inFlight = true;
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetch("/wallet/status", {
+        headers: { Accept: "application/json" },
+        credentials: "same-origin",
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      if (!response.ok) return;
+
+      const status = await response.json();
+      const changed =
+        String(status.balance ?? "") !== known.balance ||
+        String(status.latest_transaction_id ?? "0") !== known.transactionID ||
+        String(status.latest_deposit_id ?? "0") !== known.depositID ||
+        String(status.latest_deposit_status ?? "") !== known.depositStatus;
+
+      if (changed) {
+        reloading = true;
+        stopPolling();
+        setNote("Your wallet changed. Refreshing your balance and history…");
+        window.location.reload();
+        return;
+      }
+
+      if (announce && Number(status.pending_deposits) > 0) {
+        setNote("A deposit is still waiting for the payment provider. Your balance updates only after it is confirmed; do not send it again.");
+      } else if (announce && !note?.textContent) {
+        setNote("Wallet is up to date.");
+      }
+    } catch (error) {
+      // A failed check changes nothing on screen and never implies success.
+      // The next visible interval or focus event tries again.
+    } finally {
+      window.clearTimeout(timeout);
+      inFlight = false;
+    }
+  };
+
+  const schedule = () => {
+    if (reloading) return;
+    if (document.hidden) {
+      stopPolling();
+      return;
+    }
+    checkStatus(true);
+    startPolling();
+  };
+
+  window.addEventListener("pageshow", (event) => {
+    // bfcache can restore a page whose balance predates a confirmed credit.
+    if (event.persisted) checkStatus(true);
+    schedule();
+  });
+  document.addEventListener("visibilitychange", schedule);
+  window.addEventListener("focus", () => checkStatus(true));
+  window.addEventListener("online", () => checkStatus(true));
+  window.addEventListener("pagehide", stopPolling);
+
+  schedule();
+})();

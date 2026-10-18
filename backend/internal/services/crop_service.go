@@ -149,6 +149,16 @@ func (s *CropService) AvailableCrops() ([]models.Crop, error) {
 	return s.repo.ListAvailable()
 }
 
+// SearchAvailableCrops returns listed crops matching a search term. A blank
+// term is treated as "no filter" so an empty search still lists every crop.
+func (s *CropService) SearchAvailableCrops(term string) ([]models.Crop, error) {
+	term = strings.TrimSpace(term)
+	if term == "" {
+		return s.repo.ListAvailable()
+	}
+	return s.repo.SearchAvailable(term)
+}
+
 // GetCrop retrieves one product by ID.
 func (s *CropService) GetCrop(cropID int) (*models.Crop, error) {
 	if cropID <= 0 {

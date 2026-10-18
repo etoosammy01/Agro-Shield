@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"backend/internal/models"
 	"backend/internal/repository"
@@ -29,6 +30,7 @@ type MarketplacePageData struct {
 	CurrentUserID int
 	Message       string
 	Error         string
+	SearchTerm    string
 }
 
 func (h *Marketplace) MarketplaceHandler(w http.ResponseWriter, r *http.Request) {
@@ -42,28 +44,29 @@ func (h *Marketplace) MarketplaceHandler(w http.ResponseWriter, r *http.Request)
 	case http.MethodGet:
 		log.Println("User Visited Marketplace")
 		h.record("marketplace_view", nil, farmer.ID, r)
-		h.render(w, farmer.IsBuyer(), farmer.ID, "", "")
+		h.render(w, farmer.IsBuyer(), farmer.ID, "", "", strings.TrimSpace(r.URL.Query().Get("q")))
 	case http.MethodPost:
 		if r.FormValue("action") == "search" {
+			term := strings.TrimSpace(r.FormValue("search_term"))
 			uid := farmer.ID
 			if h.events != nil {
-				_ = h.events.RecordSearch(r.FormValue("search_term"), r.FormValue("normalized_produce"), farmer.Location, &uid, r.FormValue("session_id"))
+				_ = h.events.RecordSearch(term, r.FormValue("normalized_produce"), farmer.Location, &uid, r.FormValue("session_id"))
 			}
-			h.render(w, farmer.IsBuyer(), farmer.ID, "", "")
+			h.render(w, farmer.IsBuyer(), farmer.ID, "", "", term)
 			return
 		}
 		if !farmer.IsBuyer() {
-			h.render(w, farmer.IsBuyer(), farmer.ID, "", "Only buyer accounts can place orders")
+			h.render(w, farmer.IsBuyer(), farmer.ID, "", "Only buyer accounts can place orders", "")
 			return
 		}
 		cropID, _ := strconv.Atoi(r.FormValue("crop_id"))
 		quantity, _ := strconv.ParseFloat(r.FormValue("quantity"), 64)
 		if _, err := h.wallet.PayForOrder(r.Context(), farmer.ID, cropID, quantity); err != nil {
-			h.render(w, farmer.IsBuyer(), farmer.ID, "", err.Error())
+			h.render(w, farmer.IsBuyer(), farmer.ID, "", err.Error(), "")
 			return
 		}
 		h.record("checkout_completed", &cropID, farmer.ID, r, fmt.Sprintf(`{"quantity":%g}`, quantity))
-		h.render(w, farmer.IsBuyer(), farmer.ID, "Order placed successfully!", "")
+		h.render(w, farmer.IsBuyer(), farmer.ID, "Order placed successfully!", "", "")
 	default:
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
@@ -82,10 +85,19 @@ func (h *Marketplace) record(eventType string, cropID *int, userID int, r *http.
 	_ = h.events.Record(&models.MarketEvent{EventType: eventType, CropID: cropID, UserID: &uid, SessionID: sessionID, Metadata: meta})
 }
 
-func (h *Marketplace) render(w http.ResponseWriter, isBuyer bool, currentUserID int, message, errMsg string) {
-	crops, err := h.crop.AvailableCrops()
+func (h *Marketplace) render(w http.ResponseWriter, isBuyer bool, currentUserID int, message, errMsg, searchTerm string) {
+	var (
+		crops []models.Crop
+		err   error
+	)
+	if strings.TrimSpace(searchTerm) == "" {
+		crops, err = h.crop.AvailableCrops()
+	} else {
+		crops, err = h.crop.SearchAvailableCrops(searchTerm)
+	}
 	if err != nil {
 		log.Println("failed to load crops:", err)
+		errMsg = "We couldn't load the marketplace right now. Please try again."
 	}
 	data := MarketplacePageData{
 		Crops:         crops,
@@ -93,6 +105,7 @@ func (h *Marketplace) render(w http.ResponseWriter, isBuyer bool, currentUserID 
 		CurrentUserID: currentUserID,
 		Message:       message,
 		Error:         errMsg,
+		SearchTerm:    searchTerm,
 	}
 	if err := render.RenderTemplates(w, "marketplace.html", data); err != nil {
 		log.Println("render error", err)

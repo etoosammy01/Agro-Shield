@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -45,17 +46,28 @@ type WalletService struct {
 	// bank name against its code. Also the same underlying client.
 	directory bankDirectory
 
+	// virtualAccounts is the permanent-account half of the Flutterwave client,
+	// held as a narrow interface so the setup flow can be tested without HTTP.
+	virtualAccounts virtualAccountProvider
+
 	// commissionBasisPoints is the platform's cut of marketplace sales, in
 	// hundredths of a percent: 2.5% is 250. Zero means no commission.
 	commissionBasisPoints int64
+
+	// notify is the notification store, held as a narrow interface so the wallet
+	// does not depend on the whole notification stack - and so a wallet test can
+	// assert on what a farmer was told without one. Nil means notifications are
+	// switched off, which every caller tolerates: telling somebody about their
+	// money must never be what stops the money moving.
+	notify notifier
 
 	// staleDepositAfter is how long a funding attempt may stay unsettled before
 	// it is listed for an operator to investigate. Reporting only.
 	staleDepositAfter time.Duration
 }
 
-func NewWalletService(repo *repository.WalletRepository, farmers *repository.FarmerRepository, flutter *FlutterwaveClient, adminIDs []int, commissionBasisPoints int64, staleDepositAfter time.Duration) *WalletService {
-	adminSet := make(map[int]struct{}, len(adminIDs))
+func NewWalletService(repo walletStore, farmers farmerStore, flutter *FlutterwaveClient, lookups *repository.BankLookupRepository, adminIDs []int, commissionBasisPoints int64, notify notifier, staleDepositAfter time.Duration) *WalletService {
+	configured := make(map[int]struct{}, len(adminIDs))
 	for _, id := range adminIDs {
 		if id > 0 {
 			configured[id] = struct{}{}
@@ -72,11 +84,318 @@ func NewWalletService(repo *repository.WalletRepository, farmers *repository.Far
 		flutter:               flutter,
 		resolver:              flutter,
 		directory:             flutter,
+		virtualAccounts:       flutter,
 		adminIDs:              adminSet,
 		configuredAdminIDs:    configured,
 		commissionBasisPoints: commissionBasisPoints,
 		staleDepositAfter:     staleDepositAfter,
+		notify:                notify,
 	}
+}
+
+// notifier is the one method the wallet needs from NotificationService.
+type notifier interface {
+	CreateNotification(userID int, title, message, notificationType string) error
+}
+
+// AdminIDs lists the wallet admins, so a new request can be put in front of the
+// people who have to act on it. Sorted so the order a notification fan-out
+// happens in is not left to Go's map iteration.
+func (s *WalletService) AdminIDs() []int {
+	s.adminMu.RLock()
+	defer s.adminMu.RUnlock()
+
+	ids := make([]int, 0, len(s.adminIDs))
+	for id := range s.adminIDs {
+		ids = append(ids, id)
+	}
+	sort.Ints(ids)
+	return ids
+}
+
+// RefreshAdminIDs reloads the accounts flagged as admins in the database and
+// merges them with the ones configured in the environment. It is called at
+// startup, on every reconciliation pass, and before an admin page or action is
+// served, so flagging an account takes effect without a restart.
+func (s *WalletService) RefreshAdminIDs(ctx context.Context) error {
+	flagged, err := s.repo.ListAdminIDs(ctx)
+	if err != nil {
+		return err
+	}
+
+	merged := make(map[int]struct{}, len(s.configuredAdminIDs)+len(flagged))
+	for id := range s.configuredAdminIDs {
+		merged[id] = struct{}{}
+	}
+	for _, id := range flagged {
+		if id > 0 {
+			merged[id] = struct{}{}
+		}
+	}
+
+	s.adminMu.Lock()
+	s.adminIDs = merged
+	s.adminMu.Unlock()
+	return nil
+}
+
+// isConfiguredAdmin reports whether the environment granted the role. That set
+// is immutable after construction, so it needs no lock.
+func (s *WalletService) isConfiguredAdmin(farmerID int) bool {
+	_, ok := s.configuredAdminIDs[farmerID]
+	return ok
+}
+
+// AdminAccounts lists everyone who can review wallet requests: the accounts
+// flagged in the database plus anyone granted the role by configuration. The
+// page needs both, because a configured admin cannot be removed from it.
+func (s *WalletService) AdminAccounts(ctx context.Context) ([]models.AdminAccount, error) {
+	flagged, err := s.repo.ListAdminAccounts(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	seen := make(map[int]struct{}, len(flagged))
+	accounts := make([]models.AdminAccount, 0, len(flagged))
+	for _, account := range flagged {
+		account.FromConfig = s.isConfiguredAdmin(account.FarmerID)
+		seen[account.FarmerID] = struct{}{}
+		accounts = append(accounts, account)
+	}
+
+	// An ID granted only by configuration has no row in the flagged list, so its
+	// name has to be read from the account itself.
+	for _, id := range s.AdminIDs() {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		account := models.AdminAccount{FarmerID: id, FromConfig: true}
+		if s.farmers != nil {
+			if farmer, err := s.farmers.GetByID(id); err == nil && farmer != nil {
+				account.FullName = farmer.FullName
+				account.Phone = farmer.Phone
+			}
+		}
+		if account.FullName == "" {
+			account.FullName = fmt.Sprintf("Account #%d", id)
+		}
+		accounts = append(accounts, account)
+	}
+
+	sort.Slice(accounts, func(i, j int) bool {
+		if accounts[i].FullName == accounts[j].FullName {
+			return accounts[i].FarmerID < accounts[j].FarmerID
+		}
+		return accounts[i].FullName < accounts[j].FullName
+	})
+	return accounts, nil
+}
+
+// SetAdmin grants or revokes the wallet admin role on one account.
+//
+// An admin cannot remove themselves: if they were the only DB-flagged admin,
+// the page would lock everyone out of itself. Removing another admin is
+// allowed, because the actor remains.
+func (s *WalletService) SetAdmin(ctx context.Context, actorID, targetID int, admin bool) error {
+	if !s.IsAdmin(actorID) {
+		return ErrNotAdmin
+	}
+	if targetID <= 0 {
+		return ErrAdminNotFound
+	}
+	if !admin {
+		if s.isConfiguredAdmin(targetID) {
+			return ErrAdminFromConfig
+		}
+		if targetID == actorID {
+			return ErrAdminSelfRemoval
+		}
+	}
+
+	found, err := s.repo.SetAdmin(ctx, targetID, admin)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return ErrAdminNotFound
+	}
+	if err := s.RefreshAdminIDs(ctx); err != nil {
+		// The write succeeded; the cache catches up on the next page or pass.
+		log.Printf("refresh wallet admins after change: %v", err)
+	}
+	return nil
+}
+
+// SetAdminByPhone is how the page names a person: an admin knows the phone
+// number an account registered with, not its numeric id.
+func (s *WalletService) SetAdminByPhone(ctx context.Context, actorID int, phone string, admin bool) error {
+	if !s.IsAdmin(actorID) {
+		return ErrNotAdmin
+	}
+	phone = strings.TrimSpace(phone)
+	if phone == "" {
+		return ErrAdminPhoneRequired
+	}
+	if s.farmers == nil {
+		return ErrAdminNotFound
+	}
+	farmer, err := s.farmers.GetByPhone(phone)
+	if err != nil {
+		return err
+	}
+	if farmer == nil {
+		return ErrAdminNotFound
+	}
+	return s.SetAdmin(ctx, actorID, farmer.ID, admin)
+}
+
+// notifyUser delivers one notification, best-effort.
+//
+// Every caller has already moved money or recorded a decision, so a failure to
+// tell somebody about it is logged and swallowed: an admin's payout must not be
+// reported as failed because a notification row could not be written.
+func (s *WalletService) notifyUser(userID int, title, message, kind string) {
+	if s.notify == nil || userID <= 0 {
+		return
+	}
+	if err := s.notify.CreateNotification(userID, title, message, kind); err != nil {
+		log.Printf("notify user %d (%s): %v", userID, kind, err)
+	}
+}
+
+// notifyAdmins tells every configured admin that a request is waiting for them.
+//
+// Without this a request is only found by somebody opening the approvals page,
+// which is how a payout could sit untouched for days with the farmer's balance
+// already reduced.
+func (s *WalletService) notifyAdmins(title, message, kind string) {
+	s.notifyAdminsExcept(0, title, message, kind)
+}
+
+// notifyAdminsExcept skips one admin, the one whose own request this is.
+//
+// An admin who is also a member can request a payout, and the self-approval rule
+// means they cannot approve it - so "waiting for you" would be false for exactly
+// the person most likely to open the page and act on it.
+func (s *WalletService) notifyAdminsExcept(requesterID int, title, message, kind string) {
+	for _, adminID := range s.AdminIDs() {
+		if adminID == requesterID {
+			continue
+		}
+		s.notifyUser(adminID, title, message, kind)
+	}
+}
+
+// accountResolver resolves an account number at one specific bank. Flutterwave
+// exposes no reverse lookup, so callers wishing to find which bank a number
+// belongs to must ask this repeatedly, once per candidate bank.
+type accountResolver interface {
+	ResolveAccount(accountNumber, bankCode string) (*ResolvedAccount, error)
+}
+
+// virtualAccountProvider is the permanent-account half of the Flutterwave
+// client. Both methods return the provider's confirmed account details, or an
+// error that distinguishes a refusal/no-account answer from a failure that says
+// nothing about whether an account exists.
+type virtualAccountProvider interface {
+	CreatePermanentVirtualAccount(req CreateVirtualAccountRequest) (*VirtualAccountDetails, error)
+	GetPermanentVirtualAccount(orderRef string) (*VirtualAccountDetails, error)
+}
+
+// bankDirectory is the bank-list half of the Flutterwave client. Verification
+// needs it to turn a stored bank code into the name the provider uses for that
+// code, which is the only way to check a bank name against its code - resolving
+// an account tells us the holder, never the bank.
+type bankDirectory interface {
+	ListBanks(country string) ([]Bank, error)
+}
+
+// bankLookupStore is the persistence the bank fan-out needs: a cache of which
+// banks have answered for a number, plus the negative rows that stop a number
+// resolving nowhere from being swept again on every attempt.
+type bankLookupStore interface {
+	Find(ctx context.Context, accountNumber string) ([]repository.BankLookup, error)
+	HasAny(ctx context.Context, accountNumber string) (bool, error)
+	FindOne(ctx context.Context, accountNumber, bankCode string) (*repository.BankLookup, error)
+	SaveMatches(ctx context.Context, accountNumber string, matches []repository.BankLookup) error
+	SaveMiss(ctx context.Context, accountNumber string) error
+}
+
+// walletStore is everything this service asks of the wallet repository.
+//
+// It is an interface rather than the repository itself so the money paths can be
+// exercised without a database. A withdrawal is read, verified, and only then
+// begun - and that order is the whole reason a payout with details that do not
+// match never reserves funds, which is not something a test can assert while the
+// repository is a struct bound to a live connection.
+type walletStore interface {
+	GetWallet(ctx context.Context, farmerID int) (*models.Wallet, error)
+	EnsureWallet(ctx context.Context, farmerID int) (*models.Wallet, error)
+	GetStatus(ctx context.Context, farmerID int) (*models.WalletStatus, error)
+	DepositProvider(ctx context.Context, reference string) (string, error)
+	CreateDeposit(ctx context.Context, farmerID int, provider, reference, amount string) error
+	CompleteDeposit(ctx context.Context, reference, transactionID, amount, currency string) (bool, error)
+	FailDeposit(ctx context.Context, reference string) error
+	ListDeposits(ctx context.Context, farmerID int) ([]models.WalletDeposit, error)
+	ListPendingDepositsOlderThan(ctx context.Context, cutoff time.Time) ([]models.PendingDeposit, error)
+	ExpireDeposit(ctx context.Context, reference string) error
+	StalePendingDeposits(ctx context.Context, olderThan time.Duration, limit int) ([]models.WalletDeposit, error)
+
+	GetVirtualAccount(ctx context.Context, farmerID int) (*models.WalletVirtualAccount, error)
+	GetVirtualAccountByTxRef(ctx context.Context, txRef string) (*models.WalletVirtualAccount, error)
+	EnsureVirtualAccountAttempt(ctx context.Context, farmerID int, provider, txRef, identityKind, consentVersion string, now time.Time) (*models.WalletVirtualAccount, bool, error)
+	ResetVirtualAccountAttempt(ctx context.Context, farmerID int, identityKind, consentVersion string, now time.Time) error
+	ActivateVirtualAccount(ctx context.Context, farmerID int, orderRef, providerRef, accountNumber, bankName, accountName, currency string, now time.Time) error
+	FailVirtualAccountAttempt(ctx context.Context, farmerID int, reason string, now time.Time) error
+	MarkVirtualAccountChecked(ctx context.Context, farmerID int, now time.Time) error
+	ListVirtualAccountsForReconciliation(ctx context.Context, limit int) ([]models.WalletVirtualAccount, error)
+	ListPendingVirtualAccountDeposits(ctx context.Context, limit int) ([]models.PendingVirtualAccountTransfer, error)
+	RecordPendingVirtualAccountDeposit(ctx context.Context, farmerID int, reference, providerTxnID, amount, currency string) error
+	CreditVirtualAccountDeposit(ctx context.Context, farmerID int, reference, providerTxnID, amount, currency string) (bool, error)
+	FailVirtualAccountDeposit(ctx context.Context, providerTxnID, status string, now time.Time) error
+	ReverseVirtualAccountDeposit(ctx context.Context, providerTxnID, amount, currency string, now time.Time) (bool, error)
+
+	CreateWithdrawal(ctx context.Context, farmerID int, reference, amount string) error
+	ListFarmerWithdrawals(ctx context.Context, farmerID int) ([]models.Withdrawal, error)
+	ListWithdrawals(ctx context.Context, pendingOnly bool) ([]models.Withdrawal, error)
+	GetWithdrawal(ctx context.Context, withdrawalID int64) (*models.Withdrawal, error)
+	BeginWithdrawal(ctx context.Context, withdrawalID int64, adminID int) (*models.Withdrawal, error)
+	RejectWithdrawal(ctx context.Context, withdrawalID int64, adminID int) error
+	CancelWithdrawal(ctx context.Context, withdrawalID int64, farmerID int) error
+	ExpireStaleWithdrawals(ctx context.Context, cutoff time.Time) ([]models.Withdrawal, error)
+	ClaimWithdrawalReminder(ctx context.Context, withdrawalID int64, cutoff time.Time) (bool, error)
+	SetTransferID(ctx context.Context, reference, transferID string) error
+	CompleteTransfer(ctx context.Context, reference, transferID, status string, amount int64, currency string) (bool, error)
+	GetWithdrawalByReference(ctx context.Context, reference string) (*models.Withdrawal, error)
+	RecordWithdrawalVerification(ctx context.Context, reference, status, resolvedName, detail string) error
+	RevertWithdrawalToPending(ctx context.Context, reference string) error
+
+	CreateTransfer(ctx context.Context, senderID, recipientID int, reference, amount, note string) error
+	ListFarmerTransfers(ctx context.Context, farmerID int) ([]models.Transfer, error)
+	ListPendingTransfers(ctx context.Context) ([]models.Transfer, error)
+	ApproveTransfer(ctx context.Context, transferID int64, adminID int) (*models.Transfer, error)
+	RejectTransfer(ctx context.Context, transferID int64, adminID int) (*models.Transfer, error)
+	CancelTransfer(ctx context.Context, transferID int64, senderID int) error
+	ExpireStaleTransfers(ctx context.Context, cutoff time.Time) ([]models.Transfer, error)
+	ClaimTransferReminder(ctx context.Context, transferID int64, cutoff time.Time) (bool, error)
+
+	ListTransactions(ctx context.Context, farmerID int) ([]models.WalletTransaction, error)
+	ListAdminIDs(ctx context.Context) ([]int, error)
+	ListAdminAccounts(ctx context.Context) ([]models.AdminAccount, error)
+	SetAdmin(ctx context.Context, farmerID int, admin bool) (bool, error)
+	PayForOrder(ctx context.Context, buyerID, cropID int, quantity float64, commissionBasisPoints int64) (int64, error)
+	PlatformRevenueTotal(ctx context.Context) (string, int, error)
+}
+
+// farmerStore is the account half of the farmer repository: reading where a
+// payout would go, and writing the details a farmer saves. Narrow for the same
+// reason as walletStore - a withdrawal requested against details that do not
+// match must not reach the repository at all, and that is only provable with a
+// stand-in for the repository.
+type farmerStore interface {
+	GetByID(id int) (*models.Farmer, error)
+	GetByPhone(phone string) (*models.Farmer, error)
+	UpdateBankDetails(id int, bankName, bankCode, accountName, accountNumber string) error
 }
 
 // ParseStaleDepositAfter converts WALLET_STALE_DEPOSIT_HOURS into the age at
@@ -195,6 +514,16 @@ func (s *WalletService) Wallet(ctx context.Context, farmerID int) (*models.Walle
 		return nil, nil, err
 	}
 	return wallet, transactions, nil
+}
+
+// Status returns the committed wallet snapshot used for lightweight refreshes.
+// Unlike Wallet it never creates a missing wallet: a status check must not
+// change state, and the page that polls it has already loaded the wallet.
+func (s *WalletService) Status(ctx context.Context, farmerID int) (*models.WalletStatus, error) {
+	if farmerID <= 0 {
+		return nil, repository.ErrWalletNotFound
+	}
+	return s.repo.GetStatus(ctx, farmerID)
 }
 
 // RepairWallet rebuilds a user's wallet if their account has none. Admin only.
@@ -411,16 +740,502 @@ func (s *WalletService) confirmDeposit(ctx context.Context, reference, transacti
 		return false, errors.New("wallet deposits must be paid in NGN")
 	}
 	if transactionID == "" {
-		return errors.New("invalid wallet deposit verification")
+		return false, errors.New("invalid wallet deposit verification")
 	}
 	// The recorded provider is authoritative, not the reference's shape: a
 	// reference that belongs to no wallet funding attempt must never be credited.
 	if _, err := s.repo.DepositProvider(ctx, reference); errors.Is(err, repository.ErrWalletNotFound) {
-		return errors.New("invalid wallet deposit verification")
+		return false, errors.New("invalid wallet deposit verification")
 	} else if err != nil {
-		return fmt.Errorf("%w: read deposit provider: %v", ErrWalletUnavailable, err)
+		return false, fmt.Errorf("%w: read deposit provider: %v", ErrWalletUnavailable, err)
 	}
 	return s.repo.CompleteDeposit(ctx, reference, transactionID, verifiedAmount, currency)
+}
+
+// --- permanent virtual accounts --------------------------------------------
+//
+// A farmer's permanent account is opened once and then receives ordinary bank
+// transfers. Its tx_ref identifies the account, not a payment, so incoming
+// transfers are keyed on the provider's transaction id instead. That split is
+// what keeps a permanent account from turning every transfer into a duplicate
+// of the one before it.
+
+const (
+	// VirtualAccountConsentVersion names the exact consent text a farmer agreed
+	// to. Storing it means a later change to the wording can be told apart from
+	// consent collected under this one.
+	VirtualAccountConsentVersion = "2026-10-v1"
+
+	// virtualAccountRetryAfter is how long a setup with no provider answer is
+	// left alone before a retry asks the provider again. It is long enough for a
+	// slow provider call to finish and short enough to be useful.
+	virtualAccountRetryAfter = 2 * time.Minute
+
+	// virtualAccountReconcileBatch bounds one reconciliation pass. Accounts are
+	// rotated by last_checked_at, so a larger number of farmers is reached over
+	// successive passes rather than in one burst.
+	virtualAccountReconcileBatch = 25
+)
+
+var (
+	// ErrVirtualAccountConsentRequired is returned before any identity
+	// information is sent: the farmer has to agree to the share explicitly.
+	ErrVirtualAccountConsentRequired = errors.New("tick the consent box before your identity information is shared with Flutterwave")
+
+	// ErrVirtualAccountIdentityInvalid covers anything that is not an
+	// 11-digit BVN or NIN. The number itself is never echoed back.
+	ErrVirtualAccountIdentityInvalid = errors.New("enter a valid 11-digit BVN or NIN")
+
+	ErrVirtualAccountEmailRequired = errors.New("add an email address to your profile before creating a funding account")
+	ErrVirtualAccountNameRequired  = errors.New("add your full name to your profile before creating a funding account")
+
+	// ErrVirtualAccountRejected means Flutterwave refused the request outright.
+	// The provider's own diagnostic is logged, not shown, so a raw response body
+	// cannot reach the page.
+	ErrVirtualAccountRejected = errors.New("Flutterwave could not open a funding account with those details. Check your BVN or NIN and try again")
+
+	// ErrVirtualAccountPending means the provider has not confirmed whether an
+	// account exists. Retrying is safe because the same tx_ref is reused.
+	ErrVirtualAccountPending = errors.New("your funding account is still being set up")
+
+	// ErrVirtualAccountUnavailable means the account could not be saved, or the
+	// provider did not permit the request. It is deliberately vague: whether a
+	// merchant key is wrong or static accounts are not enabled is not something a
+	// farmer can act on, and saying "check your BVN" would blame the wrong party.
+	ErrVirtualAccountUnavailable = errors.New("funding accounts are temporarily unavailable. Your existing wallet still works; please try again later")
+)
+
+// VirtualAccountSetup is the browser-supplied half of the setup request. Names,
+// email and phone are never taken from it; they come from the authenticated
+// farmer, so a session cannot open an account in somebody else's name.
+type VirtualAccountSetup struct {
+	IdentityKind   string
+	IdentityNumber string
+	Consent        bool
+}
+
+func isWalletAccountNumber(number string) bool {
+	if len(number) != 10 {
+		return false
+	}
+	for _, digit := range number {
+		if digit < '0' || digit > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func validVirtualAccountEmail(email string) bool {
+	email = strings.TrimSpace(email)
+	if email == "" || len(email) > 254 || strings.ContainsAny(email, " \t\r\n") {
+		return false
+	}
+	at := strings.LastIndex(email, "@")
+	if at <= 0 || at == len(email)-1 {
+		return false
+	}
+	return strings.Contains(email[at+1:], ".")
+}
+
+func normalizeVirtualAccountIdentity(kind, number string) (string, string, error) {
+	kind = strings.ToLower(strings.TrimSpace(kind))
+	if kind != "bvn" && kind != "nin" {
+		return "", "", ErrVirtualAccountIdentityInvalid
+	}
+	number = strings.ReplaceAll(strings.TrimSpace(number), " ", "")
+	if len(number) != 11 {
+		return "", "", ErrVirtualAccountIdentityInvalid
+	}
+	for _, digit := range number {
+		if digit < '0' || digit > '9' {
+			return "", "", ErrVirtualAccountIdentityInvalid
+		}
+	}
+	return kind, number, nil
+}
+
+func splitFarmerName(fullName string) (first, last string) {
+	fields := strings.Fields(fullName)
+	if len(fields) == 0 {
+		return "", ""
+	}
+	if len(fields) == 1 {
+		return fields[0], ""
+	}
+	return fields[0], strings.Join(fields[1:], " ")
+}
+
+// verifiedAmountKobo converts a provider amount to integer kobo, rejecting
+// anything that is not an exact number of kobo. Once this returns, every amount
+// decision is integer arithmetic.
+func verifiedAmountKobo(amount float64) (int64, error) {
+	if math.IsNaN(amount) || math.IsInf(amount, 0) || amount <= 0 {
+		return 0, errors.New("invalid verified deposit amount")
+	}
+	cents := amount * 100
+	rounded := math.Round(cents)
+	if math.Abs(cents-rounded) > 0.000001 {
+		return 0, errors.New("verified deposit amount has unsupported precision")
+	}
+	if rounded > math.MaxInt64 {
+		return 0, errors.New("verified deposit amount is too large")
+	}
+	return int64(rounded), nil
+}
+
+func koboAmount(kobo int64) string {
+	return fmt.Sprintf("%d.%02d", kobo/100, kobo%100)
+}
+
+// VirtualAccount returns the farmer's permanent funding account, or nil when
+// none has been created. A missing row is an ordinary state, not a failure.
+func (s *WalletService) VirtualAccount(ctx context.Context, farmerID int) (*models.WalletVirtualAccount, error) {
+	account, err := s.repo.GetVirtualAccount(ctx, farmerID)
+	if errors.Is(err, repository.ErrVirtualAccountNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return account, nil
+}
+
+func (s *WalletService) activateVirtualAccount(ctx context.Context, farmerID int, details *VirtualAccountDetails, now time.Time) error {
+	if details == nil {
+		return fmt.Errorf("%w: provider returned no account details", ErrVirtualAccountPending)
+	}
+	accountNumber := strings.TrimSpace(details.AccountNumber)
+	if !isWalletAccountNumber(accountNumber) {
+		return fmt.Errorf("%w: provider returned an unusable account number", ErrVirtualAccountPending)
+	}
+	currency := strings.ToUpper(strings.TrimSpace(details.Currency))
+	if currency == "" {
+		currency = "NGN"
+	}
+	if currency != "NGN" {
+		return errors.New("virtual accounts must be funded in NGN")
+	}
+	if err := s.repo.ActivateVirtualAccount(ctx, farmerID, details.OrderRef, details.ProviderRef,
+		accountNumber, details.BankName, details.AccountName, currency, now); err != nil {
+		return fmt.Errorf("%w: %v", ErrVirtualAccountUnavailable, err)
+	}
+	return nil
+}
+
+// SetupVirtualAccount opens the farmer's permanent NGN account, or returns the
+// one already open.
+//
+// The identity document is passed straight to Flutterwave and is not stored,
+// logged or echoed. A nil error with a pending account is an honest "not
+// confirmed yet": the provider may still have created it, and a retry looks it
+// up by the same reference before creating anything else.
+func (s *WalletService) SetupVirtualAccount(ctx context.Context, farmer *models.Farmer, setup VirtualAccountSetup) (*models.WalletVirtualAccount, error) {
+	if farmer == nil || farmer.ID <= 0 {
+		return nil, errors.New("invalid wallet owner")
+	}
+	if !setup.Consent {
+		return nil, ErrVirtualAccountConsentRequired
+	}
+	identityKind, identityNumber, err := normalizeVirtualAccountIdentity(setup.IdentityKind, setup.IdentityNumber)
+	if err != nil {
+		return nil, err
+	}
+	if !validVirtualAccountEmail(farmer.Email) {
+		return nil, ErrVirtualAccountEmailRequired
+	}
+	first, last := splitFarmerName(farmer.FullName)
+	if first == "" {
+		return nil, ErrVirtualAccountNameRequired
+	}
+
+	now := time.Now()
+	txRef := fmt.Sprintf("AGRO-VA-%d", farmer.ID)
+	account, created, err := s.repo.EnsureVirtualAccountAttempt(ctx, farmer.ID,
+		models.ProviderFlutterwave, txRef, identityKind, VirtualAccountConsentVersion, now)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrVirtualAccountUnavailable, err)
+	}
+	if account.Ready() {
+		return account, nil
+	}
+	// A concurrent or very recent attempt may still be in flight. Not calling
+	// the provider again is what prevents two accounts being opened.
+	if !created && account.Status == models.VirtualAccountPending &&
+		now.Sub(account.UpdatedAt) < virtualAccountRetryAfter {
+		return account, nil
+	}
+
+	lookupRef := strings.TrimSpace(account.OrderRef)
+	if lookupRef == "" {
+		lookupRef = strings.TrimSpace(account.TxRef)
+	}
+	// A row this call just inserted has no earlier attempt behind it, so there is
+	// nothing to look up. A failed row is also final evidence that no account was
+	// created, so a retry may create directly. For every other row, ask the
+	// provider whether an earlier attempt already opened the account before
+	// creating a second one.
+	lookupable := !created && account.Status != models.VirtualAccountFailed
+	if lookupable && lookupRef != "" {
+		existing, lookupErr := s.virtualAccounts.GetPermanentVirtualAccount(lookupRef)
+		switch {
+		case lookupErr == nil && existing != nil:
+			// An earlier attempt did open the account; adopt it instead of
+			// asking for a second one.
+			if err := s.activateVirtualAccount(ctx, farmer.ID, existing, now); err != nil {
+				return nil, err
+			}
+			return s.repo.GetVirtualAccount(ctx, farmer.ID)
+		case errors.Is(lookupErr, ErrVirtualAccountNotFound):
+			// The provider has no account for this reference. Creating with the
+			// same reference is safe.
+		default:
+			// We could not ask. Do not create another account on an unanswered
+			// question; the farmer can retry shortly.
+			log.Printf("look up virtual account for user %d: %v", farmer.ID, lookupErr)
+			return account, nil
+		}
+	}
+
+	if err := s.repo.ResetVirtualAccountAttempt(ctx, farmer.ID, identityKind, VirtualAccountConsentVersion, now); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrVirtualAccountUnavailable, err)
+	}
+
+	details, err := s.virtualAccounts.CreatePermanentVirtualAccount(CreateVirtualAccountRequest{
+		Email:          farmer.Email,
+		TxRef:          txRef,
+		Phone:          farmer.Phone,
+		FirstName:      first,
+		LastName:       last,
+		Narration:      "Agro-Shield wallet funding",
+		IdentityKind:   identityKind,
+		IdentityNumber: identityNumber,
+	})
+	if err != nil {
+		if errors.Is(err, ErrVirtualAccountAccessDenied) {
+			// Credentials or merchant permissions, not the farmer's details. Do not
+			// tell them to check a BVN that the provider never evaluated.
+			log.Printf("create virtual account for user %d not permitted: %v", farmer.ID, err)
+			_ = s.repo.FailVirtualAccountAttempt(ctx, farmer.ID, "Flutterwave did not permit the account request", now)
+			return nil, ErrVirtualAccountUnavailable
+		}
+		if errors.Is(err, ErrVirtualAccountRefused) {
+			// A refusal proves no account was opened, so the row can leave the
+			// pending state and a later attempt can try again.
+			log.Printf("create virtual account for user %d refused: %v", farmer.ID, err)
+			_ = s.repo.FailVirtualAccountAttempt(ctx, farmer.ID, "Flutterwave refused the account request", now)
+			return nil, ErrVirtualAccountRejected
+		}
+		// An unreadable or unanswered call may still have opened an account. Keep
+		// the attempt pending; the next retry asks before creating.
+		log.Printf("create virtual account for user %d: %v", farmer.ID, err)
+		return s.repo.GetVirtualAccount(ctx, farmer.ID)
+	}
+	if details == nil || !isWalletAccountNumber(strings.TrimSpace(details.AccountNumber)) {
+		log.Printf("create virtual account for user %d returned incomplete details", farmer.ID)
+		return s.repo.GetVirtualAccount(ctx, farmer.ID)
+	}
+	if err := s.activateVirtualAccount(ctx, farmer.ID, details, now); err != nil {
+		return nil, err
+	}
+	return s.repo.GetVirtualAccount(ctx, farmer.ID)
+}
+
+// RefreshVirtualAccountStatus asks the provider about an account this server has
+// not confirmed. It never creates one and never treats an unanswered question as
+// evidence of absence.
+func (s *WalletService) RefreshVirtualAccountStatus(ctx context.Context, farmerID int) (*models.WalletVirtualAccount, error) {
+	account, err := s.repo.GetVirtualAccount(ctx, farmerID)
+	if errors.Is(err, repository.ErrVirtualAccountNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if account.Ready() {
+		return account, nil
+	}
+	lookupRef := strings.TrimSpace(account.OrderRef)
+	if lookupRef == "" {
+		lookupRef = strings.TrimSpace(account.TxRef)
+	}
+	if lookupRef == "" {
+		return account, nil
+	}
+	now := time.Now()
+	details, lookupErr := s.virtualAccounts.GetPermanentVirtualAccount(lookupRef)
+	if errors.Is(lookupErr, ErrVirtualAccountNotFound) {
+		_ = s.repo.MarkVirtualAccountChecked(ctx, farmerID, now)
+		return account, nil
+	}
+	if lookupErr != nil {
+		log.Printf("refresh virtual account for user %d: %v", farmerID, lookupErr)
+		return account, nil
+	}
+	if err := s.activateVirtualAccount(ctx, farmerID, details, now); err != nil {
+		return nil, err
+	}
+	return s.repo.GetVirtualAccount(ctx, farmerID)
+}
+
+// IsVirtualAccountTransfer reports whether a verified tx_ref belongs to a
+// permanent funding account. The answer comes from stored data, never from the
+// shape of the reference.
+func (s *WalletService) IsVirtualAccountTransfer(ctx context.Context, txRef string) (bool, error) {
+	txRef = strings.TrimSpace(txRef)
+	if txRef == "" {
+		return false, nil
+	}
+	_, err := s.repo.GetVirtualAccountByTxRef(ctx, txRef)
+	if errors.Is(err, repository.ErrVirtualAccountNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// SettleVirtualAccountTransfer credits or records one verified incoming bank
+// transfer. The webhook supplies the claimed reference; the verified transaction
+// supplies the amount, currency, status and transaction id. Only a successful
+// verification ever moves money.
+//
+// The bool reports whether the provider's answer is terminal. A pending answer
+// is deliberately not terminal: the provider will be asked again.
+func (s *WalletService) SettleVirtualAccountTransfer(ctx context.Context, verified *VerifiedTransaction, webhookTxRef string) (bool, error) {
+	if verified == nil {
+		return false, errors.New("missing verified virtual account transfer")
+	}
+	webhookTxRef = strings.TrimSpace(webhookTxRef)
+	if webhookTxRef == "" || webhookTxRef != verified.TxRef {
+		return false, ErrReferenceMismatch
+	}
+	account, err := s.repo.GetVirtualAccountByTxRef(ctx, verified.TxRef)
+	if errors.Is(err, repository.ErrVirtualAccountNotFound) {
+		return false, errors.New("verified transfer does not belong to a funding account")
+	}
+	if err != nil {
+		return false, err
+	}
+	if account.Status != models.VirtualAccountActive || account.AccountNumber == "" {
+		return false, errors.New("funding account is not active")
+	}
+	currency := strings.ToUpper(strings.TrimSpace(verified.Currency))
+	if currency != "NGN" {
+		return false, errors.New("wallet deposits must be paid in NGN")
+	}
+	amountKobo, err := verifiedAmountKobo(verified.Amount)
+	if err != nil {
+		return false, err
+	}
+	amount := koboAmount(amountKobo)
+	reference := fmt.Sprintf("VA-%d-%s", account.FarmerID, verified.TransactionID)
+	status := strings.ToLower(strings.TrimSpace(verified.Status))
+
+	switch status {
+	case "successful", "success":
+		credited, err := s.repo.CreditVirtualAccountDeposit(ctx, account.FarmerID, reference,
+			verified.TransactionID, amount, currency)
+		if err != nil {
+			return false, err
+		}
+		if credited {
+			s.notifyUser(account.FarmerID, "Wallet funded",
+				fmt.Sprintf("₦%s was added to your wallet from a bank transfer.", amount),
+				"wallet_deposit_successful")
+		}
+		return true, nil
+	case "pending", "processing", "new", "incomplete":
+		if err := s.repo.RecordPendingVirtualAccountDeposit(ctx, account.FarmerID, reference,
+			verified.TransactionID, amount, currency); err != nil {
+			return false, err
+		}
+		return false, nil
+	case "failed", "cancelled", "canceled":
+		if err := s.repo.FailVirtualAccountDeposit(ctx, verified.TransactionID, models.DepositFailed, time.Now()); err != nil {
+			return false, err
+		}
+		return true, nil
+	case "reversed", "refunded":
+		reversed, err := s.repo.ReverseVirtualAccountDeposit(ctx, verified.TransactionID, amount, currency, time.Now())
+		if errors.Is(err, repository.ErrDepositReversalUnfunded) {
+			// The money has already left the wallet. Forcing the debit would break
+			// the non-negative balance guarantee, so the deposit stays as it is and
+			// an operator has to reconcile it.
+			log.Printf("virtual account transfer %s reversed but wallet %d cannot cover it",
+				verified.TransactionID, account.FarmerID)
+			return true, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		if reversed {
+			s.notifyUser(account.FarmerID, "Deposit reversed",
+				fmt.Sprintf("₦%s added from a bank transfer was reversed. Your wallet balance has been adjusted.", amount),
+				"wallet_deposit_reversed")
+		}
+		return true, nil
+	default:
+		// Unknown provider states are left for the next delivery or the
+		// reconciliation pass; guessing could credit a payment that later fails.
+		return false, nil
+	}
+}
+
+// ReconcileVirtualAccountTransfers is the backstop for transfers whose webhook
+// never arrived. It first re-checks transfers the provider already reported but
+// did not settle, then rotates through active accounts and asks for the latest
+// transaction on each permanent reference.
+//
+// The second half is deliberately best-effort: the provider's reference lookup
+// answers with a transaction, not a list, so a transfer older than the latest
+// one can only be recovered from its own webhook or transaction id. Nothing here
+// ever expires an account or moves money that was not verified successful, and
+// the credit path is idempotent by provider transaction id.
+func (s *WalletService) ReconcileVirtualAccountTransfers(ctx context.Context) error {
+	pending, err := s.repo.ListPendingVirtualAccountDeposits(ctx, virtualAccountReconcileBatch)
+	if err != nil {
+		return fmt.Errorf("list pending virtual account transfers: %w", err)
+	}
+	for _, transfer := range pending {
+		verified, err := s.flutter.VerifyTransaction(transfer.ProviderTransactionID)
+		if err != nil {
+			log.Printf("verify pending virtual account transfer %s: %v", transfer.ProviderTransactionID, err)
+			continue
+		}
+		if _, err := s.SettleVirtualAccountTransfer(ctx, verified, verified.TxRef); err != nil {
+			log.Printf("settle pending virtual account transfer %s: %v", transfer.ProviderTransactionID, err)
+		}
+	}
+
+	accounts, err := s.repo.ListVirtualAccountsForReconciliation(ctx, virtualAccountReconcileBatch)
+	if err != nil {
+		return fmt.Errorf("list virtual accounts for reconciliation: %w", err)
+	}
+	for _, account := range accounts {
+		verified, err := s.flutter.VerifyTransactionByReference(account.TxRef)
+		if err != nil {
+			if !errors.Is(err, ErrTransactionNotFound) {
+				log.Printf("verify virtual account %d: %v", account.FarmerID, err)
+			}
+			if markErr := s.repo.MarkVirtualAccountChecked(ctx, account.FarmerID, time.Now()); markErr != nil {
+				log.Printf("mark virtual account %d checked: %v", account.FarmerID, markErr)
+			}
+			continue
+		}
+		if verified.TxRef != account.TxRef {
+			log.Printf("virtual account %d verified against reference %s; skipping", account.FarmerID, verified.TxRef)
+			continue
+		}
+		if _, err := s.SettleVirtualAccountTransfer(ctx, verified, verified.TxRef); err != nil {
+			log.Printf("settle virtual account %d: %v", account.FarmerID, err)
+		}
+		if err := s.repo.MarkVirtualAccountChecked(ctx, account.FarmerID, time.Now()); err != nil {
+			log.Printf("mark virtual account %d checked: %v", account.FarmerID, err)
+		}
+	}
+	return nil
 }
 
 // --- pending requests -------------------------------------------------------
@@ -666,6 +1481,9 @@ func (s *WalletService) reconciliationPass(ctx context.Context) {
 	}
 	if err := s.ReconcilePendingDeposits(ctx); err != nil {
 		log.Printf("reconcile pending deposits: %v", err)
+	}
+	if err := s.ReconcileVirtualAccountTransfers(ctx); err != nil {
+		log.Printf("reconcile virtual account transfers: %v", err)
 	}
 	if _, err := s.ExpireStaleRequests(ctx); err != nil {
 		log.Printf("expire stale wallet requests: %v", err)

@@ -89,6 +89,7 @@ func deleteTestUser(t *testing.T, db *sql.DB, farmerID int) {
 	for _, stmt := range []string{
 		`DELETE FROM wallet_transactions WHERE wallet_id IN (SELECT id FROM wallets WHERE farmer_id = $1)`,
 		`DELETE FROM wallet_deposits     WHERE wallet_id IN (SELECT id FROM wallets WHERE farmer_id = $1)`,
+		`DELETE FROM wallet_virtual_accounts WHERE farmer_id = $1`,
 		`DELETE FROM wallet_withdrawals  WHERE farmer_id = $1`,
 		`DELETE FROM wallet_transfers    WHERE sender_id = $1 OR recipient_id = $1`,
 		`DELETE FROM wallets             WHERE farmer_id = $1`,
@@ -118,7 +119,7 @@ func fundWallet(t *testing.T, db *sql.DB, farmerID int, amount string) string {
 	if err := repo.CreateDeposit(ctx, farmerID, models.ProviderFlutterwave, reference, amount); err != nil {
 		t.Fatalf("create deposit: %v", err)
 	}
-	if err := repo.CompleteDeposit(ctx, reference, "TX-"+reference, amount, "NGN"); err != nil {
+	if _, err := repo.CompleteDeposit(ctx, reference, "TX-"+reference, amount, "NGN"); err != nil {
 		t.Fatalf("complete deposit: %v", err)
 	}
 	return reference
@@ -290,10 +291,10 @@ func TestCompleteDepositCreditsExactlyOnce(t *testing.T) {
 	if err := repo.CreateDeposit(ctx, farmer.ID, models.ProviderFlutterwave, reference, "5000.00"); err != nil {
 		t.Fatalf("create deposit: %v", err)
 	}
-	if err := repo.CompleteDeposit(ctx, reference, "TX-1", "5000.00", "NGN"); err != nil {
+	if _, err := repo.CompleteDeposit(ctx, reference, "TX-1", "5000.00", "NGN"); err != nil {
 		t.Fatalf("complete deposit: %v", err)
 	}
-	if err := repo.CompleteDeposit(ctx, reference, "TX-1", "5000.00", "NGN"); err != nil {
+	if _, err := repo.CompleteDeposit(ctx, reference, "TX-1", "5000.00", "NGN"); err != nil {
 		t.Fatalf("replayed completion must be a no-op, got %v", err)
 	}
 
@@ -331,7 +332,7 @@ func TestConcurrentCompleteDepositCreditsOnce(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			<-start
-			errs[i] = repo.CompleteDeposit(ctx, reference, "TX-RACE", "2500.00", "NGN")
+			_, errs[i] = repo.CompleteDeposit(ctx, reference, "TX-RACE", "2500.00", "NGN")
 		}(i)
 	}
 	close(start)
@@ -374,7 +375,7 @@ func TestCompleteDepositRejectsMismatchedAmountOrCurrency(t *testing.T) {
 			if err := repo.CreateDeposit(ctx, farmer.ID, models.ProviderFlutterwave, reference, "5000.00"); err != nil {
 				t.Fatalf("create deposit: %v", err)
 			}
-			if err := repo.CompleteDeposit(ctx, reference, "TX-MISMATCH", tc.verified, tc.currency); err == nil {
+			if _, err := repo.CompleteDeposit(ctx, reference, "TX-MISMATCH", tc.verified, tc.currency); err == nil {
 				t.Fatal("mismatched deposit completion succeeded, want an error")
 			}
 
@@ -416,7 +417,7 @@ func TestCompleteDepositRollsBackWhenLedgerWriteFails(t *testing.T) {
 		t.Fatalf("pre-claim ledger reference: %v", err)
 	}
 
-	if err := repo.CompleteDeposit(ctx, reference, "TX-ROLLBACK", "5000.00", "NGN"); err == nil {
+	if _, err := repo.CompleteDeposit(ctx, reference, "TX-ROLLBACK", "5000.00", "NGN"); err == nil {
 		t.Fatal("completion succeeded despite a conflicting ledger row, want an error")
 	}
 
@@ -577,5 +578,281 @@ func TestDepositRecordsProviderAndScopesTransactionIDUniqueness(t *testing.T) {
 		`UPDATE wallet_deposits SET provider_transaction_id = 'SHARED-ID' WHERE reference = $1`, third,
 	); err == nil {
 		t.Error("a provider transaction id reused within one provider was accepted, want a unique violation")
+	}
+}
+
+// --- permanent virtual accounts -------------------------------------------
+
+// A farmer can only ever have one virtual-account row, even when two setup
+// attempts race or the browser retries. The row keeps the reference the first
+// attempt chose, because that is the reference incoming transfers carry.
+func TestVirtualAccountAttemptIsUniquePerFarmer(t *testing.T) {
+	db := testDB(t)
+	farmer := createTestUser(t, db)
+	repo := NewWalletRepository(db)
+	ctx := context.Background()
+	now := time.Now()
+
+	first, created, err := repo.EnsureVirtualAccountAttempt(ctx, farmer.ID,
+		models.ProviderFlutterwave, fmt.Sprintf("AGRO-VA-%d", farmer.ID), "bvn", "v1", now)
+	if err != nil {
+		t.Fatalf("first attempt: %v", err)
+	}
+	if !created || first.Status != models.VirtualAccountPending {
+		t.Fatalf("first attempt = %+v created=%v, want a new pending row", first, created)
+	}
+
+	second, created, err := repo.EnsureVirtualAccountAttempt(ctx, farmer.ID,
+		models.ProviderFlutterwave, "AGRO-VA-DIFFERENT", "nin", "v2", now.Add(time.Minute))
+	if err != nil {
+		t.Fatalf("second attempt: %v", err)
+	}
+	if created {
+		t.Fatal("a second row was created for the same farmer")
+	}
+	if second.ID != first.ID || second.TxRef != first.TxRef {
+		t.Fatalf("second attempt = %+v, want the original row and reference", second)
+	}
+
+	if err := repo.ActivateVirtualAccount(ctx, farmer.ID, "URF_VA_1", "FLW_VA_1",
+		"0123456789", "Flutterwave Bank", "TEST WALLET USER", "NGN", now); err != nil {
+		t.Fatalf("activate: %v", err)
+	}
+	active, err := repo.GetVirtualAccountByTxRef(ctx, first.TxRef)
+	if err != nil {
+		t.Fatalf("look up by tx_ref: %v", err)
+	}
+	if !active.Ready() || active.AccountNumber != "0123456789" || active.FarmerID != farmer.ID {
+		t.Fatalf("active account = %+v, want the farmer's confirmed account", active)
+	}
+
+	// A late response for a different account must not redirect the farmer's
+	// money to it.
+	if err := repo.ActivateVirtualAccount(ctx, farmer.ID, "URF_OTHER", "FLW_OTHER",
+		"0987654321", "Other Bank", "SOMEONE ELSE", "NGN", now); err == nil {
+		t.Fatal("a second, different account replaced the active one")
+	}
+}
+
+func TestVirtualAccountDatabaseConstraintsRejectInvalidAccounts(t *testing.T) {
+	db := testDB(t)
+	farmer := createTestUser(t, db)
+	repo := NewWalletRepository(db)
+	ctx := context.Background()
+	now := time.Now()
+
+	if _, _, err := repo.EnsureVirtualAccountAttempt(ctx, farmer.ID,
+		models.ProviderFlutterwave, fmt.Sprintf("AGRO-VA-%d", farmer.ID), "bvn", "v1", now); err != nil {
+		t.Fatalf("create attempt: %v", err)
+	}
+	// The schema itself refuses an active account without a usable number, so a
+	// malformed provider response cannot be persisted even if the service missed it.
+	if _, err := db.Exec(`UPDATE wallet_virtual_accounts SET status = 'active' WHERE farmer_id = $1`, farmer.ID); err == nil {
+		t.Fatal("an active account without an account number was accepted")
+	}
+	if _, err := db.Exec(`UPDATE wallet_virtual_accounts SET account_number = '12345' WHERE farmer_id = $1`, farmer.ID); err == nil {
+		t.Fatal("a short account number was accepted")
+	}
+}
+
+func TestVirtualAccountCreditIsExactAndIdempotent(t *testing.T) {
+	db := testDB(t)
+	farmer := createTestUser(t, db)
+	repo := NewWalletRepository(db)
+	ctx := context.Background()
+	txnID := fmt.Sprintf("PI-%d", farmer.ID)
+	reference := fmt.Sprintf("VA-%d-%s", farmer.ID, txnID)
+
+	credited, err := repo.CreditVirtualAccountDeposit(ctx, farmer.ID, reference, txnID, "10.10", "NGN")
+	if err != nil || !credited {
+		t.Fatalf("first credit = %v, %v; want true", credited, err)
+	}
+	if balance := walletBalanceOf(t, db, farmer.ID); balance != "10.10" {
+		t.Fatalf("balance = %q, want exactly 10.10", balance)
+	}
+
+	// The same provider transaction delivered again moves nothing.
+	credited, err = repo.CreditVirtualAccountDeposit(ctx, farmer.ID, reference, txnID, "10.10", "NGN")
+	if err != nil || credited {
+		t.Fatalf("replay = %v, %v; want no second credit", credited, err)
+	}
+	if balance := walletBalanceOf(t, db, farmer.ID); balance != "10.10" {
+		t.Fatalf("balance after replay = %q, want 10.10", balance)
+	}
+
+	// A replay claiming different money is a conflict, not a second payment.
+	if _, err := repo.CreditVirtualAccountDeposit(ctx, farmer.ID, reference, txnID, "99.99", "NGN"); err == nil {
+		t.Fatal("a replay with a different amount was accepted")
+	}
+	if balance := walletBalanceOf(t, db, farmer.ID); balance != "10.10" {
+		t.Fatalf("balance after conflicting replay = %q, want 10.10", balance)
+	}
+
+	var ledgerRows, depositRows int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM wallet_transactions
+		WHERE wallet_id = (SELECT id FROM wallets WHERE farmer_id = $1) AND type = 'deposit'`,
+		farmer.ID).Scan(&ledgerRows); err != nil {
+		t.Fatalf("count ledger rows: %v", err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM wallet_deposits
+		WHERE wallet_id = (SELECT id FROM wallets WHERE farmer_id = $1)`,
+		farmer.ID).Scan(&depositRows); err != nil {
+		t.Fatalf("count deposits: %v", err)
+	}
+	if ledgerRows != 1 || depositRows != 1 {
+		t.Fatalf("ledger rows = %d deposits = %d, want exactly one of each", ledgerRows, depositRows)
+	}
+}
+
+func TestVirtualAccountPendingTransferIsCreditedOnceWhenConfirmed(t *testing.T) {
+	db := testDB(t)
+	farmer := createTestUser(t, db)
+	repo := NewWalletRepository(db)
+	ctx := context.Background()
+	txnID := fmt.Sprintf("PI-PENDING-%d", farmer.ID)
+	reference := fmt.Sprintf("VA-%d-%s", farmer.ID, txnID)
+
+	if err := repo.RecordPendingVirtualAccountDeposit(ctx, farmer.ID, reference, txnID, "25.50", "NGN"); err != nil {
+		t.Fatalf("record pending: %v", err)
+	}
+	if balance := walletBalanceOf(t, db, farmer.ID); balance != "0.00" {
+		t.Fatalf("pending transfer credited the wallet: %q", balance)
+	}
+
+	pending, err := repo.ListPendingVirtualAccountDeposits(ctx, 100)
+	if err != nil {
+		t.Fatalf("list pending: %v", err)
+	}
+	found := false
+	for _, transfer := range pending {
+		if transfer.ProviderTransactionID == txnID {
+			found = true
+			if transfer.Amount != "25.50" || transfer.Currency != "NGN" {
+				t.Errorf("pending transfer = %+v, want 25.50 NGN", transfer)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("pending virtual-account transfer was not listed for reconciliation")
+	}
+
+	credited, err := repo.CreditVirtualAccountDeposit(ctx, farmer.ID, reference, txnID, "25.50", "NGN")
+	if err != nil || !credited {
+		t.Fatalf("confirm pending = %v, %v; want a credit", credited, err)
+	}
+	if balance := walletBalanceOf(t, db, farmer.ID); balance != "25.50" {
+		t.Fatalf("balance = %q, want 25.50", balance)
+	}
+	// Confirming again must not upgrade twice.
+	credited, err = repo.CreditVirtualAccountDeposit(ctx, farmer.ID, reference, txnID, "25.50", "NGN")
+	if err != nil || credited {
+		t.Fatalf("second confirm = %v, %v; want no second credit", credited, err)
+	}
+	if balance := walletBalanceOf(t, db, farmer.ID); balance != "25.50" {
+		t.Fatalf("balance after second confirm = %q, want 25.50", balance)
+	}
+}
+
+func TestVirtualAccountReversalDebitsOnlyWhenFunded(t *testing.T) {
+	db := testDB(t)
+	farmer := createTestUser(t, db)
+	repo := NewWalletRepository(db)
+	ctx := context.Background()
+	txnID := fmt.Sprintf("PI-REV-%d", farmer.ID)
+	reference := fmt.Sprintf("VA-%d-%s", farmer.ID, txnID)
+	now := time.Now()
+
+	if credited, err := repo.CreditVirtualAccountDeposit(ctx, farmer.ID, reference, txnID, "40.00", "NGN"); err != nil || !credited {
+		t.Fatalf("credit = %v, %v", credited, err)
+	}
+	reversed, err := repo.ReverseVirtualAccountDeposit(ctx, txnID, "40.00", "NGN", now)
+	if err != nil || !reversed {
+		t.Fatalf("reversal = %v, %v; want a debit", reversed, err)
+	}
+	if balance := walletBalanceOf(t, db, farmer.ID); balance != "0.00" {
+		t.Fatalf("balance after reversal = %q, want 0.00", balance)
+	}
+	var reversalRows int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM wallet_transactions
+		WHERE wallet_id = (SELECT id FROM wallets WHERE farmer_id = $1) AND type = 'deposit_reversal'`,
+		farmer.ID).Scan(&reversalRows); err != nil {
+		t.Fatalf("count reversal rows: %v", err)
+	}
+	if reversalRows != 1 {
+		t.Fatalf("reversal ledger rows = %d, want one", reversalRows)
+	}
+	// A repeated reversal is a no-op.
+	if reversed, err := repo.ReverseVirtualAccountDeposit(ctx, txnID, "40.00", "NGN", now); err != nil || reversed {
+		t.Fatalf("second reversal = %v, %v; want no further movement", reversed, err)
+	}
+
+	// A wallet that no longer holds the money is left alone and reported, so a
+	// failed debit cannot silently overdraw it.
+	secondTxn := fmt.Sprintf("PI-REV2-%d", farmer.ID)
+	if credited, err := repo.CreditVirtualAccountDeposit(ctx, farmer.ID,
+		fmt.Sprintf("VA-%d-%s", farmer.ID, secondTxn), secondTxn, "12.34", "NGN"); err != nil || !credited {
+		t.Fatalf("second credit = %v, %v", credited, err)
+	}
+	if _, err := db.Exec(`UPDATE wallets SET balance = 1.00 WHERE farmer_id = $1`, farmer.ID); err != nil {
+		t.Fatalf("simulate spent funds: %v", err)
+	}
+	if _, err := repo.ReverseVirtualAccountDeposit(ctx, secondTxn, "12.34", "NGN", now); !errors.Is(err, ErrDepositReversalUnfunded) {
+		t.Fatalf("unfunded reversal error = %v, want ErrDepositReversalUnfunded", err)
+	}
+	if balance := walletBalanceOf(t, db, farmer.ID); balance != "1.00" {
+		t.Fatalf("balance after refused reversal = %q, want 1.00", balance)
+	}
+	var status string
+	if err := db.QueryRow(`SELECT status FROM wallet_deposits
+		WHERE provider = 'flutterwave' AND provider_transaction_id = $1`, secondTxn).Scan(&status); err != nil {
+		t.Fatalf("read deposit status: %v", err)
+	}
+	if status != models.DepositSuccessful {
+		t.Fatalf("deposit status = %q, want successful after a refused reversal", status)
+	}
+}
+
+// Flutterwave retries deliveries, and reconciliation can run while a webhook is
+// being handled. The provider transaction id, not an application-level flag, is
+// what makes exactly one of those paths credit the wallet.
+func TestConcurrentVirtualAccountCreditMovesMoneyOnce(t *testing.T) {
+	db := testDB(t)
+	farmer := createTestUser(t, db)
+	repo := NewWalletRepository(db)
+	ctx := context.Background()
+	txnID := fmt.Sprintf("PI-RACE-%d", farmer.ID)
+	reference := fmt.Sprintf("VA-%d-%s", farmer.ID, txnID)
+
+	const workers = 8
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	errs := make([]error, workers)
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			_, errs[i] = repo.CreditVirtualAccountDeposit(ctx, farmer.ID, reference, txnID, "1234.56", "NGN")
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+
+	for i, err := range errs {
+		if err != nil {
+			t.Errorf("concurrent credit %d: %v", i, err)
+		}
+	}
+	if balance := walletBalanceOf(t, db, farmer.ID); balance != "1234.56" {
+		t.Errorf("balance after concurrent delivery = %q, want 1234.56", balance)
+	}
+	var ledgerRows int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM wallet_transactions
+		WHERE wallet_id = (SELECT id FROM wallets WHERE farmer_id = $1) AND type = 'deposit'`,
+		farmer.ID).Scan(&ledgerRows); err != nil {
+		t.Fatalf("count ledger rows: %v", err)
+	}
+	if ledgerRows != 1 {
+		t.Errorf("ledger rows = %d, want exactly one credit", ledgerRows)
 	}
 }

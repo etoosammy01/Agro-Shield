@@ -2,8 +2,10 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -14,6 +16,13 @@ type Config struct {
 	// Application
 	Port   string
 	AppEnv string
+
+	// TrustProxyHeaders must only be enabled when a trusted reverse proxy
+	// overwrites X-Forwarded-For. TrustedProxyCIDRs are the networks from which
+	// those headers are accepted; forwarded values are ignored for any other
+	// peer, so a directly reachable client cannot choose its own rate-limit key.
+	TrustProxyHeaders bool
+	TrustedProxyCIDRs []*net.IPNet
 
 	// Database
 	DatabaseURL string
@@ -105,6 +114,37 @@ func Load() (Config, error) {
 		TermiiAPIKey:   strings.TrimSpace(os.Getenv("TERMII_API_KEY")),
 		TermiiSenderID: strings.TrimSpace(os.Getenv("TERMII_SENDER_ID")),
 		TermiiBaseURL:  strings.TrimSpace(os.Getenv("TERMII_BASE_URL")),
+	}
+
+	rawTrustProxy := strings.TrimSpace(os.Getenv("TRUST_PROXY_HEADERS"))
+	rawTrustedCIDRs := strings.TrimSpace(os.Getenv("TRUSTED_PROXY_CIDRS"))
+	if rawTrustProxy != "" {
+		trust, err := strconv.ParseBool(rawTrustProxy)
+		if err != nil {
+			return Config{}, fmt.Errorf("TRUST_PROXY_HEADERS must be true or false: %w", err)
+		}
+		cfg.TrustProxyHeaders = trust
+	}
+	if cfg.TrustProxyHeaders {
+		if rawTrustedCIDRs == "" {
+			return Config{}, fmt.Errorf("TRUSTED_PROXY_CIDRS must list the proxy networks when TRUST_PROXY_HEADERS is true")
+		}
+		for _, item := range strings.Split(rawTrustedCIDRs, ",") {
+			item = strings.TrimSpace(item)
+			if item == "" {
+				continue
+			}
+			_, network, err := net.ParseCIDR(item)
+			if err != nil {
+				return Config{}, fmt.Errorf("TRUSTED_PROXY_CIDRS contains an invalid network %q: %w", item, err)
+			}
+			cfg.TrustedProxyCIDRs = append(cfg.TrustedProxyCIDRs, network)
+		}
+		if len(cfg.TrustedProxyCIDRs) == 0 {
+			return Config{}, fmt.Errorf("TRUSTED_PROXY_CIDRS must contain at least one proxy network")
+		}
+	} else if rawTrustedCIDRs != "" {
+		return Config{}, fmt.Errorf("TRUSTED_PROXY_CIDRS requires TRUST_PROXY_HEADERS=true")
 	}
 
 	// Card and bank transfer are the two funding routes we advertise; naming

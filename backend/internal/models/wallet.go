@@ -14,6 +14,19 @@ type Wallet struct {
 	UpdatedAt time.Time
 }
 
+// WalletStatus is the small read-only snapshot the wallet page polls while it is
+// open. It exists so a confirmed credit can move the on-screen balance and
+// history without the browser ever computing or crediting anything: the server
+// reports what is already committed, and the page reloads when it changes.
+type WalletStatus struct {
+	Balance             string
+	Currency            string
+	PendingDeposits     int
+	LatestTransactionID int64
+	LatestDepositID     int64
+	LatestDepositStatus string
+}
+
 type WalletTransaction struct {
 	ID        int64
 	Type      string
@@ -29,6 +42,11 @@ const ProviderFlutterwave = "flutterwave"
 
 // Funding lifecycle. A deposit is only ever credited from DepositPending, and
 // the terminal states are never processed again.
+//
+// Expired is deliberately not a synonym for failed. Failed means the payment
+// provider answered and the payment did not succeed; expired means the
+// reconciliation pass asked and the provider had no transaction for the
+// reference at all. Only that second answer may close an attempt nobody paid.
 const (
 	DepositPending    = "pending"
 	DepositProcessing = "processing"
@@ -49,18 +67,75 @@ type WalletDeposit struct {
 	CreatedAt      time.Time
 }
 
-// Deposit statuses.
+// Permanent virtual-account lifecycle.
 //
-// Expired is deliberately not a synonym for failed. Failed means the payment
-// provider answered and the payment did not succeed; expired means the
-// reconciliation pass asked and the provider had no transaction for the
-// reference at all. Only that second answer may close an attempt nobody paid.
+// A single permanent account belongs to a farmer for as long as the account
+// exists, so it is stored once and reused for every incoming bank transfer.
+// Pending means the provider has not confirmed the account yet; the farmer may
+// have an account at Flutterwave even so, which is why a retry asks the
+// provider before creating anything. Failed means the provider refused the
+// attempt outright. Active is the only state whose details are shown as usable.
 const (
-	DepositPending    = "pending"
-	DepositSuccessful = "successful"
-	DepositFailed     = "failed"
-	DepositExpired    = "expired"
+	VirtualAccountPending = "pending"
+	VirtualAccountActive  = "active"
+	VirtualAccountFailed  = "failed"
 )
+
+// WalletVirtualAccount is the farmer's permanent NGN funding account.
+//
+// The BVN or NIN used to open it is deliberately absent: it is sent to
+// Flutterwave during setup and never stored here. IdentityKind records which
+// document was used so the wallet page can describe the verification honestly,
+// and ConsentAt/ConsentVersion record that the farmer agreed to the share.
+type WalletVirtualAccount struct {
+	ID          int64
+	FarmerID    int
+	Provider    string
+	TxRef       string
+	OrderRef    string
+	ProviderRef string
+
+	AccountNumber string
+	BankName      string
+	AccountName   string
+	Currency      string
+	Status        string
+
+	IdentityKind   string
+	ConsentVersion string
+	ConsentAt      time.Time
+	FailureReason  string
+	LastCheckedAt  time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+// Ready reports whether the account can be shown as a usable funding account.
+func (a WalletVirtualAccount) Ready() bool {
+	return a.Status == VirtualAccountActive && a.AccountNumber != ""
+}
+
+// MaskedAccountNumber is safe to use where a full number would be too much
+// detail, such as a notification. The wallet page itself shows the full number
+// because the farmer needs to copy it.
+func (a WalletVirtualAccount) MaskedAccountNumber() string {
+	if len(a.AccountNumber) <= 4 {
+		return "••••"
+	}
+	return "••••••" + a.AccountNumber[len(a.AccountNumber)-4:]
+}
+
+// PendingVirtualAccountTransfer is an incoming bank transfer that Flutterwave
+// reported but has not settled. Reconciliation re-checks it by the provider's
+// own transaction id, because a static account's permanent tx_ref identifies
+// the account rather than one payment.
+type PendingVirtualAccountTransfer struct {
+	FarmerID              int
+	Reference             string
+	ProviderTransactionID string
+	Amount                string
+	Currency              string
+}
 
 // PendingDeposit is an attempt that has been waiting on the payment provider
 // longer than the reconciliation window. The admin page lists these as its

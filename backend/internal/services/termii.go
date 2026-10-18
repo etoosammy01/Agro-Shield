@@ -102,7 +102,7 @@ func (t *TermiiSender) Send(to, message string) error {
 		return fmt.Errorf("termii response exceeds %d bytes", maxTermiiResponseSize)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return fmt.Errorf("termii returned %d: %s", resp.StatusCode, string(respBody))
+		return providerHTTPError("termii", resp.StatusCode, respBody)
 	}
 
 	var parsed termiiSendResponse
@@ -112,7 +112,7 @@ func (t *TermiiSender) Send(to, message string) error {
 	// Termii can answer 200 while still rejecting the message, so the status
 	// code alone is not proof of delivery.
 	if parsed.MessageID == "" && !strings.Contains(strings.ToLower(parsed.Message), "success") {
-		return fmt.Errorf("termii rejected the message: %s", parsed.Message)
+		return fmt.Errorf("termii rejected the message: %s", safeProviderMessage(parsed.Message))
 	}
 	return nil
 }

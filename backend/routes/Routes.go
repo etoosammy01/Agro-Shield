@@ -1,12 +1,16 @@
 package routes
 
 import (
+	"fmt"
+	"html"
+	"net/http"
+	"strings"
+
 	"backend/handlers"
 	app "backend/internal"
 	"backend/internal/services"
 	"backend/middleware"
 	"backend/ussd"
-	"net/http"
 )
 
 func RegisterRoutes(container *app.Container) {
@@ -20,11 +24,20 @@ func RegisterRoutes(container *app.Container) {
 
 	http.Handle(
 		"/static/",
-		http.StripPrefix(
-			"/static/",
-			http.FileServer(http.Dir("../frontend")),
+		middleware.StaticCache(
+			middleware.NoDirectoryListing(
+				http.StripPrefix(
+					"/static/",
+					http.FileServer(http.Dir("../frontend")),
+				),
+			),
 		),
 	)
+
+	// Public crawl entry points. Only genuinely public pages are listed; no
+	// authenticated route or private listing is exposed here.
+	http.HandleFunc("/robots.txt", middleware.OnlyGet(robotsHandler))
+	http.HandleFunc("/sitemap.xml", middleware.OnlyGet(sitemapHandler))
 
 	// ========================================================
 	// HOME
@@ -565,6 +578,27 @@ func RegisterRoutes(container *app.Container) {
 	)
 
 	// --------------------------------------------------------
+	// TYPING STATE
+	//
+	// GET /chat/typing?conversation_id=123
+	// POST /chat/typing
+	//
+	// The handler checks conversation membership for both
+	// directions and only reports the name of another member.
+	// --------------------------------------------------------
+
+	http.HandleFunc(
+		"/chat/typing",
+		middleware.OnlyPath(
+			"/chat/typing",
+			middleware.RequireAuth(
+				container.FarmerRepo,
+				chatHandler.TypingHandler,
+			),
+		),
+	)
+
+	// --------------------------------------------------------
 	// SEND MESSAGE
 	//
 	// POST /chat/send
@@ -872,6 +906,12 @@ func RegisterRoutes(container *app.Container) {
 		"/wallet",
 		middleware.OnlyGet(middleware.RequireAuth(container.FarmerRepo, walletHandler.Page)),
 	))
+	// Read-only snapshot for the open wallet page. It returns committed values
+	// only, so the page can notice a confirmed credit without computing one.
+	http.HandleFunc("/wallet/status", middleware.OnlyPath(
+		"/wallet/status",
+		middleware.OnlyGet(middleware.RequireAuth(container.FarmerRepo, walletHandler.Status)),
+	))
 	http.HandleFunc("/wallet/otp/send", middleware.OnlyPath(
 		"/wallet/otp/send",
 		middleware.RequireAuth(container.FarmerRepo, walletHandler.SendOTP),
@@ -879,6 +919,17 @@ func RegisterRoutes(container *app.Container) {
 	http.HandleFunc("/wallet/deposit", middleware.OnlyPath(
 		"/wallet/deposit",
 		middleware.RequireAuth(container.FarmerRepo, walletHandler.Deposit),
+	))
+	// The permanent funding account. Setup is a POST because it carries a BVN or
+	// NIN; the check is a POST as well so a link preview or refresh cannot ask
+	// the provider anything.
+	http.HandleFunc("/wallet/virtual-account", middleware.OnlyPath(
+		"/wallet/virtual-account",
+		middleware.RequireAuth(container.FarmerRepo, walletHandler.CreateVirtualAccount),
+	))
+	http.HandleFunc("/wallet/virtual-account/check", middleware.OnlyPath(
+		"/wallet/virtual-account/check",
+		middleware.RequireAuth(container.FarmerRepo, walletHandler.CheckVirtualAccount),
 	))
 	http.HandleFunc("/wallet/withdraw", middleware.OnlyPath(
 		"/wallet/withdraw",
@@ -1008,4 +1059,75 @@ func RegisterRoutes(container *app.Container) {
 			paymentHandler.Webhook,
 		),
 	)
+}
+
+// robotsHandler advertises only public pages and points crawlers away from
+// authenticated and transactional paths. It intentionally does not disallow
+// /static/ because product images need to be fetchable by crawlers.
+func robotsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	_, _ = fmt.Fprint(w, `User-agent: *
+Allow: /
+Allow: /learning
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /profile/edit
+Disallow: /complete-profile
+Disallow: /storage
+Disallow: /marketplace
+Disallow: /market-insights
+Disallow: /product
+Disallow: /cart
+Disallow: /orders
+Disallow: /order
+Disallow: /deliveries
+Disallow: /delivery
+Disallow: /wallet
+Disallow: /wallet/
+Disallow: /chat
+Disallow: /negotiations
+Disallow: /negotiation
+Disallow: /notifications
+Disallow: /ai-assistant
+Disallow: /ai-diagnosis-history
+Disallow: /feedback
+Disallow: /sales
+Disallow: /admin/
+Disallow: /payments/
+Disallow: /webhooks/
+Disallow: /ussd
+Disallow: /locations/
+`)
+	if base, ok := publicBaseURL(r); ok {
+		_, _ = fmt.Fprintf(w, "\nSitemap: %s/sitemap.xml\n", base)
+	}
+}
+
+// sitemapHandler lists only the public landing and learning pages. Private
+// marketplace and product pages are intentionally absent.
+func sitemapHandler(w http.ResponseWriter, r *http.Request) {
+	base, ok := publicBaseURL(r)
+	if !ok {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	_, _ = fmt.Fprintf(w, `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>%s/</loc></url>
+  <url><loc>%s/learning</loc></url>
+</urlset>
+`, html.EscapeString(base), html.EscapeString(base))
+}
+
+func publicBaseURL(r *http.Request) (string, bool) {
+	host := strings.TrimSpace(r.Host)
+	if host == "" {
+		return "", false
+	}
+	scheme := "http"
+	if middleware.RequestIsHTTPS(r) {
+		scheme = "https"
+	}
+	return scheme + "://" + host, true
 }

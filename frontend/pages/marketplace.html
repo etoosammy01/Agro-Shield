@@ -69,9 +69,17 @@
 
         <form method="post" action="/marketplace" class="marketplace-search-form">
             <input type="hidden" name="action" value="search">
-            <input type="search" name="search_term" id="search" placeholder="Search products..." class="search-box">
+            <input type="search" name="search_term" id="search" placeholder="Search products..." class="search-box"
+                value="{{.SearchTerm}}">
             <button type="submit">Search</button>
+            {{if .SearchTerm}}
+            <a href="/marketplace" class="clear-search">Clear search</a>
+            {{end}}
         </form>
+
+        {{if .SearchTerm}}
+        <p class="search-summary">Showing results for “{{.SearchTerm}}”.</p>
+        {{end}}
 
         <section class="product-grid" id="product-grid">
 
@@ -152,7 +160,11 @@
 
             {{else}}
 
+            {{if $.SearchTerm}}
+            <p>No produce matches “{{$.SearchTerm}}”.</p>
+            {{else}}
             <p>No product listed for sale yet.</p>
+            {{end}}
 
             {{end}}
 

@@ -218,6 +218,30 @@ func (r *CropRepository) ListByFarmer(
 // ============================================================
 
 func (r *CropRepository) ListAvailable() ([]models.Crop, error) {
+	return r.listAvailable(`
+		WHERE crops.listed_for_sale = TRUE
+		AND crops.quantity > 0
+	`)
+}
+
+// SearchAvailable returns only listed crops whose name or location matches the
+// search term. Filtering happens in SQL so the server-rendered result agrees
+// with what the buyer asked for; the previous behaviour recorded the search
+// but still rendered every crop.
+func (r *CropRepository) SearchAvailable(term string) ([]models.Crop, error) {
+	pattern := "%" + term + "%"
+	return r.listAvailable(`
+		WHERE crops.listed_for_sale = TRUE
+		AND crops.quantity > 0
+		AND (
+			crops.name ILIKE $1
+			OR crops.location ILIKE $1
+			OR farmers.full_name ILIKE $1
+		)
+	`, pattern)
+}
+
+func (r *CropRepository) listAvailable(where string, args ...any) ([]models.Crop, error) {
 
 	query := `
 		SELECT
@@ -240,12 +264,11 @@ func (r *CropRepository) ListAvailable() ([]models.Crop, error) {
 		FROM crops
 		INNER JOIN farmers
 			ON farmers.id = crops.farmer_id
-		WHERE crops.listed_for_sale = TRUE
-		AND crops.quantity > 0
+	` + where + `
 		ORDER BY crops.created_at DESC
 	`
 
-	rows, err := r.db.Query(query)
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}

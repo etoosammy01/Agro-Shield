@@ -1,10 +1,12 @@
 package repository
 
 import (
-	"backend/internal/models"
+	"context"
 	"database/sql"
 	"errors"
 	"strings"
+
+	"backend/internal/models"
 
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -15,6 +17,17 @@ import (
 // race past the pre-check in AuthService.Register. Callers match it with
 // errors.Is rather than comparing error strings.
 var ErrPhoneExists = errors.New("phone number already registered")
+
+// Account-closure refusals. A closed account keeps its order, sale, and wallet
+// ledger history for record-keeping, so deletion must not be possible while
+// money is still held, a provider account is attached, or a transfer could land
+// after the owner has lost access.
+var (
+	ErrAccountNotFound          = errors.New("account not found")
+	ErrAccountHasBalance        = errors.New("account still has a wallet balance")
+	ErrAccountHasPendingRequest = errors.New("account has pending wallet activity")
+	ErrAccountHasFundingAccount = errors.New("account has a funding account")
+)
 
 // isUniqueViolation reports whether err is a PostgreSQL unique-constraint
 // violation (SQLSTATE 23505).
@@ -95,6 +108,7 @@ func (r *FarmerRepository) GetByPhone(phone string) (*models.Farmer, error) {
 		updated_at
 	FROM farmers
 	WHERE phone = $1
+	AND deleted_at IS NULL
 	`
 	var farmer models.Farmer
 	err := r.db.QueryRow(query, phone).Scan(
@@ -137,6 +151,7 @@ func (r *FarmerRepository) GetByID(id int) (*models.Farmer, error) {
 		updated_at
 	FROM farmers
 	WHERE id = $1
+	AND deleted_at IS NULL
 	`
 	var farmer models.Farmer
 	err := r.db.QueryRow(query, id).Scan(
@@ -165,13 +180,15 @@ func (r *FarmerRepository) GetByID(id int) (*models.Farmer, error) {
 // ListForChat returns registered users that can be contacted in general chat.
 func (r *FarmerRepository) ListForChat(excludeID int, search string) ([]models.Farmer, error) {
 	rows, err := r.db.Query(`
-		SELECT id, full_name, phone, COALESCE(email, ''), password_hash,
+		SELECT id, full_name, phone, COALESCE(email, ''),
 			location, COALESCE(lga, location), COALESCE(state, ''), COALESCE(country, ''),
 			role, COALESCE(photo_url, ''), COALESCE(bank_name, ''), COALESCE(bank_code, ''),
 			COALESCE(account_name, ''), COALESCE(account_number, ''), created_at, updated_at
 		FROM farmers
-		WHERE id <> $1 AND ($2 = '' OR full_name ILIKE '%' || $2 || '%' OR role ILIKE '%' || $2 || '%' OR location ILIKE '%' || $2 || '%')
-		ORDER BY full_name ASC`, excludeID, strings.TrimSpace(search))
+		WHERE id <> $1 AND deleted_at IS NULL
+		AND ($2 = '' OR full_name ILIKE '%' || $2 || '%' OR role ILIKE '%' || $2 || '%' OR location ILIKE '%' || $2 || '%')
+		ORDER BY full_name ASC
+		LIMIT 50`, excludeID, strings.TrimSpace(search))
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +196,7 @@ func (r *FarmerRepository) ListForChat(excludeID int, search string) ([]models.F
 	var users []models.Farmer
 	for rows.Next() {
 		var user models.Farmer
-		if err := rows.Scan(&user.ID, &user.FullName, &user.Phone, &user.Email, &user.PasswordHash, &user.Location, &user.LGA, &user.State, &user.Country, &user.Role, &user.PhotoURL, &user.BankName, &user.BankCode, &user.AccountName, &user.AccountNumber, &user.CreatedAt, &user.UpdatedAt); err != nil {
+		if err := rows.Scan(&user.ID, &user.FullName, &user.Phone, &user.Email, &user.Location, &user.LGA, &user.State, &user.Country, &user.Role, &user.PhotoURL, &user.BankName, &user.BankCode, &user.AccountName, &user.AccountNumber, &user.CreatedAt, &user.UpdatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, user)
@@ -227,4 +244,151 @@ func (r *FarmerRepository) UpdatePassword(id int, passwordHash string) error {
 		id,
 	)
 	return err
+}
+
+// DeleteAccount closes an account by anonymising it rather than removing the
+// row. Orders, sales, and wallet ledger entries must keep a stable account id,
+// so the row stays and the personal details on it are replaced: name, phone,
+// email, photo, location, payout details, password, and admin flag. The caller
+// must have proved control of the account before reaching here.
+//
+// The closure is refused while money or a provider account is still attached,
+// because a transfer that lands after the owner loses access would be stranded:
+//
+//   - a non-zero wallet balance,
+//   - a pending/processing deposit, withdrawal, or transfer,
+//   - a virtual funding account that would keep receiving bank transfers.
+//
+// Everything is one transaction: the account is either fully anonymised or not
+// touched at all. Repeating the call returns ErrAccountNotFound.
+func (r *FarmerRepository) DeleteAccount(ctx context.Context, farmerID int) error {
+	if farmerID <= 0 {
+		return ErrAccountNotFound
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var id int
+	err = tx.QueryRowContext(ctx,
+		`SELECT id FROM farmers WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`, farmerID,
+	).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrAccountNotFound
+	}
+	if err != nil {
+		return err
+	}
+
+	// The balance and every in-flight request are read under the same lock
+	// DeleteAccount writes under, so a credit cannot slip in between the check
+	// and the anonymisation.
+	var balance string
+	err = tx.QueryRowContext(ctx,
+		`SELECT balance::text FROM wallets WHERE farmer_id = $1 FOR UPDATE`, farmerID,
+	).Scan(&balance)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	if err == nil && balance != "0.00" && balance != "0" && balance != "0.0" {
+		return ErrAccountHasBalance
+	}
+
+	var pending int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT
+			(SELECT COUNT(*) FROM wallet_deposits d
+				JOIN wallets w ON w.id = d.wallet_id
+				WHERE w.farmer_id = $1 AND d.status IN ('pending', 'processing'))
+			+ (SELECT COUNT(*) FROM wallet_withdrawals
+				WHERE farmer_id = $1 AND status IN ('pending', 'processing'))
+			+ (SELECT COUNT(*) FROM wallet_transfers
+				WHERE (sender_id = $1 OR recipient_id = $1) AND status = 'pending')`,
+		farmerID,
+	).Scan(&pending); err != nil {
+		return err
+	}
+	if pending > 0 {
+		return ErrAccountHasPendingRequest
+	}
+
+	var fundingAccounts int
+	if err := tx.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM wallet_virtual_accounts WHERE farmer_id = $1`, farmerID,
+	).Scan(&fundingAccounts); err != nil {
+		return err
+	}
+	if fundingAccounts > 0 {
+		return ErrAccountHasFundingAccount
+	}
+
+	// Personal data with no record-keeping value is removed outright. Cart rows
+	// are transient; negotiations are the conversation around an offer, and the
+	// order itself keeps the agreed price and quantity.
+	for _, stmt := range []string{
+		`DELETE FROM cart_items WHERE buyer_id = $1`,
+		`DELETE FROM negotiations WHERE buyer_id = $1 OR farmer_id = $1`,
+		`DELETE FROM negotiation_messages WHERE sender_id = $1`,
+		`DELETE FROM chat_messages WHERE sender_id = $1`,
+		`DELETE FROM conversation_members WHERE user_id = $1`,
+		`DELETE FROM notifications WHERE user_id = $1`,
+		`DELETE FROM feedback WHERE user_id = $1`,
+		`DELETE FROM diagnoses WHERE farmer_id = $1`,
+		`DELETE FROM otp_codes WHERE farmer_id = $1`,
+		`UPDATE market_events SET user_id = NULL WHERE user_id = $1`,
+		`UPDATE marketplace_searches SET user_id = NULL WHERE user_id = $1`,
+	} {
+		if _, err := tx.ExecContext(ctx, stmt, farmerID); err != nil {
+			return err
+		}
+	}
+
+	// Listings nobody has ordered can go. A crop that appears in an order or
+	// delivery is kept for that record, but is taken off the marketplace so a
+	// closed account is not still selling produce.
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM crops c
+		WHERE c.farmer_id = $1
+		AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.crop_id = c.id)
+		AND NOT EXISTS (SELECT 1 FROM deliveries d WHERE d.crop_id = c.id)`, farmerID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE crops SET listed_for_sale = FALSE, updated_at = CURRENT_TIMESTAMP WHERE farmer_id = $1`, farmerID,
+	); err != nil {
+		return err
+	}
+
+	// The phone number is freed for a future registration. The placeholder is
+	// unique because it includes the id, and it can never pass the Nigerian
+	// phone rules used by login and OTP.
+	placeholderPhone := fmt.Sprintf("deleted-%d", farmerID)
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE farmers
+		SET full_name = 'Deleted account',
+			phone = $2,
+			email = NULL,
+			password_hash = 'deleted',
+			location = 'Deleted account',
+			lga = NULL,
+			state = NULL,
+			country = 'Nigeria',
+			photo_url = $3,
+			bank_name = NULL,
+			bank_code = NULL,
+			account_name = NULL,
+			account_number = NULL,
+			is_admin = FALSE,
+			deleted_at = CURRENT_TIMESTAMP,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1 AND deleted_at IS NULL`,
+		farmerID, placeholderPhone, models.DefaultPhotoURL,
+	); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }

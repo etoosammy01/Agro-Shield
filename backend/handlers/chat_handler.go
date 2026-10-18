@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"html/template"
 	"log"
 	"net/http"
@@ -113,6 +114,116 @@ func (h *ChatHandler) PresenceHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(chatPresenceResponse{OnlineUserIDs: onlineIDs}); err != nil {
 		log.Println("presence response error:", err)
 	}
+}
+
+type chatTypingResponse struct {
+	Typing bool   `json:"typing"`
+	Name   string `json:"name,omitempty"`
+}
+
+// TypingHandler records and reads the short-lived "is typing" state for a
+// conversation. GET is used by the thread's poller; POST is used while the
+// current user types. Both require authentication and conversation
+// membership, and the response never exposes user IDs or non-member names.
+func (h *ChatHandler) TypingHandler(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+
+	farmer, ok := middleware.FarmerFromContext(r)
+
+	if !ok || farmer == nil {
+		http.Redirect(
+			w,
+			r,
+			"/login",
+			http.StatusSeeOther,
+		)
+		return
+	}
+
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		http.Error(
+			w,
+			"Method Not Allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	rawConversationID := r.URL.Query().Get("conversation_id")
+	if r.Method == http.MethodPost {
+		rawConversationID = r.FormValue("conversation_id")
+	}
+
+	conversationID, err := strconv.Atoi(
+		rawConversationID,
+	)
+
+	if err != nil || conversationID <= 0 {
+		http.Error(
+			w,
+			"Invalid conversation ID",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		typing, err := strconv.ParseBool(
+			strings.TrimSpace(r.FormValue("typing")),
+		)
+
+		if err != nil {
+			http.Error(
+				w,
+				"Invalid typing state",
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		if err := h.service.SetTyping(
+			conversationID,
+			farmer.ID,
+			farmer.FullName,
+			typing,
+		); err != nil {
+			writeChatTypingError(w, err)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	name, typing, err := h.service.TypingStatus(
+		conversationID,
+		farmer.ID,
+	)
+
+	if err != nil {
+		writeChatTypingError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	if err := json.NewEncoder(w).Encode(chatTypingResponse{
+		Typing: typing,
+		Name:   name,
+	}); err != nil {
+		log.Println("chat typing response error:", err)
+	}
+}
+
+func writeChatTypingError(w http.ResponseWriter, err error) {
+	if errors.Is(err, services.ErrChatAccessDenied) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	log.Println("chat typing request failed:", err)
+	http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 }
 
 // ============================================================

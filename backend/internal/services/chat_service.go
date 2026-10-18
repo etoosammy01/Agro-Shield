@@ -39,6 +39,7 @@ type ChatService struct {
 	memberRepo       *repository.ConversationMemberRepository
 	messageRepo      *repository.ChatMessageRepository
 	notification     *NotificationService
+	typing           *typingTracker
 }
 
 // ============================================================
@@ -57,6 +58,7 @@ func NewChatService(
 		memberRepo:       memberRepo,
 		messageRepo:      messageRepo,
 		notification:     notification,
+		typing:           newTypingTracker(),
 	}
 }
 
@@ -334,10 +336,14 @@ func (s *ChatService) RemoveMember(
 		)
 	}
 
-	return s.memberRepo.RemoveMember(
+	if err := s.memberRepo.RemoveMember(
 		conversationID,
 		userID,
-	)
+	); err != nil {
+		return err
+	}
+	s.typing.set(conversationID, userID, "", false)
+	return nil
 }
 
 // ============================================================
@@ -396,10 +402,14 @@ func (s *ChatService) LeaveGroup(
 		)
 	}
 
-	return s.memberRepo.RemoveMember(
+	if err := s.memberRepo.RemoveMember(
 		conversationID,
 		userID,
-	)
+	); err != nil {
+		return err
+	}
+	s.typing.set(conversationID, userID, "", false)
+	return nil
 }
 
 // ============================================================

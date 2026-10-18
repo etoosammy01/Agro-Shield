@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"log"
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -17,14 +19,16 @@ import (
 )
 
 type Dashboard struct {
-	crop         *services.CropService
-	order        *services.OrderService
-	cart         *services.CartService
-	ai           *services.AIService
-	negotiation  *services.NegotiationService
-	weather      *services.WeatherService
-	notification *services.NotificationService
-	events       *repository.MarketEventRepository
+	crop          *services.CropService
+	order         *services.OrderService
+	cart          *services.CartService
+	ai            *services.AIService
+	negotiation   *services.NegotiationService
+	weather       *services.WeatherService
+	notification  *services.NotificationService
+	events        *repository.MarketEventRepository
+	reconcileMu   sync.Mutex
+	lastReconcile time.Time
 }
 
 func NewDashboardHandler(crop *services.CropService, order *services.OrderService, cart *services.CartService, ai *services.AIService, negotiation *services.NegotiationService, weather *services.WeatherService, notification *services.NotificationService, events *repository.MarketEventRepository) *Dashboard {
@@ -143,8 +147,19 @@ func (h *Dashboard) DashBoard(w http.ResponseWriter, r *http.Request) {
 
 		data := DashboardData{FullName: "user"}
 		if h.events != nil {
-			if err := h.events.ReconcileCheckoutAbandonments(24 * time.Hour); err != nil {
-				log.Printf("dashboard checkout reconciliation failed: %v", err)
+			// Checkout abandonment reconciliation is a write operation. Keep it
+			// off the hot path when many dashboard tabs load at once, while still
+			// running it promptly on the first request.
+			h.reconcileMu.Lock()
+			shouldReconcile := h.lastReconcile.IsZero() || time.Since(h.lastReconcile) >= time.Minute
+			if shouldReconcile {
+				h.lastReconcile = time.Now()
+			}
+			h.reconcileMu.Unlock()
+			if shouldReconcile {
+				if err := h.events.ReconcileCheckoutAbandonments(r.Context(), 24*time.Hour); err != nil {
+					log.Printf("dashboard checkout reconciliation failed: %v", err)
+				}
 			}
 		}
 
@@ -188,6 +203,7 @@ func (h *Dashboard) DashBoard(w http.ResponseWriter, r *http.Request) {
 				data.Priorities = buyerPriorities(data)
 			} else {
 				var farmerCrops []models.Crop
+				var negotiations []models.Negotiation
 				if got, err := h.crop.MyCrops(farmer.ID); err == nil {
 					farmerCrops = got
 					data.StorageCrops = got
@@ -204,12 +220,14 @@ func (h *Dashboard) DashBoard(w http.ResponseWriter, r *http.Request) {
 				if h.events != nil && len(farmerCrops) > 0 {
 					cutoff := time.Now().Add(-30 * 24 * time.Hour)
 					previous := cutoff.Add(-30 * 24 * time.Hour)
-					if summary, err := h.events.FarmerDemandSummary(farmer.ID, farmer.Location, cutoff, previous); err != nil {
+					summaryCtx, cancelSummaries := context.WithTimeout(r.Context(), 20*time.Second)
+					defer cancelSummaries()
+					if summary, err := h.events.FarmerDemandSummary(summaryCtx, farmer.ID, farmer.Location, cutoff, previous); err != nil {
 						log.Printf("dashboard demand summary unavailable for farmer %d: %v", farmer.ID, err)
 					} else {
 						data.Demand = summary
 					}
-					if summaries, err := h.events.GroupedDemandSummaries(farmer.ID, farmer.Location, cutoff, previous); err != nil {
+					if summaries, err := h.events.GroupedDemandSummaries(summaryCtx, farmer.ID, farmer.Location, cutoff, previous); err != nil {
 						log.Printf("dashboard produce comparisons unavailable for farmer %d: %v", farmer.ID, err)
 					} else {
 						data.ProduceDemands = summaries
@@ -266,7 +284,8 @@ func (h *Dashboard) DashBoard(w http.ResponseWriter, r *http.Request) {
 				}
 				data.RecentActivity = mergeActivity(activity, 5)
 				if h.negotiation != nil {
-					if negotiations, err := h.negotiation.MyNegotiations(farmer.ID); err == nil {
+					if got, err := h.negotiation.MyNegotiations(farmer.ID); err == nil {
+						negotiations = got
 						cutoff := time.Now().Add(-30 * 24 * time.Hour)
 						for _, n := range negotiations {
 							if !n.CreatedAt.Before(cutoff) {
@@ -275,22 +294,13 @@ func (h *Dashboard) DashBoard(w http.ResponseWriter, r *http.Request) {
 						}
 					}
 				}
-				var crops []models.Crop
-				if got, err := h.crop.MyCrops(farmer.ID); err == nil {
-					crops = got
-				}
+				crops := farmerCrops
 				var diagnoses []models.Diagnosis
 				if got, err := h.ai.History(farmer.ID); err == nil {
 					diagnoses = got
 					if len(diagnoses) > 0 {
 						latest := diagnoses[0]
 						data.LatestDiagnosis = &latest
-					}
-				}
-				var negotiations []models.Negotiation
-				if h.negotiation != nil {
-					if got, err := h.negotiation.MyNegotiations(farmer.ID); err == nil {
-						negotiations = got
 					}
 				}
 				data.Priorities = farmerPriorities(data, crops, diagnoses, negotiations)
@@ -344,7 +354,9 @@ func (h *Dashboard) MarketInsights(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cutoff := time.Now().Add(-30 * 24 * time.Hour)
-	summaries, err := h.events.GroupedDemandSummaries(farmer.ID, farmer.Location, cutoff, cutoff.Add(-30*24*time.Hour))
+	summaryCtx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+	summaries, err := h.events.GroupedDemandSummaries(summaryCtx, farmer.ID, farmer.Location, cutoff, cutoff.Add(-30*24*time.Hour))
 	if err != nil {
 		log.Printf("market insights unavailable for farmer %d: %v", farmer.ID, err)
 		http.Error(w, "Unable to load market insights", http.StatusInternalServerError)

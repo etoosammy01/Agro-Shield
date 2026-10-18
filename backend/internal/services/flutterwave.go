@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -148,7 +149,7 @@ func (c *FlutterwaveClient) InitializePayment(req InitializePaymentRequest) (str
 		return "", err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("flutterwave returned %d: %s", resp.StatusCode, string(respBody))
+		return "", providerHTTPError("flutterwave", resp.StatusCode, respBody)
 	}
 
 	var parsed initializePaymentResponse
@@ -156,7 +157,7 @@ func (c *FlutterwaveClient) InitializePayment(req InitializePaymentRequest) (str
 		return "", fmt.Errorf("unmarshal response: %w", err)
 	}
 	if parsed.Status != "success" {
-		return "", fmt.Errorf("flutterwave rejected the request: %s", parsed.Message)
+		return "", fmt.Errorf("flutterwave rejected the request: %s", safeProviderMessage(parsed.Message))
 	}
 
 	return parsed.Data.Link, nil
@@ -209,7 +210,7 @@ func (c *FlutterwaveClient) VerifyTransaction(transactionID string) (*VerifiedTr
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("flutterwave returned %d: %s", resp.StatusCode, string(respBody))
+		return nil, providerHTTPError("flutterwave", resp.StatusCode, respBody)
 	}
 
 	var parsed verifyTransactionResponse
@@ -218,7 +219,7 @@ func (c *FlutterwaveClient) VerifyTransaction(transactionID string) (*VerifiedTr
 	}
 
 	if parsed.Status != "success" {
-		return nil, fmt.Errorf("Flutterwave did not verify transaction: %s", parsed.Status)
+		return nil, fmt.Errorf("Flutterwave did not verify transaction: %s", safeProviderMessage(parsed.Status))
 	}
 	if parsed.Data.ID != id {
 		return nil, fmt.Errorf("verified transaction ID does not match request")
@@ -279,14 +280,14 @@ func (c *FlutterwaveClient) VerifyTransactionByReference(reference string) (*Ver
 	// The not-found answer arrives as a 400 carrying "No transaction found"
 	// rather than as a 404, so the body decides, exactly as ResolveAccount does.
 	if resp.StatusCode != http.StatusOK {
-		detail := providerMessage(respBody)
+		detail := safeProviderMessage(providerMessage(respBody))
 		if resp.StatusCode == http.StatusNotFound || notFoundMessage(detail) {
 			if detail == "" {
 				detail = fmt.Sprintf("provider returned %d", resp.StatusCode)
 			}
 			return nil, fmt.Errorf("%w: %s", ErrTransactionNotFound, detail)
 		}
-		return nil, fmt.Errorf("flutterwave reference verification returned %d: %s", resp.StatusCode, string(respBody))
+		return nil, providerHTTPError("flutterwave reference verification", resp.StatusCode, respBody)
 	}
 
 	var parsed verifyTransactionResponse
@@ -295,9 +296,9 @@ func (c *FlutterwaveClient) VerifyTransactionByReference(reference string) (*Ver
 	}
 	if parsed.Status != "success" {
 		if notFoundMessage(parsed.Message) {
-			return nil, fmt.Errorf("%w: %s", ErrTransactionNotFound, parsed.Message)
+			return nil, fmt.Errorf("%w: %s", ErrTransactionNotFound, safeProviderMessage(parsed.Message))
 		}
-		return nil, fmt.Errorf("flutterwave could not verify the reference: %s", parsed.Message)
+		return nil, fmt.Errorf("flutterwave could not verify the reference: %s", safeProviderMessage(parsed.Message))
 	}
 	if strings.TrimSpace(parsed.Data.TxRef) == "" {
 		// A success with no transaction is contradictory, not an answer. Reading
@@ -421,7 +422,7 @@ func (c *FlutterwaveClient) CreateTransfer(req CreateTransferRequest) (string, e
 		if transferRefused(resp.StatusCode) {
 			return "", fmt.Errorf("%w: %s", ErrTransferNotCreated, http.StatusText(resp.StatusCode))
 		}
-		return "", fmt.Errorf("flutterwave transfer returned %d: %s", resp.StatusCode, string(respBody))
+		return "", providerHTTPError("flutterwave transfer", resp.StatusCode, respBody)
 	}
 	var parsed transferResponse
 	if err := json.Unmarshal(respBody, &parsed); err != nil {
@@ -432,7 +433,7 @@ func (c *FlutterwaveClient) CreateTransfer(req CreateTransferRequest) (string, e
 	if parsed.Status != "success" {
 		// The provider answered with a rejection object rather than a created
 		// transfer, which is it saying no.
-		return "", fmt.Errorf("%w: %s", ErrTransferNotCreated, parsed.Message)
+		return "", fmt.Errorf("%w: %s", ErrTransferNotCreated, safeProviderMessage(parsed.Message))
 	}
 	if parsed.Data.ID <= 0 {
 		// Contradictory rather than a refusal: a success carrying no id may
@@ -475,7 +476,7 @@ func (c *FlutterwaveClient) ListBanks(country string) ([]Bank, error) {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("flutterwave bank list returned %d: %s", resp.StatusCode, string(body))
+		return nil, providerHTTPError("flutterwave bank list", resp.StatusCode, body)
 	}
 	var parsed struct {
 		Status  string `json:"status"`
@@ -489,7 +490,7 @@ func (c *FlutterwaveClient) ListBanks(country string) ([]Bank, error) {
 		return nil, fmt.Errorf("unmarshal bank list: %w", err)
 	}
 	if parsed.Status != "success" {
-		return nil, fmt.Errorf("flutterwave bank list failed: %s", parsed.Message)
+		return nil, fmt.Errorf("flutterwave bank list failed: %s", safeProviderMessage(parsed.Message))
 	}
 	banks := make([]Bank, 0, len(parsed.Data))
 	for _, item := range parsed.Data {
@@ -570,6 +571,44 @@ func providerMessage(body []byte) string {
 	return strings.TrimSpace(parsed.Message)
 }
 
+// safeProviderMessage keeps provider diagnostics useful without placing a raw
+// response body in an error string or log. Provider bodies can contain request
+// echoes, URLs, or account fragments; only the parsed "message" field is kept,
+// with control characters stripped and a hard length cap.
+var providerLongDigitRun = regexp.MustCompile(`\d{6,}`)
+
+func safeProviderMessage(message string) string {
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return ""
+	}
+	var b strings.Builder
+	for _, r := range message {
+		if b.Len() >= 200 {
+			break
+		}
+		if r == '\n' || r == '\r' || r == '\t' {
+			r = ' '
+		}
+		if r < 32 || r == 127 {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	// Account numbers, BVNs, and phone numbers are runs of digits. They are
+	// not needed to diagnose a provider failure, so redact long runs while
+	// preserving the descriptive words around them.
+	return strings.TrimSpace(providerLongDigitRun.ReplaceAllString(b.String(), "[redacted]"))
+}
+
+func providerHTTPError(prefix string, status int, body []byte) error {
+	detail := safeProviderMessage(providerMessage(body))
+	if detail == "" {
+		return fmt.Errorf("%s returned HTTP %d", prefix, status)
+	}
+	return fmt.Errorf("%s returned HTTP %d: %s", prefix, status, detail)
+}
+
 type ResolvedAccount struct {
 	AccountNumber string
 	AccountName   string
@@ -636,14 +675,14 @@ func (c *FlutterwaveClient) ResolveAccount(accountNumber, bankCode string) (*Res
 		// The not-found answer arrives as 400 "invalid account", not the 404 the
 		// API documentation implies, so the body decides. A 404 with no readable
 		// message is the same answer by status.
-		detail := providerMessage(respBody)
+		detail := safeProviderMessage(providerMessage(respBody))
 		if resp.StatusCode == http.StatusNotFound || notFoundMessage(detail) {
 			if detail == "" {
 				detail = fmt.Sprintf("provider returned %d", resp.StatusCode)
 			}
 			return nil, fmt.Errorf("%w: %s", ErrAccountNotResolved, detail)
 		}
-		return nil, fmt.Errorf("flutterwave resolve returned %d: %s", resp.StatusCode, string(respBody))
+		return nil, providerHTTPError("flutterwave resolve", resp.StatusCode, respBody)
 	}
 
 	var parsed resolveAccountResponse
@@ -652,9 +691,9 @@ func (c *FlutterwaveClient) ResolveAccount(accountNumber, bankCode string) (*Res
 	}
 	if parsed.Status != "success" {
 		if notFoundMessage(parsed.Message) {
-			return nil, fmt.Errorf("%w: %s", ErrAccountNotResolved, parsed.Message)
+			return nil, fmt.Errorf("%w: %s", ErrAccountNotResolved, safeProviderMessage(parsed.Message))
 		}
-		return nil, fmt.Errorf("flutterwave could not resolve account: %s", parsed.Message)
+		return nil, fmt.Errorf("flutterwave could not resolve account: %s", safeProviderMessage(parsed.Message))
 	}
 	accountName := strings.TrimSpace(parsed.Data.AccountName)
 	if accountName == "" {
@@ -666,6 +705,283 @@ func (c *FlutterwaveClient) ResolveAccount(accountNumber, bankCode string) (*Res
 	}
 
 	return &ResolvedAccount{AccountNumber: accountNumber, AccountName: accountName}, nil
+}
+
+// ErrVirtualAccountRefused means Flutterwave answered and refused to open the
+// account, so no account exists for this attempt.
+//
+// Only answers that rule an account out qualify. A timeout, a 429 or a 5xx may
+// have created one, and retrying those with a second reference would be how a
+// farmer ends up with two accounts. Those stay ordinary errors, and the
+// deterministic tx_ref makes a retry safe.
+var ErrVirtualAccountRefused = errors.New("the provider refused the virtual account request")
+
+// ErrVirtualAccountAccessDenied means the provider rejected the credentials or
+// did not grant this merchant access to static virtual accounts. It is distinct
+// from a refusal of the farmer's details: retrying the same identity form cannot
+// fix it, and the page must not imply that the BVN or NIN was wrong.
+var ErrVirtualAccountAccessDenied = errors.New("the provider did not permit virtual account creation")
+
+// ErrVirtualAccountNotFound means the provider answered and has no virtual
+// account for the reference. It is an answer, not a failure: the caller may
+// safely try to create the account again with the same reference.
+var ErrVirtualAccountNotFound = errors.New("no virtual account exists for this reference")
+
+// CreateVirtualAccountRequest describes a permanent NGN virtual account.
+//
+// FirstName, LastName, Email and Phone come from the authenticated farmer's
+// account, never from the browser. IdentityKind is "bvn" or "nin" and
+// IdentityNumber is that document's number; it is sent to Flutterwave and is
+// never persisted by Agro-Shield.
+type CreateVirtualAccountRequest struct {
+	Email          string
+	TxRef          string
+	Phone          string
+	FirstName      string
+	LastName       string
+	Narration      string
+	BankCode       string
+	IdentityKind   string
+	IdentityNumber string
+}
+
+// VirtualAccountDetails is the provider's confirmed account, reduced to the
+// fields the wallet displays. Nothing else from the response body is kept.
+type VirtualAccountDetails struct {
+	TxRef         string
+	OrderRef      string
+	ProviderRef   string
+	AccountNumber string
+	BankName      string
+	AccountName   string
+	Currency      string
+	Status        string
+}
+
+type virtualAccountResponse struct {
+	Status  string `json:"status"`
+	Message string `json:"message"`
+	Data    struct {
+		ResponseCode    string `json:"response_code"`
+		ResponseMessage string `json:"response_message"`
+		FLWRef          string `json:"flw_ref"`
+		OrderRef        string `json:"order_ref"`
+		AccountNumber   string `json:"account_number"`
+		AccountName     string `json:"account_name"`
+		BankName        string `json:"bank_name"`
+		Currency        string `json:"currency"`
+		AccountStatus   string `json:"account_status"`
+	} `json:"data"`
+}
+
+// virtualAccountRefused reports whether a provider answer proves no account was
+// created. Credential failures and validation answers do; anything mentioning a
+// duplicate reference deliberately does not, because that is the provider
+// saying an account may already exist under this tx_ref.
+func virtualAccountRefused(status int, message string) bool {
+	switch status {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return true
+	case http.StatusBadRequest, http.StatusUnprocessableEntity:
+		lowered := strings.ToLower(message)
+		for _, marker := range []string{"duplicate", "already exist", "already been used", "has been used"} {
+			if strings.Contains(lowered, marker) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
+}
+
+func parseVirtualAccount(response virtualAccountResponse) (*VirtualAccountDetails, error) {
+	if response.Status != "success" {
+		return nil, fmt.Errorf("flutterwave virtual account request failed: %s", safeProviderMessage(response.Message))
+	}
+	switch strings.TrimSpace(response.Data.ResponseCode) {
+	case "02", "00":
+	case "":
+		// Some responses omit response_code but still carry a full account. A
+		// missing number below is what actually proves nothing was created.
+	default:
+		return nil, fmt.Errorf("flutterwave virtual account request was not accepted: %s",
+			safeProviderMessage(response.Data.ResponseMessage))
+	}
+	accountNumber := strings.TrimSpace(response.Data.AccountNumber)
+	if accountNumber == "" {
+		return nil, fmt.Errorf("flutterwave virtual account response is missing the account number")
+	}
+	return &VirtualAccountDetails{
+		OrderRef:      strings.TrimSpace(response.Data.OrderRef),
+		ProviderRef:   strings.TrimSpace(response.Data.FLWRef),
+		AccountNumber: accountNumber,
+		BankName:      strings.TrimSpace(response.Data.BankName),
+		AccountName:   strings.TrimSpace(response.Data.AccountName),
+		Currency:      strings.TrimSpace(response.Data.Currency),
+		Status:        strings.TrimSpace(response.Data.AccountStatus),
+	}, nil
+}
+
+// CreatePermanentVirtualAccount opens a static NGN virtual account. Static
+// accounts require either a BVN or a NIN, and the tx_ref is the reference every
+// incoming transfer will carry.
+func (c *FlutterwaveClient) CreatePermanentVirtualAccount(req CreateVirtualAccountRequest) (*VirtualAccountDetails, error) {
+	req.Email = strings.TrimSpace(req.Email)
+	req.TxRef = strings.TrimSpace(req.TxRef)
+	req.IdentityKind = strings.ToLower(strings.TrimSpace(req.IdentityKind))
+	req.IdentityNumber = strings.TrimSpace(req.IdentityNumber)
+	if req.Email == "" || req.TxRef == "" {
+		return nil, fmt.Errorf("virtual account email and reference are required")
+	}
+	if req.IdentityKind != "bvn" && req.IdentityKind != "nin" {
+		return nil, fmt.Errorf("virtual account requires a BVN or NIN")
+	}
+	if req.IdentityNumber == "" {
+		return nil, fmt.Errorf("virtual account identity number is required")
+	}
+
+	payload := map[string]any{
+		"email":          req.Email,
+		"tx_ref":         req.TxRef,
+		"is_permanent":   true,
+		"narration":      req.Narration,
+		req.IdentityKind: req.IdentityNumber,
+	}
+	if strings.TrimSpace(req.Phone) != "" {
+		payload["phonenumber"] = strings.TrimSpace(req.Phone)
+	}
+	if strings.TrimSpace(req.FirstName) != "" {
+		payload["firstname"] = strings.TrimSpace(req.FirstName)
+	}
+	if strings.TrimSpace(req.LastName) != "" {
+		payload["lastname"] = strings.TrimSpace(req.LastName)
+	}
+	if strings.TrimSpace(req.BankCode) != "" {
+		payload["bank_code"] = strings.TrimSpace(req.BankCode)
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal virtual account request: %w", err)
+	}
+	httpReq, err := http.NewRequest(http.MethodPost, flutterwaveBaseURL+"/virtual-account-numbers", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("build virtual account request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+c.SecretKey)
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		// No answer says nothing about whether an account was opened.
+		return nil, fmt.Errorf("call flutterwave virtual account: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := readFlutterwaveResponse(resp)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		detail := safeProviderMessage(providerMessage(respBody))
+		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+			if detail == "" {
+				detail = http.StatusText(resp.StatusCode)
+			}
+			return nil, fmt.Errorf("%w: %s", ErrVirtualAccountAccessDenied, detail)
+		}
+		if virtualAccountRefused(resp.StatusCode, detail) {
+			if detail == "" {
+				detail = http.StatusText(resp.StatusCode)
+			}
+			return nil, fmt.Errorf("%w: %s", ErrVirtualAccountRefused, detail)
+		}
+		return nil, providerHTTPError("flutterwave virtual account", resp.StatusCode, respBody)
+	}
+
+	var parsed virtualAccountResponse
+	if err := json.Unmarshal(respBody, &parsed); err != nil {
+		// A 2xx we cannot read may still describe a created account.
+		return nil, fmt.Errorf("unmarshal virtual account response: %w", err)
+	}
+	if parsed.Status != "success" {
+		detail := safeProviderMessage(parsed.Message)
+		if virtualAccountRefused(http.StatusBadRequest, detail) {
+			return nil, fmt.Errorf("%w: %s", ErrVirtualAccountRefused, detail)
+		}
+		return nil, fmt.Errorf("flutterwave rejected the virtual account request: %s", detail)
+	}
+	details, err := parseVirtualAccount(parsed)
+	if err != nil {
+		return nil, err
+	}
+	// The account is found by the tx_ref we sent, not by whatever order_ref the
+	// provider chose to echo, because that is the reference its transfer
+	// webhooks carry.
+	details.TxRef = req.TxRef
+	if details.OrderRef == "" {
+		details.OrderRef = req.TxRef
+	}
+	if details.Currency == "" {
+		details.Currency = "NGN"
+	}
+	return details, nil
+}
+
+// GetPermanentVirtualAccount looks up a static account by its order reference.
+// It is used before retrying a setup whose provider answer was lost, so a
+// second account is not opened for the same farmer.
+func (c *FlutterwaveClient) GetPermanentVirtualAccount(orderRef string) (*VirtualAccountDetails, error) {
+	orderRef = strings.TrimSpace(orderRef)
+	if orderRef == "" {
+		return nil, fmt.Errorf("virtual account reference is required")
+	}
+	endpoint := fmt.Sprintf("%s/virtual-account-numbers/%s", flutterwaveBaseURL, url.PathEscape(orderRef))
+	httpReq, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build virtual account lookup request: %w", err)
+	}
+	httpReq.Header.Set("Authorization", "Bearer "+c.SecretKey)
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("call flutterwave virtual account lookup: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := readFlutterwaveResponse(resp)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		detail := safeProviderMessage(providerMessage(body))
+		if resp.StatusCode == http.StatusNotFound || notFoundMessage(detail) {
+			if detail == "" {
+				detail = fmt.Sprintf("provider returned %d", resp.StatusCode)
+			}
+			return nil, fmt.Errorf("%w: %s", ErrVirtualAccountNotFound, detail)
+		}
+		return nil, providerHTTPError("flutterwave virtual account lookup", resp.StatusCode, body)
+	}
+	var parsed virtualAccountResponse
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return nil, fmt.Errorf("unmarshal virtual account lookup: %w", err)
+	}
+	if parsed.Status != "success" {
+		detail := safeProviderMessage(parsed.Message)
+		if notFoundMessage(detail) {
+			return nil, fmt.Errorf("%w: %s", ErrVirtualAccountNotFound, detail)
+		}
+		return nil, fmt.Errorf("flutterwave virtual account lookup failed: %s", detail)
+	}
+	details, err := parseVirtualAccount(parsed)
+	if err != nil {
+		return nil, err
+	}
+	if details.Currency == "" {
+		details.Currency = "NGN"
+	}
+	return details, nil
 }
 
 type VerifiedTransfer struct {
@@ -694,7 +1010,7 @@ func (c *FlutterwaveClient) VerifyTransfer(transferID string) (*VerifiedTransfer
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("flutterwave transfer verification returned %d: %s", resp.StatusCode, string(body))
+		return nil, providerHTTPError("flutterwave transfer verification", resp.StatusCode, body)
 	}
 	var parsed struct {
 		Status string `json:"status"`

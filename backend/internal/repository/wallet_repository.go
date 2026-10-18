@@ -16,6 +16,17 @@ var ErrWalletNotFound = errors.New("wallet not found")
 var ErrWithdrawalNotFound = errors.New("withdrawal not found")
 var ErrTransferNotFound = errors.New("transfer not found")
 
+// ErrVirtualAccountNotFound is the repository's "no row" answer. Callers that
+// are deciding whether to call the provider must tell it apart from a database
+// failure: only a definite absence permits a create attempt.
+var ErrVirtualAccountNotFound = errors.New("virtual account not found")
+
+// ErrDepositReversalUnfunded means a provider reversal arrived after the money
+// had already been spent or withdrawn, so the wallet cannot absorb it without
+// going negative. Nothing is changed; the deposit stays successful for an
+// operator to reconcile.
+var ErrDepositReversalUnfunded = errors.New("wallet balance cannot cover the deposit reversal")
+
 // Rejections that describe something the user can act on. They are sentinels so
 // callers can pass them through to the page while replacing genuine
 // infrastructure failures with a generic message.
@@ -99,6 +110,33 @@ func (r *WalletRepository) GetWallet(ctx context.Context, farmerID int) (*models
 		return nil, ErrWalletNotFound
 	}
 	return &wallet, err
+}
+
+// GetStatus reads the owner's committed balance plus enough identifiers for the
+// wallet page to tell whether anything changed since it rendered. It never
+// writes, credits, or asks the payment provider anything.
+func (r *WalletRepository) GetStatus(ctx context.Context, farmerID int) (*models.WalletStatus, error) {
+	var status models.WalletStatus
+	err := r.db.QueryRowContext(ctx, `
+		SELECT
+			w.balance::text,
+			w.currency,
+			(SELECT COUNT(*) FROM wallet_deposits d
+				WHERE d.wallet_id = w.id AND d.status IN ('pending', 'processing')),
+			COALESCE((SELECT MAX(t.id) FROM wallet_transactions t WHERE t.wallet_id = w.id), 0),
+			COALESCE((SELECT MAX(d.id) FROM wallet_deposits d WHERE d.wallet_id = w.id), 0),
+			COALESCE((SELECT d.status FROM wallet_deposits d
+				WHERE d.wallet_id = w.id ORDER BY d.id DESC LIMIT 1), '')
+		FROM wallets w
+		WHERE w.farmer_id = $1`, farmerID,
+	).Scan(
+		&status.Balance, &status.Currency, &status.PendingDeposits,
+		&status.LatestTransactionID, &status.LatestDepositID, &status.LatestDepositStatus,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrWalletNotFound
+	}
+	return &status, err
 }
 
 // EnsureWallet returns the user's wallet, creating it if it is somehow missing.
@@ -366,6 +404,405 @@ func (r *WalletRepository) StalePendingDeposits(ctx context.Context, olderThan t
 		deposits = append(deposits, deposit)
 	}
 	return deposits, rows.Err()
+}
+
+// --- permanent virtual accounts --------------------------------------------
+//
+// A farmer has at most one permanent NGN account. It is stored separately from
+// wallet_deposits because it is an account, not a payment: its tx_ref is reused
+// by every incoming transfer, so it cannot be the unique key of a deposit. Each
+// incoming transfer is recorded in wallet_deposits under the provider's own
+// transaction id instead, which is what makes duplicate deliveries harmless.
+
+const virtualAccountColumns = `
+	id, farmer_id, provider, tx_ref, order_ref, provider_ref, account_number,
+	bank_name, account_name, currency, status, identity_kind, consent_version,
+	consent_at, failure_reason, last_checked_at, created_at, updated_at`
+
+type virtualAccountScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanVirtualAccount(row virtualAccountScanner) (*models.WalletVirtualAccount, error) {
+	var account models.WalletVirtualAccount
+	var consentAt, lastChecked sql.NullTime
+	err := row.Scan(
+		&account.ID, &account.FarmerID, &account.Provider, &account.TxRef,
+		&account.OrderRef, &account.ProviderRef, &account.AccountNumber,
+		&account.BankName, &account.AccountName, &account.Currency,
+		&account.Status, &account.IdentityKind, &account.ConsentVersion,
+		&consentAt, &account.FailureReason, &lastChecked,
+		&account.CreatedAt, &account.UpdatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrVirtualAccountNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if consentAt.Valid {
+		account.ConsentAt = consentAt.Time
+	}
+	if lastChecked.Valid {
+		account.LastCheckedAt = lastChecked.Time
+	}
+	return &account, nil
+}
+
+func (r *WalletRepository) GetVirtualAccount(ctx context.Context, farmerID int) (*models.WalletVirtualAccount, error) {
+	return scanVirtualAccount(r.db.QueryRowContext(ctx, `
+		SELECT `+virtualAccountColumns+`
+		FROM wallet_virtual_accounts WHERE farmer_id = $1`, farmerID))
+}
+
+// GetVirtualAccountByTxRef is how an incoming transfer is matched to its owner.
+// The webhook's tx_ref is the account's permanent reference; it is never taken
+// from the browser or from the transfer amount.
+func (r *WalletRepository) GetVirtualAccountByTxRef(ctx context.Context, txRef string) (*models.WalletVirtualAccount, error) {
+	return scanVirtualAccount(r.db.QueryRowContext(ctx, `
+		SELECT `+virtualAccountColumns+`
+		FROM wallet_virtual_accounts WHERE tx_ref = $1`, txRef))
+}
+
+// EnsureVirtualAccountAttempt creates the one row a farmer may have, or returns
+// the row another caller already created. The bool reports whether this call
+// inserted it. Two simultaneous requests therefore agree on one tx_ref instead
+// of both asking the provider to open an account.
+func (r *WalletRepository) EnsureVirtualAccountAttempt(ctx context.Context, farmerID int, provider, txRef, identityKind, consentVersion string, now time.Time) (*models.WalletVirtualAccount, bool, error) {
+	account, err := scanVirtualAccount(r.db.QueryRowContext(ctx, `
+		INSERT INTO wallet_virtual_accounts
+			(farmer_id, provider, tx_ref, identity_kind, consent_version, consent_at, status, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, 'pending', $6)
+		ON CONFLICT (farmer_id) DO NOTHING
+		RETURNING `+virtualAccountColumns,
+		farmerID, provider, txRef, identityKind, consentVersion, now))
+	if err == nil {
+		return account, true, nil
+	}
+	if !errors.Is(err, ErrVirtualAccountNotFound) {
+		return nil, false, err
+	}
+	existing, err := r.GetVirtualAccount(ctx, farmerID)
+	if err != nil {
+		return nil, false, err
+	}
+	return existing, false, nil
+}
+
+// ResetVirtualAccountAttempt refreshes the consent record on a retry and puts a
+// failed row back into pending. An active account is never reset: its details
+// stay valid and a retry must not replace it.
+func (r *WalletRepository) ResetVirtualAccountAttempt(ctx context.Context, farmerID int, identityKind, consentVersion string, now time.Time) error {
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE wallet_virtual_accounts
+		SET status = 'pending', identity_kind = $2, consent_version = $3,
+			consent_at = $4, failure_reason = '', updated_at = $4
+		WHERE farmer_id = $1 AND status <> 'active'`,
+		farmerID, identityKind, consentVersion, now)
+	return err
+}
+
+// ActivateVirtualAccount stores the provider's confirmed details. It refuses to
+// overwrite a different active account, which protects the farmer from a
+// late-arriving response to an old attempt changing where their money lands.
+func (r *WalletRepository) ActivateVirtualAccount(ctx context.Context, farmerID int, orderRef, providerRef, accountNumber, bankName, accountName, currency string, now time.Time) error {
+	current, err := r.GetVirtualAccount(ctx, farmerID)
+	if err != nil {
+		return err
+	}
+	if current.Status == models.VirtualAccountActive {
+		if current.AccountNumber == accountNumber {
+			return nil
+		}
+		return fmt.Errorf("a different virtual account is already active for this farmer")
+	}
+	if strings.TrimSpace(currency) == "" {
+		currency = "NGN"
+	}
+	_, err = r.db.ExecContext(ctx, `
+		UPDATE wallet_virtual_accounts
+		SET status = 'active', order_ref = $2, provider_ref = $3,
+			account_number = $4, bank_name = $5, account_name = $6,
+			currency = $7, failure_reason = '', last_checked_at = $8, updated_at = $8
+		WHERE farmer_id = $1 AND (status <> 'active' OR account_number = $4)`,
+		farmerID, orderRef, providerRef, accountNumber, bankName, accountName, currency, now)
+	return err
+}
+
+func (r *WalletRepository) FailVirtualAccountAttempt(ctx context.Context, farmerID int, reason string, now time.Time) error {
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE wallet_virtual_accounts
+		SET status = 'failed', failure_reason = $2, updated_at = $3
+		WHERE farmer_id = $1 AND status <> 'active'`,
+		farmerID, reason, now)
+	return err
+}
+
+func (r *WalletRepository) MarkVirtualAccountChecked(ctx context.Context, farmerID int, now time.Time) error {
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE wallet_virtual_accounts SET last_checked_at = $2 WHERE farmer_id = $1`,
+		farmerID, now)
+	return err
+}
+
+// ListVirtualAccountsForReconciliation rotates through active accounts, least
+// recently checked first, so one pass is bounded and every account is reached.
+func (r *WalletRepository) ListVirtualAccountsForReconciliation(ctx context.Context, limit int) ([]models.WalletVirtualAccount, error) {
+	if limit <= 0 {
+		limit = 25
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT `+virtualAccountColumns+`
+		FROM wallet_virtual_accounts
+		WHERE status = 'active'
+		ORDER BY last_checked_at ASC NULLS FIRST, id ASC
+		LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var accounts []models.WalletVirtualAccount
+	for rows.Next() {
+		account, err := scanVirtualAccount(rows)
+		if err != nil {
+			return nil, err
+		}
+		accounts = append(accounts, *account)
+	}
+	return accounts, rows.Err()
+}
+
+// ListPendingVirtualAccountDeposits lists transfers the provider reported but
+// did not settle, so the pass can verify them by their own transaction id.
+func (r *WalletRepository) ListPendingVirtualAccountDeposits(ctx context.Context, limit int) ([]models.PendingVirtualAccountTransfer, error) {
+	if limit <= 0 {
+		limit = 25
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT w.farmer_id, d.reference, d.provider_transaction_id, d.amount::text, d.currency
+		FROM wallet_deposits d
+		JOIN wallets w ON w.id = d.wallet_id
+		WHERE d.provider = 'flutterwave'
+			AND d.status = 'pending'
+			AND d.provider_transaction_id IS NOT NULL
+			AND d.reference LIKE 'VA-%'
+		ORDER BY d.created_at ASC, d.id ASC
+		LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var transfers []models.PendingVirtualAccountTransfer
+	for rows.Next() {
+		var transfer models.PendingVirtualAccountTransfer
+		if err := rows.Scan(&transfer.FarmerID, &transfer.Reference,
+			&transfer.ProviderTransactionID, &transfer.Amount, &transfer.Currency); err != nil {
+			return nil, err
+		}
+		transfers = append(transfers, transfer)
+	}
+	return transfers, rows.Err()
+}
+
+// RecordPendingVirtualAccountDeposit remembers an incoming transfer the provider
+// has not settled. It never credits the wallet; it only gives reconciliation a
+// transaction id to ask about later.
+func (r *WalletRepository) RecordPendingVirtualAccountDeposit(ctx context.Context, farmerID int, reference, providerTxnID, amount, currency string) error {
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO wallet_deposits
+			(wallet_id, provider, reference, provider_transaction_id, amount, currency, status)
+		SELECT id, 'flutterwave', $2, $3, $4::numeric, $5, 'pending'
+		FROM wallets WHERE farmer_id = $1
+		ON CONFLICT (provider, provider_transaction_id) DO NOTHING`,
+		farmerID, reference, providerTxnID, amount, currency)
+	return err
+}
+
+// CreditVirtualAccountDeposit credits a verified incoming transfer exactly once.
+//
+// The provider transaction id is the idempotency key: a retried webhook, a
+// concurrent delivery and the reconciliation pass all name the same payment, and
+// only the call that inserts the successful row moves the balance. The amount
+// moves as a NUMERIC value, never as a float.
+func (r *WalletRepository) CreditVirtualAccountDeposit(ctx context.Context, farmerID int, reference, providerTxnID, amount, currency string) (bool, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+
+	var walletID int64
+	err = tx.QueryRowContext(ctx, `SELECT id FROM wallets WHERE farmer_id = $1`, farmerID).Scan(&walletID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, ErrWalletNotFound
+	}
+	if err != nil {
+		return false, err
+	}
+
+	var depositID int64
+	err = tx.QueryRowContext(ctx, `
+		INSERT INTO wallet_deposits
+			(wallet_id, provider, reference, provider_transaction_id, amount, currency,
+			 verified_amount, verified_currency, status)
+		VALUES ($1, 'flutterwave', $2, $3, $4::numeric, $5, $4::numeric, $5, 'successful')
+		ON CONFLICT (provider, provider_transaction_id) DO NOTHING
+		RETURNING id`,
+		walletID, reference, providerTxnID, amount, currency).Scan(&depositID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return false, err
+	}
+
+	credited := false
+	if err == nil {
+		credited = true
+	} else {
+		// The payment is already recorded. Credit only a row that was still
+		// pending for this same wallet and the same verified money; anything else
+		// is a conflict that a human has to look at.
+		var storedDepositID, storedWalletID int64
+		var storedStatus, storedAmount, storedCurrency, storedReference string
+		err = tx.QueryRowContext(ctx, `
+			SELECT id, wallet_id, status, amount::text, currency, reference
+			FROM wallet_deposits
+			WHERE provider = 'flutterwave' AND provider_transaction_id = $1
+			FOR UPDATE`, providerTxnID,
+		).Scan(&storedDepositID, &storedWalletID, &storedStatus, &storedAmount, &storedCurrency, &storedReference)
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, fmt.Errorf("virtual account deposit disappeared during credit")
+		}
+		if err != nil {
+			return false, err
+		}
+		if storedWalletID != walletID {
+			return false, fmt.Errorf("provider transaction belongs to a different wallet")
+		}
+		if storedStatus == models.DepositSuccessful {
+			if storedAmount == amount && storedCurrency == currency {
+				return false, nil
+			}
+			return false, fmt.Errorf("provider transaction was already credited with different details")
+		}
+		if storedStatus != models.DepositPending && storedStatus != models.DepositProcessing {
+			return false, fmt.Errorf("provider transaction cannot be credited from status %s", storedStatus)
+		}
+		if storedAmount != amount || storedCurrency != currency {
+			return false, fmt.Errorf("verified amount or currency does not match the pending transfer")
+		}
+		reference = storedReference
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE wallet_deposits
+			SET status = 'successful', verified_amount = $1::numeric,
+				verified_currency = $2, updated_at = $3
+			WHERE id = $4`,
+			amount, currency, time.Now(), storedDepositID); err != nil {
+			return false, err
+		}
+		credited = true
+	}
+
+	if !credited {
+		return false, nil
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE wallets SET balance = balance + $1::numeric, updated_at = $2 WHERE id = $3`,
+		amount, time.Now(), walletID); err != nil {
+		return false, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO wallet_transactions (wallet_id, reference, type, amount)
+		VALUES ($1, $2, 'deposit', $3::numeric)`,
+		walletID, "deposit:"+reference, amount); err != nil {
+		return false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// FailVirtualAccountDeposit closes a pending incoming transfer the provider says
+// did not succeed. No balance moves: a pending transfer was never credited.
+func (r *WalletRepository) FailVirtualAccountDeposit(ctx context.Context, providerTxnID, status string, now time.Time) error {
+	if status != models.DepositFailed && status != models.DepositReversed {
+		return fmt.Errorf("invalid deposit failure status %q", status)
+	}
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE wallet_deposits SET status = $2, updated_at = $3
+		WHERE provider = 'flutterwave' AND provider_transaction_id = $1 AND status = 'pending'`,
+		providerTxnID, status, now)
+	return err
+}
+
+// ReverseVirtualAccountDeposit unwinds a transfer the provider has reversed.
+//
+// A pending transfer is simply marked reversed. A credited one is debited only
+// when the wallet still holds the money; otherwise nothing is changed and the
+// caller is told, because forcing the debit would violate the wallet's
+// non-negative balance rule and hide a real shortfall.
+func (r *WalletRepository) ReverseVirtualAccountDeposit(ctx context.Context, providerTxnID, amount, currency string, now time.Time) (bool, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+
+	var depositID, walletID int64
+	var status, storedAmount, storedCurrency, reference string
+	err = tx.QueryRowContext(ctx, `
+		SELECT id, wallet_id, status, amount::text, currency, reference
+		FROM wallet_deposits
+		WHERE provider = 'flutterwave' AND provider_transaction_id = $1
+		FOR UPDATE`, providerTxnID,
+	).Scan(&depositID, &walletID, &status, &storedAmount, &storedCurrency, &reference)
+	if errors.Is(err, sql.ErrNoRows) {
+		// Nothing was recorded, so there is no funded balance to unwind.
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if status == models.DepositReversed {
+		return false, nil
+	}
+	if status == models.DepositSuccessful {
+		if storedAmount != amount || !strings.EqualFold(storedCurrency, currency) {
+			return false, fmt.Errorf("reversal details do not match the credited transfer")
+		}
+		result, err := tx.ExecContext(ctx, `
+			UPDATE wallets SET balance = balance - $1::numeric, updated_at = $2
+			WHERE id = $3 AND balance >= $1::numeric`,
+			amount, now, walletID)
+		if err != nil {
+			return false, err
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return false, err
+		}
+		if affected != 1 {
+			return false, ErrDepositReversalUnfunded
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO wallet_transactions (wallet_id, reference, type, amount)
+			VALUES ($1, $2, 'deposit_reversal', $3::numeric)`,
+			walletID, "deposit-reversal:"+providerTxnID, amount); err != nil {
+			return false, err
+		}
+	} else if status != models.DepositPending && status != models.DepositProcessing &&
+		status != models.DepositFailed && status != models.DepositExpired {
+		return false, fmt.Errorf("deposit cannot be reversed from status %s", status)
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE wallet_deposits SET status = 'reversed', updated_at = $2 WHERE id = $1`,
+		depositID, now); err != nil {
+		return false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (r *WalletRepository) CreateWithdrawal(ctx context.Context, farmerID int, reference, amount string) error {

@@ -2,17 +2,18 @@ package repository
 
 import (
 	"backend/internal/models"
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
 	"time"
 )
 
-func (r *MarketEventRepository) DemandSummary(produceType string, since, previousSince time.Time) (models.ProduceDemandSummary, error) {
+func (r *MarketEventRepository) DemandSummary(ctx context.Context, produceType string, since, previousSince time.Time) (models.ProduceDemandSummary, error) {
 	var s models.ProduceDemandSummary
 	var currentTotal, previousTotal int
 	s.ProduceType = produceType
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowContext(ctx, `
 		SELECT COALESCE(SUM(CASE WHEN e.event_type='listing_view' AND e.created_at >= $2 THEN 1 ELSE 0 END),0),
 		       COALESCE(SUM(CASE WHEN e.event_type='cart_item_added' AND e.created_at >= $2 THEN 1 ELSE 0 END),0),
 		       COALESCE(SUM(CASE WHEN e.event_type IN ('negotiation_started','negotiation_created') AND e.created_at >= $2 THEN 1 ELSE 0 END),0),
@@ -26,7 +27,7 @@ func (r *MarketEventRepository) DemandSummary(produceType string, since, previou
 	if err != nil {
 		return s, err
 	}
-	if err := r.db.QueryRow(`SELECT COUNT(*) FILTER (WHERE e.created_at >= $2), COUNT(*) FILTER (WHERE e.created_at >= $3 AND e.created_at < $2) FROM market_events e JOIN crops c ON c.id=e.crop_id WHERE LOWER(c.name)=LOWER($1)`, produceType, since, previousSince).Scan(&currentTotal, &previousTotal); err != nil {
+	if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FILTER (WHERE e.created_at >= $2), COUNT(*) FILTER (WHERE e.created_at >= $3 AND e.created_at < $2) FROM market_events e JOIN crops c ON c.id=e.crop_id WHERE LOWER(c.name)=LOWER($1)`, produceType, since, previousSince).Scan(&currentTotal, &previousTotal); err != nil {
 		return s, err
 	}
 	s.TrendPercent = calculateTrendPercent(currentTotal, previousTotal)
@@ -44,8 +45,8 @@ func (r *MarketEventRepository) DemandSummary(produceType string, since, previou
 	return s, nil
 }
 
-func (r *MarketEventRepository) GroupedDemandSummaries(farmerID int, location string, since, previous time.Time) ([]models.ProduceDemandSummary, error) {
-	rows, err := r.db.Query(`SELECT DISTINCT name FROM crops WHERE farmer_id=$1 ORDER BY name`, farmerID)
+func (r *MarketEventRepository) GroupedDemandSummaries(ctx context.Context, farmerID int, location string, since, previous time.Time) ([]models.ProduceDemandSummary, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT DISTINCT name FROM crops WHERE farmer_id=$1 ORDER BY name`, farmerID)
 	if err != nil {
 		return nil, err
 	}
@@ -63,36 +64,36 @@ func (r *MarketEventRepository) GroupedDemandSummaries(farmerID int, location st
 	}
 	result := make([]models.ProduceDemandSummary, 0, len(names))
 	for _, name := range names {
-		s, err := r.DemandSummary(name, since, previous)
+		s, err := r.DemandSummary(ctx, name, since, previous)
 		if err != nil {
 			return nil, err
 		}
 		s.ComparisonLocation = location
 		var minimum, median, maximum sql.NullFloat64
 		var count int
-		if err := r.db.QueryRow(`SELECT MIN(price_per_unit), PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_unit), MAX(price_per_unit), COUNT(*) FROM crops WHERE LOWER(name)=LOWER($1) AND listed_for_sale=true AND LOWER(location)=LOWER($2) AND farmer_id<>$3`, name, location, farmerID).Scan(&minimum, &median, &maximum, &count); err != nil {
+		if err := r.db.QueryRowContext(ctx, `SELECT MIN(price_per_unit), PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_unit), MAX(price_per_unit), COUNT(*) FROM crops WHERE LOWER(name)=LOWER($1) AND listed_for_sale=true AND LOWER(location)=LOWER($2) AND farmer_id<>$3`, name, location, farmerID).Scan(&minimum, &median, &maximum, &count); err != nil {
 			return nil, err
 		} else if count > 0 {
 			s.LocalPriceMin, s.LocalPriceMedian, s.LocalPriceMax = minimum.Float64, median.Float64, maximum.Float64
 			s.PriceAvailable = true
 		}
-		if err := r.db.QueryRow(`SELECT COUNT(*), COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_unit),0) FROM crops WHERE listed_for_sale=true AND LOWER(name)=LOWER($1) AND farmer_id<>$2 AND LOWER(state)=LOWER((SELECT state FROM farmers WHERE id=$2))`, name, farmerID).Scan(&s.StateListings, &s.StatePriceMedian); err != nil {
+		if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*), COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_unit),0) FROM crops WHERE listed_for_sale=true AND LOWER(name)=LOWER($1) AND farmer_id<>$2 AND LOWER(state)=LOWER((SELECT state FROM farmers WHERE id=$2))`, name, farmerID).Scan(&s.StateListings, &s.StatePriceMedian); err != nil {
 			return nil, err
 		}
-		if err := r.db.QueryRow(`SELECT COUNT(*), COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_unit),0) FROM crops WHERE listed_for_sale=true AND LOWER(name)=LOWER($1) AND farmer_id<>$2 AND LOWER(lga) IN (SELECT LOWER(neighbor_lga) FROM lga_neighbors WHERE LOWER(state)=LOWER((SELECT state FROM farmers WHERE id=$2)) AND LOWER(lga)=LOWER((SELECT lga FROM farmers WHERE id=$2)))`, name, farmerID).Scan(&s.NearbyListings, &s.NearbyPriceMedian); err != nil {
+		if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*), COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_unit),0) FROM crops WHERE listed_for_sale=true AND LOWER(name)=LOWER($1) AND farmer_id<>$2 AND LOWER(lga) IN (SELECT LOWER(neighbor_lga) FROM lga_neighbors WHERE LOWER(state)=LOWER((SELECT state FROM farmers WHERE id=$2)) AND LOWER(lga)=LOWER((SELECT lga FROM farmers WHERE id=$2)))`, name, farmerID).Scan(&s.NearbyListings, &s.NearbyPriceMedian); err != nil {
 			return nil, err
 		}
-		if err := r.db.QueryRow(`SELECT COUNT(*), COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_unit),0) FROM crops WHERE listed_for_sale=true AND LOWER(name)=LOWER($1) AND farmer_id<>$2`, name, farmerID).Scan(&s.NationalListings, &s.NationalPriceMedian); err != nil {
+		if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*), COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_unit),0) FROM crops WHERE listed_for_sale=true AND LOWER(name)=LOWER($1) AND farmer_id<>$2`, name, farmerID).Scan(&s.NationalListings, &s.NationalPriceMedian); err != nil {
 			return nil, err
 		}
 		s.ComparisonScope = "Local LGA"
 		if s.StateListings == 0 && s.NationalListings == 0 {
 			s.ComparisonScope = "No independent listings"
 		}
-		if err := r.db.QueryRow(`SELECT COALESCE(AVG(price_per_unit),0) FROM crops WHERE farmer_id=$1 AND LOWER(name)=LOWER($2) AND listed_for_sale=true`, farmerID, name).Scan(&s.FarmerPrice); err != nil {
+		if err := r.db.QueryRowContext(ctx, `SELECT COALESCE(AVG(price_per_unit),0) FROM crops WHERE farmer_id=$1 AND LOWER(name)=LOWER($2) AND listed_for_sale=true`, farmerID, name).Scan(&s.FarmerPrice); err != nil {
 			return nil, err
 		}
-		if err := r.db.QueryRow(`SELECT COUNT(*), COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_unit),0) FROM external_market_prices WHERE LOWER(produce_type)=LOWER($1) AND collected_at >= $2 AND (state IS NULL OR LOWER(state)=LOWER((SELECT state FROM farmers WHERE id=$3)))`, name, since, farmerID).Scan(&s.ExternalListings, &s.ExternalPriceMedian); err != nil {
+		if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*), COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_unit),0) FROM external_market_prices WHERE LOWER(produce_type)=LOWER($1) AND collected_at >= $2 AND (state IS NULL OR LOWER(state)=LOWER((SELECT state FROM farmers WHERE id=$3)))`, name, since, farmerID).Scan(&s.ExternalListings, &s.ExternalPriceMedian); err != nil {
 			return nil, err
 		}
 		s.ExternalPriceAvailable = s.ExternalListings > 0 && s.ExternalPriceMedian > 0
@@ -116,18 +117,18 @@ func (r *MarketEventRepository) GroupedDemandSummaries(farmerID int, location st
 	return result, nil
 }
 
-func (r *MarketEventRepository) FarmerDemandSummary(farmerID int, location string, since, previousSince time.Time) (models.ProduceDemandSummary, error) {
+func (r *MarketEventRepository) FarmerDemandSummary(ctx context.Context, farmerID int, location string, since, previousSince time.Time) (models.ProduceDemandSummary, error) {
 	var s models.ProduceDemandSummary
 	var current, previous int
-	err := r.db.QueryRow(`SELECT COUNT(*) FILTER (WHERE e.created_at >= $2), COUNT(*) FILTER (WHERE e.created_at >= $3 AND e.created_at < $2), COUNT(*) FILTER (WHERE e.event_type='listing_view' AND e.created_at >= $2), COUNT(*) FILTER (WHERE e.event_type='cart_item_added' AND e.created_at >= $2), COUNT(*) FILTER (WHERE e.event_type IN ('negotiation_started','negotiation_created') AND e.created_at >= $2), COUNT(*) FILTER (WHERE e.event_type='checkout_completed' AND e.created_at >= $2), COALESCE(SUM(CASE WHEN e.event_type='checkout_completed' AND e.created_at >= $2 THEN COALESCE((e.metadata->>'quantity')::double precision,0) ELSE 0 END),0), COUNT(DISTINCT c.id) FROM market_events e JOIN crops c ON c.id=e.crop_id WHERE c.farmer_id=$1`, farmerID, since, previousSince).Scan(&current, &previous, &s.Views, &s.CartAdds, &s.Negotiations, &s.Orders, &s.UnitsOrdered, &s.CurrentListings)
-	_ = r.db.QueryRow(`SELECT COUNT(*) FROM marketplace_searches WHERE created_at >= $1`, since).Scan(&s.Searches)
-	_ = r.db.QueryRow(`SELECT COUNT(*) FROM marketplace_searches WHERE created_at >= $1 AND LOWER(location)=LOWER($2)`, since, location).Scan(&s.Searches)
-	_ = r.db.QueryRow(`SELECT COUNT(*) FROM crops WHERE listed_for_sale=true AND LOWER(location)=LOWER($1)`, location).Scan(&s.LocalListings)
+	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FILTER (WHERE e.created_at >= $2), COUNT(*) FILTER (WHERE e.created_at >= $3 AND e.created_at < $2), COUNT(*) FILTER (WHERE e.event_type='listing_view' AND e.created_at >= $2), COUNT(*) FILTER (WHERE e.event_type='cart_item_added' AND e.created_at >= $2), COUNT(*) FILTER (WHERE e.event_type IN ('negotiation_started','negotiation_created') AND e.created_at >= $2), COUNT(*) FILTER (WHERE e.event_type='checkout_completed' AND e.created_at >= $2), COALESCE(SUM(CASE WHEN e.event_type='checkout_completed' AND e.created_at >= $2 THEN COALESCE((e.metadata->>'quantity')::double precision,0) ELSE 0 END),0), COUNT(DISTINCT c.id) FROM market_events e JOIN crops c ON c.id=e.crop_id WHERE c.farmer_id=$1`, farmerID, since, previousSince).Scan(&current, &previous, &s.Views, &s.CartAdds, &s.Negotiations, &s.Orders, &s.UnitsOrdered, &s.CurrentListings)
+	_ = r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM marketplace_searches WHERE created_at >= $1`, since).Scan(&s.Searches)
+	_ = r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM marketplace_searches WHERE created_at >= $1 AND LOWER(location)=LOWER($2)`, since, location).Scan(&s.Searches)
+	_ = r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM crops WHERE listed_for_sale=true AND LOWER(location)=LOWER($1)`, location).Scan(&s.LocalListings)
 	s.ComparisonLocation = location
-	_ = r.db.QueryRow(`SELECT COUNT(*) FILTER (WHERE status='open'), COUNT(*) FILTER (WHERE status='accepted'), COUNT(*) FILTER (WHERE status='rejected'), COALESCE(SUM(quantity),0) FROM negotiations WHERE farmer_id=$1 AND created_at >= $2`, farmerID, since).Scan(&s.NegotiationsActive, &s.NegotiationsAccepted, &s.NegotiationsRejected, &s.NegotiatedUnits)
-	_ = r.db.QueryRow(`SELECT COALESCE(AVG(m.offer_price),0) FROM negotiation_messages m JOIN negotiations n ON n.id=m.negotiation_id WHERE n.farmer_id=$1 AND m.message_type='offer' AND m.offer_price>0 AND m.created_at >= $2`, farmerID, since).Scan(&s.AverageOfferPrice)
+	_ = r.db.QueryRowContext(ctx, `SELECT COUNT(*) FILTER (WHERE status='open'), COUNT(*) FILTER (WHERE status='accepted'), COUNT(*) FILTER (WHERE status='rejected'), COALESCE(SUM(quantity),0) FROM negotiations WHERE farmer_id=$1 AND created_at >= $2`, farmerID, since).Scan(&s.NegotiationsActive, &s.NegotiationsAccepted, &s.NegotiationsRejected, &s.NegotiatedUnits)
+	_ = r.db.QueryRowContext(ctx, `SELECT COALESCE(AVG(m.offer_price),0) FROM negotiation_messages m JOIN negotiations n ON n.id=m.negotiation_id WHERE n.farmer_id=$1 AND m.message_type='offer' AND m.offer_price>0 AND m.created_at >= $2`, farmerID, since).Scan(&s.AverageOfferPrice)
 	var initial, remaining float64
-	_ = r.db.QueryRow(`SELECT COALESCE(SUM(initial_listed_quantity),0), COALESCE(SUM(quantity),0), COALESCE(AVG(EXTRACT(EPOCH FROM (first_order_at-first_listed_at))/3600) FILTER (WHERE first_order_at IS NOT NULL AND first_listed_at IS NOT NULL),0), COALESCE(AVG(EXTRACT(EPOCH FROM (sold_out_at-first_listed_at))/3600) FILTER (WHERE sold_out_at IS NOT NULL AND first_listed_at IS NOT NULL),0) FROM crops WHERE farmer_id=$1`, farmerID).Scan(&initial, &remaining, &s.TimeToFirstOrderHours, &s.TimeToSellOutHours)
+	_ = r.db.QueryRowContext(ctx, `SELECT COALESCE(SUM(initial_listed_quantity),0), COALESCE(SUM(quantity),0), COALESCE(AVG(EXTRACT(EPOCH FROM (first_order_at-first_listed_at))/3600) FILTER (WHERE first_order_at IS NOT NULL AND first_listed_at IS NOT NULL),0), COALESCE(AVG(EXTRACT(EPOCH FROM (sold_out_at-first_listed_at))/3600) FILTER (WHERE sold_out_at IS NOT NULL AND first_listed_at IS NOT NULL),0) FROM crops WHERE farmer_id=$1`, farmerID).Scan(&initial, &remaining, &s.TimeToFirstOrderHours, &s.TimeToSellOutHours)
 	s.SellThroughRate = calculateSellThrough(initial, remaining)
 	s.LifecycleDataAvailable = initial > 0
 	if s.NegotiationsActive+s.NegotiationsAccepted+s.NegotiationsRejected > 0 {
@@ -344,11 +345,11 @@ func validateExternalPrice(produce string, price float64, unit, provider, market
 
 // ReconcileCheckoutAbandonments records one abandonment for checkout starts
 // that remained incomplete beyond the timeout. It is safe to run repeatedly.
-func (r *MarketEventRepository) ReconcileCheckoutAbandonments(timeout time.Duration) error {
+func (r *MarketEventRepository) ReconcileCheckoutAbandonments(ctx context.Context, timeout time.Duration) error {
 	if timeout <= 0 {
 		timeout = 24 * time.Hour
 	}
-	_, err := r.db.Exec(`INSERT INTO market_events (event_type,user_id,session_id,metadata,created_at)
+	_, err := r.db.ExecContext(ctx, `INSERT INTO market_events (event_type,user_id,session_id,metadata,created_at)
 		SELECT 'checkout_abandoned', s.user_id, s.session_id, jsonb_build_object('checkout_started_event_id',s.id), CURRENT_TIMESTAMP
 		FROM market_events s
 		WHERE s.event_type='checkout_started' AND s.created_at < CURRENT_TIMESTAMP-$1::interval

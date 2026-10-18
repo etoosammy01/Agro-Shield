@@ -148,7 +148,7 @@ func NewContainer(
 	// Flutterwave API.
 	// ========================================================
 
-	walletService := services.NewWalletService(walletRepo, farmerRepo, flutterwaveClient, walletAdminIDs, commissionBasisPoints, staleDepositAfter)
+	walletService := services.NewWalletService(walletRepo, farmerRepo, flutterwaveClient, bankLookupRepo, walletAdminIDs, commissionBasisPoints, notificationService, staleDepositAfter)
 	paymentService := services.NewPaymentService(paymentRepo, orderRepo, farmerRepo, flutterwaveClient, walletService)
 
 	// One-time passcodes guard password resets and wallet payouts. The

@@ -193,10 +193,13 @@ func (s *PaymentService) ProcessWebhook(ctx context.Context, body []byte, receiv
 	var payload struct {
 		Event string `json:"event"`
 		Data  struct {
-			ID        int64  `json:"id"`
-			TxRef     string `json:"tx_ref"`
-			Reference string `json:"reference"`
-			Status    string `json:"status"`
+			ID          int64   `json:"id"`
+			TxRef       string  `json:"tx_ref"`
+			Reference   string  `json:"reference"`
+			Status      string  `json:"status"`
+			Amount      float64 `json:"amount"`
+			Currency    string  `json:"currency"`
+			PaymentType string  `json:"payment_type"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
@@ -241,6 +244,45 @@ func (s *PaymentService) ProcessWebhook(ctx context.Context, body []byte, receiv
 	verified, err := s.fw.VerifyTransaction(transactionID)
 	if err != nil {
 		return false, fmt.Errorf("verify transaction: %w", err)
+	}
+
+	// A permanent virtual account has one tx_ref for every transfer it receives,
+	// so it must be routed before the checkout-deposit check: its reference is
+	// not a deposit reference and the amount is not known in advance.
+	isVirtualAccount, err := s.wallet.IsVirtualAccountTransfer(ctx, verified.TxRef)
+	if err != nil {
+		return false, err
+	}
+	if isVirtualAccount {
+		if payload.Data.TxRef != verified.TxRef {
+			return false, ErrReferenceMismatch
+		}
+		// Flutterwave marks transfers into a virtual account as bank transfers.
+		// An omitted value is tolerated for compatibility; a different value says
+		// this verified payment is not the kind of payment this branch handles.
+		if paymentType := strings.TrimSpace(payload.Data.PaymentType); paymentType != "" &&
+			!strings.EqualFold(paymentType, "bank_transfer") {
+			return false, errors.New("verified transaction is not a bank transfer")
+		}
+		if payload.Data.Currency != "" && !strings.EqualFold(payload.Data.Currency, verified.Currency) {
+			return false, errors.New("webhook currency does not match the verified transaction")
+		}
+		if payload.Data.Amount > 0 && !sameMoney(fmt.Sprintf("%.2f", payload.Data.Amount), verified.Amount) {
+			return false, errors.New("webhook amount does not match the verified transaction")
+		}
+		settled, err := s.wallet.SettleVirtualAccountTransfer(ctx, verified, payload.Data.TxRef)
+		if err != nil {
+			return false, fmt.Errorf("settle virtual account transfer: %w", err)
+		}
+		if !settled {
+			// Still pending at the provider. Leave the delivery unprocessed so a
+			// retry, or reconciliation, can settle it later.
+			return false, nil
+		}
+		if err := s.repo.MarkWebhookProcessed(ctx, transactionID, payload.Event); err != nil {
+			return false, fmt.Errorf("mark virtual account webhook processed: %w", err)
+		}
+		return false, nil
 	}
 
 	_, isWalletDeposit, err := s.wallet.IsWalletDeposit(ctx, verified.TxRef)

@@ -23,7 +23,12 @@
         </nav>
     </header>
 
-    <main class="wallet-page">
+    <main class="wallet-page"
+        data-wallet-balance="{{.Wallet.Balance}}"
+        data-wallet-currency="{{.Wallet.Currency}}"
+        data-latest-transaction-id="{{.LatestTransactionID}}"
+        data-latest-deposit-id="{{.LatestDepositID}}"
+        data-latest-deposit-status="{{if .Deposits}}{{(index .Deposits 0).Status}}{{end}}">
         <section class="wallet-hero">
             <div class="wallet-hero-copy">
                 <p class="wallet-eyebrow">Your money, growing with your farm</p>
@@ -46,6 +51,111 @@
         {{if .Error}}<p class="wallet-alert wallet-alert-error" role="alert"><span aria-hidden="true">!</span>{{.Error}}</p>{{end}}
         {{if .Success}}<p class="wallet-alert wallet-alert-success" role="status"><span aria-hidden="true">✓</span>{{.Success}}</p>{{end}}
         <p class="wallet-alert wallet-alert-info" id="connection-status" role="status" aria-live="polite" hidden></p>
+
+        <section class="wallet-funding" aria-labelledby="funding-account-heading">
+            <article class="wallet-card wallet-funding-card">
+                <div class="wallet-funding-main">
+                    <div class="wallet-card-icon" aria-hidden="true">₦</div>
+                    <p class="wallet-card-kicker">Permanent funding account</p>
+                    <h2 id="funding-account-heading">Receive money into your wallet</h2>
+
+                    {{if and .VirtualAccount .VirtualAccount.Ready}}
+                    <p class="wallet-funding-lead">Transfer to this account from any Nigerian bank app. The account stays yours, so you can use it for every top-up.</p>
+                    <dl class="wallet-account-details">
+                        <div>
+                            <dt>Bank</dt>
+                            <dd>{{if .VirtualAccount.BankName}}{{.VirtualAccount.BankName}}{{else}}<span class="wallet-muted">Not returned by Flutterwave</span>{{end}}</dd>
+                        </div>
+                        <div>
+                            <dt>Account number</dt>
+                            <dd class="wallet-account-number-row">
+                                <span class="wallet-account-number" id="funding-account-number">{{.VirtualAccount.AccountNumber}}</span>
+                                <button class="wallet-copy-button" type="button" data-copy-target="funding-account-number" aria-label="Copy your funding account number">Copy number</button>
+                                <span class="wallet-inline-status" id="funding-copy-status" role="status" aria-live="polite"></span>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>Account name</dt>
+                            <dd>{{if .VirtualAccount.AccountName}}{{.VirtualAccount.AccountName}}{{else}}<span class="wallet-muted">Not returned by Flutterwave — use your registered name</span>{{end}}</dd>
+                        </div>
+                    </dl>
+                    <p class="wallet-verification-status wallet-verification-active" role="status">
+                        <span aria-hidden="true">✓</span> Identity verified and funding account active
+                    </p>
+                    {{else if .VirtualAccount}}
+                    <p class="wallet-funding-lead">
+                        {{if eq .VirtualAccount.Status "failed"}}
+                        Flutterwave did not complete this funding account. No account details were confirmed. You can submit your details again.
+                        {{else}}
+                        Flutterwave has not confirmed your funding account yet. Nothing is lost: your existing wallet and payout details still work.
+                        {{end}}
+                    </p>
+                    <p class="wallet-verification-status wallet-verification-pending" role="status">
+                        <span aria-hidden="true">◷</span>
+                        {{if eq .VirtualAccount.Status "failed"}}Setup did not complete{{else}}Identity submitted — waiting for Flutterwave{{end}}
+                    </p>
+                    {{if and (eq .VirtualAccount.Status "pending") .VirtualAccount.TxRef}}
+                    <form method="POST" action="/wallet/virtual-account/check" class="wallet-check-form">
+                        <button class="wallet-button wallet-button-secondary" type="submit">Check account status</button>
+                    </form>
+                    {{end}}
+                    {{if .HasEmail}}
+                    <form method="POST" action="/wallet/virtual-account" class="wallet-identity-form" data-virtual-account-form>
+                        <p class="wallet-form-heading">{{if eq .VirtualAccount.Status "failed"}}Try again{{else}}Retry setup{{end}}</p>
+                        <label class="wallet-label" for="identity-kind">Identity document</label>
+                        <select id="identity-kind" name="identity_kind" required>
+                            <option value="bvn">BVN</option>
+                            <option value="nin">NIN</option>
+                        </select>
+                        <label class="wallet-label" for="identity-number">BVN or NIN number</label>
+                        <input id="identity-number" name="identity_number" type="text" inputmode="numeric" pattern="[0-9]{11}" maxlength="11" autocomplete="off" placeholder="11 digits" required>
+                        <label class="wallet-consent" for="virtual-account-consent">
+                            <input id="virtual-account-consent" type="checkbox" name="consent" value="yes" required>
+                            <span>I agree that Agro-Shield may share my name, email address, phone number and the BVN or NIN above with Flutterwave to open a permanent NGN virtual bank account in my name. Agro-Shield does not store the BVN or NIN.</span>
+                        </label>
+                        <button class="wallet-button wallet-button-primary" type="submit" data-va-submit>Retry funding account <span aria-hidden="true">→</span></button>
+                        <p class="wallet-inline-status" id="virtual-account-status" role="status" aria-live="polite"></p>
+                    </form>
+                    {{else}}
+                    <p class="wallet-alert wallet-alert-info">Add an email address to your profile before creating a funding account. <a href="/profile/edit">Update your profile</a></p>
+                    {{end}}
+                    {{else}}
+                    <p class="wallet-funding-lead">Open a permanent NGN virtual account with Flutterwave. Transfers from any Nigerian bank app will land in your Agro-Shield wallet after the provider confirms them.</p>
+                    {{if .HasEmail}}
+                    <form method="POST" action="/wallet/virtual-account" class="wallet-identity-form" data-virtual-account-form>
+                        <label class="wallet-label" for="identity-kind">Identity document</label>
+                        <select id="identity-kind" name="identity_kind" required>
+                            <option value="bvn">BVN</option>
+                            <option value="nin">NIN</option>
+                        </select>
+                        <label class="wallet-label" for="identity-number">BVN or NIN number</label>
+                        <input id="identity-number" name="identity_number" type="text" inputmode="numeric" pattern="[0-9]{11}" maxlength="11" autocomplete="off" placeholder="11 digits" required>
+                        <label class="wallet-consent" for="virtual-account-consent">
+                            <input id="virtual-account-consent" type="checkbox" name="consent" value="yes" required>
+                            <span>I agree that Agro-Shield may share my name, email address, phone number and the BVN or NIN above with Flutterwave to open a permanent NGN virtual bank account in my name. Agro-Shield does not store the BVN or NIN.</span>
+                        </label>
+                        <button class="wallet-button wallet-button-primary" type="submit" data-va-submit>Create my funding account <span aria-hidden="true">→</span></button>
+                        <p class="wallet-inline-status" id="virtual-account-status" role="status" aria-live="polite"></p>
+                    </form>
+                    {{else}}
+                    <p class="wallet-alert wallet-alert-info">Add an email address to your profile before creating a funding account. <a href="/profile/edit">Update your profile</a></p>
+                    {{end}}
+                    {{end}}
+                </div>
+
+                <aside class="wallet-funding-instructions" aria-label="How to fund your wallet">
+                    <h3>How transfers work</h3>
+                    <ol>
+                        <li>Open your bank app and choose a transfer to another bank.</li>
+                        <li>Enter the account number shown here and confirm the name.</li>
+                        <li>Send any amount in Naira.</li>
+                        <li>Your wallet is credited only after Flutterwave confirms the transfer.</li>
+                    </ol>
+                    <p class="wallet-footnote"><span aria-hidden="true">🔒</span> Your BVN or NIN is used only to open the account with Flutterwave. It is not stored by Agro-Shield and never appears in your wallet history.</p>
+                    <p class="wallet-footnote">If a transfer stays pending, do not send it again. Check your deposit history first.</p>
+                </aside>
+            </article>
+        </section>
 
         <section class="wallet-actions" aria-label="Wallet actions">
             <article class="wallet-card wallet-action-card wallet-deposit-card">

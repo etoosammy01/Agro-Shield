@@ -442,3 +442,184 @@ func TestCreateTransferSeparatesARefusalFromAnUnknownFate(t *testing.T) {
 		}
 	})
 }
+
+func TestCreatePermanentVirtualAccountSendsTheDocumentedRequest(t *testing.T) {
+	captured := &capturedRequest{}
+	client := clientWithTransport(&fakeTransport{
+		status: http.StatusOK,
+		body: `{"status":"success","message":"Virtual account created","data":{
+			"response_code":"02","response_message":"success","flw_ref":"FLW-VA-1",
+			"order_ref":"URF_VA_1","account_number":"1234567890",
+			"account_name":"ADAEZE OKONKWO","bank_name":"Flutterwave Bank"}}`,
+		captured: captured,
+	})
+
+	details, err := client.CreatePermanentVirtualAccount(CreateVirtualAccountRequest{
+		Email:          "adaeze@example.test",
+		TxRef:          "AGRO-VA-42",
+		Phone:          "08000000000",
+		FirstName:      "Adaeze",
+		LastName:       "Okonkwo",
+		Narration:      "Agro-Shield wallet",
+		IdentityKind:   "bvn",
+		IdentityNumber: "22222222222",
+	})
+	if err != nil {
+		t.Fatalf("CreatePermanentVirtualAccount() error = %v", err)
+	}
+
+	if captured.method != http.MethodPost {
+		t.Errorf("method = %q, want POST", captured.method)
+	}
+	if captured.path != "/v3/virtual-account-numbers" {
+		t.Errorf("path = %q, want /v3/virtual-account-numbers", captured.path)
+	}
+	if captured.auth != "Bearer test-secret-key" {
+		t.Errorf("Authorization = %q, want the bearer secret key", captured.auth)
+	}
+	for field, want := range map[string]any{
+		"email":        "adaeze@example.test",
+		"tx_ref":       "AGRO-VA-42",
+		"is_permanent": true,
+		"bvn":          "22222222222",
+		"phonenumber":  "08000000000",
+		"firstname":    "Adaeze",
+		"lastname":     "Okonkwo",
+	} {
+		if got := captured.body[field]; got != want {
+			t.Errorf("body[%q] = %v, want %v", field, got, want)
+		}
+	}
+	if _, present := captured.body["nin"]; present {
+		t.Error("body contained nin for a BVN request")
+	}
+	if details.TxRef != "AGRO-VA-42" {
+		t.Errorf("TxRef = %q, want the reference we sent so webhooks route back", details.TxRef)
+	}
+	if details.OrderRef != "URF_VA_1" || details.ProviderRef != "FLW-VA-1" {
+		t.Errorf("refs = %q/%q, want the provider's order and transaction refs", details.OrderRef, details.ProviderRef)
+	}
+	if details.AccountNumber != "1234567890" || details.BankName != "Flutterwave Bank" {
+		t.Errorf("account = %q/%q, want the returned number and bank", details.AccountNumber, details.BankName)
+	}
+	if details.Currency != "NGN" {
+		t.Errorf("Currency = %q, want the NGN default", details.Currency)
+	}
+}
+
+func TestCreatePermanentVirtualAccountSupportsNIN(t *testing.T) {
+	captured := &capturedRequest{}
+	client := clientWithTransport(&fakeTransport{
+		status:   http.StatusOK,
+		body:     `{"status":"success","data":{"response_code":"02","account_number":"1234567890"}}`,
+		captured: captured,
+	})
+
+	if _, err := client.CreatePermanentVirtualAccount(CreateVirtualAccountRequest{
+		Email:          "adaeze@example.test",
+		TxRef:          "AGRO-VA-42",
+		IdentityKind:   "nin",
+		IdentityNumber: "33333333333",
+	}); err != nil {
+		t.Fatalf("CreatePermanentVirtualAccount() error = %v", err)
+	}
+	if captured.body["nin"] != "33333333333" {
+		t.Errorf("body[nin] = %v, want the NIN number", captured.body["nin"])
+	}
+	if _, present := captured.body["bvn"]; present {
+		t.Error("body contained bvn for a NIN request")
+	}
+}
+
+func TestCreatePermanentVirtualAccountRequiresAnAccountNumber(t *testing.T) {
+	client := clientWithTransport(&fakeTransport{
+		status: http.StatusOK,
+		body:   `{"status":"success","data":{"response_code":"02"}}`,
+	})
+	if _, err := client.CreatePermanentVirtualAccount(CreateVirtualAccountRequest{
+		Email:          "adaeze@example.test",
+		TxRef:          "AGRO-VA-42",
+		IdentityKind:   "bvn",
+		IdentityNumber: "22222222222",
+	}); err == nil {
+		t.Fatal("expected an error for a success response without an account number")
+	}
+}
+
+func TestCreatePermanentVirtualAccountClassifiesProviderAnswers(t *testing.T) {
+	request := CreateVirtualAccountRequest{
+		Email:          "adaeze@example.test",
+		TxRef:          "AGRO-VA-42",
+		IdentityKind:   "bvn",
+		IdentityNumber: "22222222222",
+	}
+
+	tests := []struct {
+		name    string
+		status  int
+		body    string
+		refused bool
+		denied  bool
+	}{
+		{"invalid key", http.StatusUnauthorized, `{"message":"Invalid key"}`, false, true},
+		{"forbidden", http.StatusForbidden, `{"message":"Merchant not permitted"}`, false, true},
+		{"validation", http.StatusUnprocessableEntity, `{"message":"BVN 22222222222 is invalid"}`, true, false},
+		{"duplicate reference", http.StatusBadRequest, `{"message":"Duplicate tx_ref supplied"}`, false, false},
+		{"server error", http.StatusInternalServerError, `{"message":"Internal error"}`, false, false},
+		{"accepted status but rejected body", http.StatusOK, `{"status":"error","message":"Merchant is not enabled"}`, true, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := clientWithTransport(&fakeTransport{status: tc.status, body: tc.body})
+			_, err := client.CreatePermanentVirtualAccount(request)
+			if err == nil {
+				t.Fatal("expected an error")
+			}
+			if got := errors.Is(err, ErrVirtualAccountRefused); got != tc.refused {
+				t.Fatalf("ErrVirtualAccountRefused = %v, want %v (err: %v)", got, tc.refused, err)
+			}
+			if got := errors.Is(err, ErrVirtualAccountAccessDenied); got != tc.denied {
+				t.Fatalf("ErrVirtualAccountAccessDenied = %v, want %v (err: %v)", got, tc.denied, err)
+			}
+			if strings.Contains(err.Error(), "22222222222") {
+				t.Fatalf("identity number leaked into the error: %v", err)
+			}
+		})
+	}
+}
+
+func TestGetPermanentVirtualAccountDistinguishesMissingAccounts(t *testing.T) {
+	captured := &capturedRequest{}
+	client := clientWithTransport(&fakeTransport{
+		status:   http.StatusNotFound,
+		body:     `{"status":"error","message":"Virtual account not found"}`,
+		captured: captured,
+	})
+
+	_, err := client.GetPermanentVirtualAccount("URF VA/1")
+	if !errors.Is(err, ErrVirtualAccountNotFound) {
+		t.Fatalf("error = %v, want ErrVirtualAccountNotFound", err)
+	}
+	if captured.method != http.MethodGet {
+		t.Errorf("method = %q, want GET", captured.method)
+	}
+	if captured.path != "/v3/virtual-account-numbers/URF VA/1" {
+		t.Errorf("path = %q, want the escaped order reference", captured.path)
+	}
+
+	client = clientWithTransport(&fakeTransport{
+		status: http.StatusOK,
+		body: `{"status":"success","data":{"response_code":"02","account_number":"1234567890",
+			"bank_name":"Flutterwave Bank","account_status":"active"}}`,
+	})
+	details, err := client.GetPermanentVirtualAccount("URF_VA_1")
+	if err != nil {
+		t.Fatalf("GetPermanentVirtualAccount() error = %v", err)
+	}
+	if details.AccountNumber != "1234567890" || details.Status != "active" {
+		t.Errorf("details = %+v, want the provider's account and status", details)
+	}
+	if details.Currency != "NGN" {
+		t.Errorf("Currency = %q, want the NGN default", details.Currency)
+	}
+}

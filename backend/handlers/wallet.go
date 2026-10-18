@@ -50,6 +50,18 @@ type WalletPageData struct {
 	Error         string
 	Success       string
 	IsAdmin       bool
+
+	// VirtualAccount is the farmer's permanent NGN funding account, or nil when
+	// none has been created. HasEmail says whether the account has the address
+	// Flutterwave requires before a setup form is worth showing.
+	VirtualAccount *models.WalletVirtualAccount
+	HasEmail       bool
+
+	// LatestTransactionID and LatestDepositID are the watermarks the page's
+	// refresh script compares against /wallet/status. They let the page reload
+	// only when the committed wallet has actually moved.
+	LatestTransactionID int64
+	LatestDepositID     int64
 }
 
 // WalletAdminPageData is the approvals page's payload.
@@ -61,6 +73,9 @@ type WalletPageData struct {
 type WalletAdminPageData struct {
 	Withdrawals       []models.Withdrawal
 	Transfers         []models.Transfer
+	PendingDeposits   []models.PendingDeposit
+	Admins            []models.AdminAccount
+	AgedRequests      int
 	StalePending      []models.WalletDeposit
 	StaleAfterHours   int
 	RevenueTotal      string
@@ -112,18 +127,65 @@ func (h *WalletHandler) Page(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Could not load transfer history", http.StatusInternalServerError)
 		return
 	}
+	// The funding account is additive: not being able to read it must not take
+	// the rest of the wallet down with it.
+	virtualAccount, err := h.wallet.VirtualAccount(r.Context(), farmer.ID)
+	if err != nil {
+		log.Printf("load virtual account for user %d: %v", farmer.ID, err)
+		virtualAccount = nil
+	}
 	data := WalletPageData{
 		Wallet: wallet, Transactions: transactions, Deposits: deposits,
 		Withdrawals: withdrawals, Transfers: transfers,
 		BankName: farmer.BankName, BankCode: farmer.BankCode,
 		AccountName: farmer.AccountName, AccountNumber: farmer.AccountNumber,
 		Error: r.URL.Query().Get("error"), Success: r.URL.Query().Get("success"),
-		IsAdmin: h.wallet.IsAdmin(farmer.ID),
+		IsAdmin:        h.wallet.IsAdmin(farmer.ID),
+		VirtualAccount: virtualAccount,
+		HasEmail:       strings.TrimSpace(farmer.Email) != "",
+	}
+	if len(transactions) > 0 {
+		data.LatestTransactionID = transactions[0].ID
+	}
+	if len(deposits) > 0 {
+		data.LatestDepositID = deposits[0].ID
 	}
 	if err := render.RenderTemplates(w, "wallet.html", data); err != nil {
 		log.Printf("render wallet page for user %d: %v", farmer.ID, err)
 		http.Error(w, "Could not render wallet", http.StatusInternalServerError)
 	}
+}
+
+// Status reports the owner's committed wallet snapshot for the page's refresh
+// script. It is read-only: it never credits, reconciles, or calls Flutterwave.
+// The handler is authenticated and scoped to the session's own farmer id, so one
+// account can never read another's balance.
+func (h *WalletHandler) Status(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	farmer, ok := middleware.FarmerFromContext(r)
+	if !ok || farmer == nil {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		return
+	}
+	status, err := h.wallet.Status(r.Context(), farmer.ID)
+	if err != nil {
+		log.Printf("load wallet status for user %d: %v", farmer.ID, err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Could not load wallet status"})
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, map[string]any{
+		"balance":               status.Balance,
+		"currency":              status.Currency,
+		"pending_deposits":      status.PendingDeposits,
+		"latest_transaction_id": status.LatestTransactionID,
+		"latest_deposit_id":     status.LatestDepositID,
+		"latest_deposit_status": status.LatestDepositStatus,
+		"checked_at":            time.Now().UTC().Format(time.RFC3339),
+	})
 }
 
 func (h *WalletHandler) Deposit(w http.ResponseWriter, r *http.Request) {
@@ -167,6 +229,113 @@ func depositErrorMessage(err error) string {
 		return "That amount is too large. Enter a smaller amount."
 	default:
 		return "We could not confirm the payment setup because of a technical issue. Check your deposit history before retrying; if you completed a payment, do not pay again while its status is pending."
+	}
+}
+
+// CreateVirtualAccount opens the farmer's permanent NGN funding account.
+//
+// The identity number is read from the form, passed to the service, and never
+// logged. Consent is required server-side as well as in the page, so a crafted
+// POST cannot send identity information without it.
+func (h *WalletHandler) CreateVirtualAccount(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	farmer, ok := middleware.FarmerFromContext(r)
+	if !ok || farmer == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form", http.StatusBadRequest)
+		return
+	}
+
+	account, err := h.wallet.SetupVirtualAccount(r.Context(), farmer, services.VirtualAccountSetup{
+		IdentityKind:   r.FormValue("identity_kind"),
+		IdentityNumber: r.FormValue("identity_number"),
+		Consent:        consentGiven(r.FormValue("consent")),
+	})
+	if err != nil {
+		// The error is safe by construction: it never carries the identity number
+		// or a raw provider body.
+		log.Printf("create virtual account for user %d: %v", farmer.ID, err)
+		http.Redirect(w, r, "/wallet?error="+url.QueryEscape(virtualAccountErrorMessage(err)), http.StatusSeeOther)
+		return
+	}
+	if account != nil && account.Ready() {
+		http.Redirect(w, r, "/wallet?success="+url.QueryEscape(
+			"Your permanent funding account is ready. Transfer to it from any Nigerian bank app."), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/wallet?success="+url.QueryEscape(
+		"Your funding account is being set up. Flutterwave has not confirmed it yet; you can check again in a moment."), http.StatusSeeOther)
+}
+
+// CheckVirtualAccount asks Flutterwave about a setup that has not been
+// confirmed. It never creates an account, so it cannot produce a duplicate.
+func (h *WalletHandler) CheckVirtualAccount(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	farmer, ok := middleware.FarmerFromContext(r)
+	if !ok || farmer == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	account, err := h.wallet.RefreshVirtualAccountStatus(r.Context(), farmer.ID)
+	if err != nil {
+		log.Printf("refresh virtual account for user %d: %v", farmer.ID, err)
+		http.Redirect(w, r, "/wallet?error="+url.QueryEscape(
+			"We could not check the funding account because of a technical issue. No account details were changed; try again shortly."), http.StatusSeeOther)
+		return
+	}
+	if account == nil {
+		http.Redirect(w, r, "/wallet?error="+url.QueryEscape(
+			"No funding account has been created yet."), http.StatusSeeOther)
+		return
+	}
+	if account.Ready() {
+		http.Redirect(w, r, "/wallet?success="+url.QueryEscape(
+			"Your permanent funding account is ready."), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/wallet?success="+url.QueryEscape(
+		"Flutterwave has not confirmed the funding account yet. You can keep using the rest of your wallet."), http.StatusSeeOther)
+}
+
+func consentGiven(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "yes", "on", "true", "1":
+		return true
+	default:
+		return false
+	}
+}
+
+// virtualAccountErrorMessage maps setup failures to text the farmer can act on.
+// Anything unrecognised becomes a generic technical message, so a raw provider
+// diagnostic never reaches the page.
+func virtualAccountErrorMessage(err error) string {
+	switch {
+	case errors.Is(err, services.ErrVirtualAccountConsentRequired):
+		return services.ErrVirtualAccountConsentRequired.Error()
+	case errors.Is(err, services.ErrVirtualAccountIdentityInvalid):
+		return services.ErrVirtualAccountIdentityInvalid.Error()
+	case errors.Is(err, services.ErrVirtualAccountEmailRequired):
+		return services.ErrVirtualAccountEmailRequired.Error()
+	case errors.Is(err, services.ErrVirtualAccountNameRequired):
+		return services.ErrVirtualAccountNameRequired.Error()
+	case errors.Is(err, services.ErrVirtualAccountRejected):
+		return services.ErrVirtualAccountRejected.Error()
+	case errors.Is(err, services.ErrVirtualAccountPending):
+		return "Your funding account is still being set up. Try again in a moment; do not submit your details repeatedly."
+	case errors.Is(err, services.ErrVirtualAccountUnavailable):
+		return services.ErrVirtualAccountUnavailable.Error()
+	default:
+		return "We could not create your funding account because of a technical issue. No account was confirmed; please try again."
 	}
 }
 
@@ -532,8 +701,39 @@ func (h *WalletHandler) AdminPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Could not load pending deposits", http.StatusInternalServerError)
 		return
 	}
+	// The exception list is supporting information, so a failed read must not
+	// take the approvals page down with it: the admin can still act on the
+	// withdrawals and transfers that did load.
+	pendingDeposits, err := h.wallet.PendingDepositsAwaitingProvider(r.Context())
+	if err != nil {
+		log.Printf("load pending deposits for admin %d: %v", farmer.ID, err)
+		pendingDeposits = nil
+	}
+	// The admin list is supporting information as well: not being able to read
+	// it must not stop the approvals themselves from being served.
+	admins, err := h.wallet.AdminAccounts(r.Context())
+	if err != nil {
+		log.Printf("load wallet admins for admin %d: %v", farmer.ID, err)
+		admins = nil
+	}
+	// The overview counts the same requests the reminder pass nudges, so the
+	// number on the page and the notification an admin receives cannot disagree.
+	agedCutoff := time.Now().Add(-services.ApprovalReminderAfter)
+	agedRequests := 0
+	for _, withdrawal := range withdrawals {
+		if (withdrawal.Status == models.WithdrawalPending || withdrawal.Status == models.WithdrawalProcessing) &&
+			withdrawal.CreatedAt.Before(agedCutoff) {
+			agedRequests++
+		}
+	}
+	for _, transfer := range transfers {
+		if transfer.Status == models.TransferPending && transfer.CreatedAt.Before(agedCutoff) {
+			agedRequests++
+		}
+	}
 	data := WalletAdminPageData{
 		Withdrawals: withdrawals, Transfers: transfers,
+		PendingDeposits: pendingDeposits, Admins: admins, AgedRequests: agedRequests,
 		StalePending: stalePending, StaleAfterHours: int(h.wallet.StaleDepositAfter().Hours()),
 		RevenueTotal: revenueTotal, RevenueCount: revenueCount,
 		CommissionEnabled: h.wallet.CommissionEnabled(), CommissionLabel: h.wallet.CommissionLabel(),
@@ -732,6 +932,35 @@ func (h *WalletHandler) ReconcileWithdrawal(w http.ResponseWriter, r *http.Reque
 		run: func(ctx context.Context, id int64, adminID int) error {
 			_, err := h.wallet.ReconcileWithdrawal(ctx, id, adminID)
 			return err
+		},
+	})
+}
+
+// ReturnWithdrawalToQueue puts a payout that never reached Flutterwave back in
+// the approval queue, so it can be rejected and the reserved funds released.
+func (h *WalletHandler) ReturnWithdrawalToQueue(w http.ResponseWriter, r *http.Request) {
+	h.runAdminWalletAction(w, r, adminWalletAction{
+		idField:      "withdrawal_id",
+		redirectPath: adminWalletPath,
+		failure:      "Could not return the request to the queue. It has a saved Flutterwave transfer, so a payout may be on its way - check the provider before doing anything else. Funds remain reserved.",
+		success:      "Request returned to the queue. Reject it to release the reserved funds.",
+		run: func(ctx context.Context, id int64, adminID int) error {
+			return h.wallet.ReturnWithdrawalToQueue(ctx, id, adminID)
+		},
+	})
+}
+
+// RecordTransferID takes the Flutterwave transfer id an admin found in the
+// provider's dashboard and stores it against a payout that never recorded its
+// own, so that payout can then be reconciled.
+func (h *WalletHandler) RecordTransferID(w http.ResponseWriter, r *http.Request) {
+	h.runAdminWalletAction(w, r, adminWalletAction{
+		idField:      "withdrawal_id",
+		redirectPath: adminWalletPath,
+		failure:      "Could not record the Flutterwave transfer id. Check the number against the provider's dashboard and try again; funds remain reserved.",
+		success:      "Flutterwave transfer recorded. Check the provider status to settle or refund this payout.",
+		runForm: func(ctx context.Context, id int64, adminID int, form url.Values) error {
+			return h.wallet.RecordProviderTransferID(ctx, id, adminID, form.Get("provider_transfer_id"))
 		},
 	})
 }

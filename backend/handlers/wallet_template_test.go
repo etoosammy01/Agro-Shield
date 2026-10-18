@@ -632,3 +632,146 @@ func TestWalletAdminPageRendersTheAdminConsoleShell(t *testing.T) {
 		}
 	}
 }
+
+// The permanent funding account is the only place on the wallet page that
+// handles identity data. These renders pin what the farmer sees in each state,
+// and that a state never offers an action that would do nothing.
+func TestWalletPageRendersTheActiveFundingAccount(t *testing.T) {
+	data := WalletPageData{
+		Wallet: &models.Wallet{ID: 1, FarmerID: 7, Balance: "1500.00", Currency: "NGN"},
+		VirtualAccount: &models.WalletVirtualAccount{
+			ID: 1, FarmerID: 7, TxRef: "AGRO-VA-7",
+			AccountNumber: "0123456789",
+			BankName:      "Flutterwave Bank",
+			AccountName:   "ADAEZE OKONKWO",
+			Currency:      "NGN",
+			Status:        models.VirtualAccountActive,
+		},
+		HasEmail: true,
+	}
+
+	recorder := httptest.NewRecorder()
+	if err := render.RenderTemplates(recorder, "wallet.html", data); err != nil {
+		t.Fatalf("render wallet.html: %v", err)
+	}
+	body := recorder.Body.String()
+
+	for _, want := range []string{
+		"0123456789",
+		"Flutterwave Bank",
+		"ADAEZE OKONKWO",
+		"Identity verified and funding account active",
+		`data-copy-target="funding-account-number"`,
+		"How transfers work",
+		"/static/assets/logo/Agro-Shield_logo.png",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the active funding account did not render %q", want)
+		}
+	}
+	// An active account must not ask for identity data again: resubmitting could
+	// only produce a second account request.
+	for _, unwanted := range []string{
+		`action="/wallet/virtual-account"`,
+		`name="identity_number"`,
+	} {
+		if strings.Contains(body, unwanted) {
+			t.Errorf("an active account rendered the setup form %q", unwanted)
+		}
+	}
+}
+
+func TestWalletPageRendersAPendingFundingAccountHonestly(t *testing.T) {
+	data := WalletPageData{
+		Wallet: &models.Wallet{ID: 1, FarmerID: 7, Balance: "0.00", Currency: "NGN"},
+		VirtualAccount: &models.WalletVirtualAccount{
+			ID: 1, FarmerID: 7, TxRef: "AGRO-VA-7", Status: models.VirtualAccountPending,
+		},
+		HasEmail: true,
+	}
+
+	recorder := httptest.NewRecorder()
+	if err := render.RenderTemplates(recorder, "wallet.html", data); err != nil {
+		t.Fatalf("render wallet.html: %v", err)
+	}
+	body := recorder.Body.String()
+
+	for _, want := range []string{
+		"waiting for Flutterwave",
+		`action="/wallet/virtual-account/check"`,
+		"Check account status",
+		`action="/wallet/virtual-account"`,
+		`name="consent"`,
+		`pattern="[0-9]{11}"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the pending funding account did not render %q", want)
+		}
+	}
+	if strings.Contains(body, "Identity verified") {
+		t.Error("a pending account was rendered as verified")
+	}
+}
+
+func TestWalletPageRendersAFailedFundingAccountWithARetry(t *testing.T) {
+	data := WalletPageData{
+		Wallet: &models.Wallet{ID: 1, FarmerID: 7, Balance: "0.00", Currency: "NGN"},
+		VirtualAccount: &models.WalletVirtualAccount{
+			ID: 1, FarmerID: 7, TxRef: "AGRO-VA-7", Status: models.VirtualAccountFailed,
+		},
+		HasEmail: true,
+	}
+
+	recorder := httptest.NewRecorder()
+	if err := render.RenderTemplates(recorder, "wallet.html", data); err != nil {
+		t.Fatalf("render wallet.html: %v", err)
+	}
+	body := recorder.Body.String()
+
+	for _, want := range []string{"Setup did not complete", "Try again", `name="consent"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the failed funding account did not render %q", want)
+		}
+	}
+	// A failed attempt has nothing to check; the way forward is a retry.
+	if strings.Contains(body, "/wallet/virtual-account/check") {
+		t.Error("a failed account offered a status check that cannot succeed")
+	}
+}
+
+func TestWalletPageOffersSetupOnlyWhenTheProfileHasAnEmail(t *testing.T) {
+	renderPage := func(t *testing.T, hasEmail bool) string {
+		t.Helper()
+		recorder := httptest.NewRecorder()
+		data := WalletPageData{
+			Wallet:   &models.Wallet{ID: 1, FarmerID: 7, Balance: "0.00", Currency: "NGN"},
+			HasEmail: hasEmail,
+		}
+		if err := render.RenderTemplates(recorder, "wallet.html", data); err != nil {
+			t.Fatalf("render wallet.html: %v", err)
+		}
+		return recorder.Body.String()
+	}
+
+	withEmail := renderPage(t, true)
+	for _, want := range []string{
+		"Receive money into your wallet",
+		`action="/wallet/virtual-account"`,
+		`name="consent"`,
+		`name="identity_kind"`,
+		`name="identity_number"`,
+		"Agro-Shield does not store the BVN or NIN",
+	} {
+		if !strings.Contains(withEmail, want) {
+			t.Errorf("the setup form did not render %q", want)
+		}
+	}
+
+	withoutEmail := renderPage(t, false)
+	if strings.Contains(withoutEmail, `action="/wallet/virtual-account"`) {
+		t.Error("the setup form was offered without a profile email")
+	}
+	if !strings.Contains(withoutEmail, `href="/profile/edit"`) {
+		t.Error("the page did not tell the farmer where to add an email")
+	}
+}
