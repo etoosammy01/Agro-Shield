@@ -172,7 +172,7 @@ func (h *AIAssistant) Handler(w http.ResponseWriter, r *http.Request) {
 				w,
 				farmer.ID,
 				"",
-				err.Error(),
+				userError(err, "We couldn't complete that diagnosis right now. Please try again."),
 			)
 			return
 		}

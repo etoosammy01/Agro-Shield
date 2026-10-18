@@ -41,7 +41,7 @@ func (h *FeedbackHandler) CreateFeedback(w http.ResponseWriter, r *http.Request)
 	feedback.UserID = farmer.ID
 
 	if err := h.service.CreateFeedback(&feedback); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, userError(err, "We couldn't complete that request. Please try again."), http.StatusBadRequest)
 		return
 	}
 
@@ -65,7 +65,7 @@ func (h *FeedbackHandler) GetFeedbackByFarmer(w http.ResponseWriter, r *http.Req
 
 	feedbacks, err := h.service.GetFeedbackByFarmer(farmerID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, userError(err, "We couldn't complete that request. Please try again."), http.StatusBadRequest)
 		return
 	}
 
@@ -87,15 +87,15 @@ func (h *FeedbackHandler) GetFarmerRating(w http.ResponseWriter, r *http.Request
 
 	average, total, err := h.service.GetFarmerRating(farmerID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, userError(err, "We couldn't complete that request. Please try again."), http.StatusBadRequest)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"farmer_id":     farmerID,
+		"farmer_id":      farmerID,
 		"average_rating": average,
-		"total_reviews": total,
+		"total_reviews":  total,
 	})
 }

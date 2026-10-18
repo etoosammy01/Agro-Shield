@@ -251,7 +251,7 @@ func (h *Storage) createCrop(
 			w,
 			farmerID,
 			fullName,
-			"Failed to upload product picture",
+			uploadErrorMessage(err),
 		)
 		return
 	}
@@ -290,7 +290,7 @@ func (h *Storage) createCrop(
 		accuracy,
 	); err != nil {
 		log.Println("CREATE CROP FAILED:", err)
-		h.render(w, farmerID, fullName, err.Error())
+		h.render(w, farmerID, fullName, userError(err, "We couldn't save this product. Please try again."))
 		return
 	}
 
@@ -402,15 +402,23 @@ func (h *Storage) updateCrop(
 			"updated produce image upload failed:",
 			uploadErr,
 		)
-	} else {
-		uploadedURL = strings.TrimSpace(uploadedURL)
+		// Report the failure instead of saving the change without the new
+		// photo the farmer chose. The existing image is untouched.
+		h.render(
+			w,
+			farmerID,
+			fullName,
+			uploadErrorMessage(uploadErr),
+		)
+		return
+	}
+	uploadedURL = strings.TrimSpace(uploadedURL)
 
-		if uploadedURL != "" {
-			imageURLs = append(
-				imageURLs,
-				uploadedURL,
-			)
-		}
+	if uploadedURL != "" {
+		imageURLs = append(
+			imageURLs,
+			uploadedURL,
+		)
 	}
 
 	// Make sure there is still at least one image.
@@ -446,7 +454,7 @@ func (h *Storage) updateCrop(
 			w,
 			farmerID,
 			fullName,
-			err.Error(),
+			userError(err, "We couldn't complete that product change. Please try again."),
 		)
 		return
 	}
@@ -489,7 +497,7 @@ func (h *Storage) unlistCrop(
 			w,
 			farmerID,
 			fullName,
-			err.Error(),
+			userError(err, "We couldn't complete that product change. Please try again."),
 		)
 		return
 	}
@@ -532,7 +540,7 @@ func (h *Storage) relistCrop(
 			w,
 			farmerID,
 			fullName,
-			err.Error(),
+			userError(err, "We couldn't complete that product change. Please try again."),
 		)
 		return
 	}
@@ -575,7 +583,7 @@ func (h *Storage) deleteCrop(
 			w,
 			farmerID,
 			fullName,
-			err.Error(),
+			userError(err, "We couldn't complete that product change. Please try again."),
 		)
 		return
 	}

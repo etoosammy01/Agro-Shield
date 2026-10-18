@@ -394,7 +394,7 @@ func (h *Negotiation) ThreadHandler(
 					w,
 					negotiationID,
 					farmer.ID,
-					err.Error(),
+					userError(err, "We couldn't complete that negotiation action. Please try again."),
 				)
 
 				return
@@ -438,7 +438,7 @@ func (h *Negotiation) ThreadHandler(
 					w,
 					negotiationID,
 					farmer.ID,
-					err.Error(),
+					userError(err, "We couldn't complete that negotiation action. Please try again."),
 				)
 
 				return
@@ -481,7 +481,7 @@ func (h *Negotiation) ThreadHandler(
 					w,
 					negotiationID,
 					farmer.ID,
-					err.Error(),
+					userError(err, "We couldn't complete that negotiation action. Please try again."),
 				)
 
 				return
@@ -523,7 +523,7 @@ func (h *Negotiation) ThreadHandler(
 					w,
 					negotiationID,
 					farmer.ID,
-					err.Error(),
+					userError(err, "We couldn't complete that negotiation action. Please try again."),
 				)
 
 				return
@@ -532,7 +532,7 @@ func (h *Negotiation) ThreadHandler(
 		case "end":
 
 			if err := h.service.End(negotiationID, farmer.ID); err != nil {
-				h.render(w, negotiationID, farmer.ID, err.Error())
+				h.render(w, negotiationID, farmer.ID, userError(err, "We couldn't complete that negotiation action. Please try again."))
 				return
 			}
 

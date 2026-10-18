@@ -3,7 +3,14 @@ package repository
 import (
 	"backend/internal/models"
 	"database/sql"
+	"errors"
 )
+
+// ErrOfferStatusConflict means the offer was not in the status the caller
+// expected, usually because another participant accepted or rejected it first.
+// Callers treat it as "this offer is no longer pending" rather than as a
+// database failure.
+var ErrOfferStatusConflict = errors.New("offer status has already changed")
 
 // ============================================================
 // NEGOTIATION MESSAGE REPOSITORY
@@ -255,9 +262,15 @@ func (r *NegotiationMessageRepository) GetByID(
 // This does NOT change the negotiation itself.
 // ============================================================
 
+// UpdateOfferStatus moves one offer from expectedStatus to status.
+//
+// The expected status is part of the UPDATE, so two participants accepting the
+// same offer at once cannot both succeed: the second statement matches no row.
+// That is what keeps an accepted deal from being added to the cart twice.
 func (r *NegotiationMessageRepository) UpdateOfferStatus(
 	offerID int,
 	status string,
+	expectedStatus string,
 ) error {
 
 	query := `
@@ -265,12 +278,14 @@ func (r *NegotiationMessageRepository) UpdateOfferStatus(
 		SET offer_status = $1
 		WHERE id = $2
 		AND message_type = 'offer'
+		AND offer_status = $3
 	`
 
 	result, err := r.db.Exec(
 		query,
 		status,
 		offerID,
+		expectedStatus,
 	)
 
 	if err != nil {
@@ -283,7 +298,7 @@ func (r *NegotiationMessageRepository) UpdateOfferStatus(
 	}
 
 	if rowsAffected == 0 {
-		return sql.ErrNoRows
+		return ErrOfferStatusConflict
 	}
 
 	return nil

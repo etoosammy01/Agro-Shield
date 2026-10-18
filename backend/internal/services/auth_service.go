@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"strings"
 
@@ -25,6 +26,12 @@ var (
 
 	// ErrPasswordTooShort means the password is under the minimum length.
 	ErrPasswordTooShort = errors.New("password must be at least 8 characters")
+
+	// Account-closure errors. They are separate so the profile page can say
+	// what is actually wrong instead of a generic failure.
+	ErrDeletePasswordRequired = errors.New("password is required")
+	ErrDeletePasswordWrong    = errors.New("password is incorrect")
+	ErrDeletePhoneMismatch    = errors.New("phone number does not match this account")
 )
 
 type AuthService struct {
@@ -240,4 +247,75 @@ func (s *AuthService) ResetPassword(phone, newPassword string) error {
 	}
 
 	return s.repo.UpdatePassword(farmer.ID, string(hash))
+}
+
+// VerifyPassword reports whether password matches the account's stored hash.
+// The caller must already know which account is being acted on; this is an
+// ownership proof for destructive actions such as closing an account, not a
+// login. It returns ErrDeletePasswordWrong for a bad password and
+// repository.ErrAccountNotFound for an unknown or already closed account.
+func (s *AuthService) VerifyPassword(farmerID int, password string) error {
+	if password == "" {
+		return ErrDeletePasswordRequired
+	}
+	farmer, err := s.repo.GetByID(farmerID)
+	if err != nil {
+		return err
+	}
+	if farmer == nil {
+		return repository.ErrAccountNotFound
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(farmer.PasswordHash), []byte(password)); err != nil {
+		return ErrDeletePasswordWrong
+	}
+	return nil
+}
+
+// CloseAccount permanently closes a farmer's account after proving control of
+// it with the current password and the account's own phone number. The
+// repository keeps the financial history and anonymises the personal details,
+// so this is irreversible in the sense that matters to the user: the profile
+// and login are gone.
+func (s *AuthService) CloseAccount(ctx context.Context, farmerID int, confirmPhone, password string) error {
+	farmer, err := s.repo.GetByID(farmerID)
+	if err != nil {
+		return err
+	}
+	if farmer == nil {
+		return repository.ErrAccountNotFound
+	}
+
+	if !samePhone(farmer.Phone, confirmPhone) {
+		return ErrDeletePhoneMismatch
+	}
+	if password == "" {
+		return ErrDeletePasswordRequired
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(farmer.PasswordHash), []byte(password)); err != nil {
+		return ErrDeletePasswordWrong
+	}
+
+	return s.repo.DeleteAccount(ctx, farmerID)
+}
+
+// samePhone compares two phone numbers by their last ten digits, so the same
+// number typed with a country code, spaces, or dashes still matches. The
+// confirmation is an "are you sure" check on the caller's own account, not an
+// authorization decision, so being forgiving about formatting is safe.
+func samePhone(a, b string) bool {
+	digits := func(value string) string {
+		var out strings.Builder
+		for _, r := range value {
+			if r >= '0' && r <= '9' {
+				out.WriteRune(r)
+			}
+		}
+		value = out.String()
+		if len(value) > 10 {
+			value = value[len(value)-10:]
+		}
+		return value
+	}
+	left, right := digits(a), digits(b)
+	return left != "" && left == right
 }

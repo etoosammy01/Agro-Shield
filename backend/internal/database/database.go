@@ -406,6 +406,14 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE INDEX IF NOT EXISTS idx_orders_buyer_time ON orders(buyer_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_orders_crop_time ON orders(crop_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_orders_status_time ON orders(status, created_at DESC);
+
+-- Idempotency for a marketplace checkout. The token is generated per rendered
+-- buy form and reused if that form is submitted again, so a retried request
+-- finds its earlier order instead of debiting the wallet a second time. Rows
+-- created before this column existed stay NULL and are unaffected.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS checkout_token TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_checkout_token
+	ON orders(checkout_token) WHERE checkout_token IS NOT NULL;
 `); err != nil {
 		return fmt.Errorf("orders migration: %w", err)
 	}

@@ -676,6 +676,10 @@ body {
     font-weight: 600;
 }
 
+.auth-right form .message.notice {
+    color: #2e7d32;
+}
+
 
 /* =========================================
    RESPONSIVE DESIGN

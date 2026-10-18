@@ -290,9 +290,6 @@ func (s *NegotiationService) SendMessage(
 	return nil
 }
 
-
-
-
 // ============================================================
 // SEND OFFER
 //
@@ -587,14 +584,29 @@ func (s *NegotiationService) Accept(
 
 	// --------------------------------------------------------
 	// Mark offer as accepted.
+	//
+	// The repository only updates an offer that is still pending, so a
+	// simultaneous second accept loses here instead of putting the same deal
+	// in the cart twice.
 	// --------------------------------------------------------
 
 	if err := s.msgRepo.UpdateOfferStatus(
 		offerID,
 		"accepted",
+		"pending",
 	); err != nil {
+		if errors.Is(err, repository.ErrOfferStatusConflict) {
+			return errors.New(
+				"this offer is no longer pending",
+			)
+		}
 		return err
 	}
+
+	// The copy loaded above still has the old status. AddFromNegotiation only
+	// accepts a negotiation whose status is "accepted", so reflect the change
+	// before handing it over.
+	negotiation.Status = "accepted"
 
 	// --------------------------------------------------------
 	// Finalize negotiation.
@@ -604,12 +616,9 @@ func (s *NegotiationService) Accept(
 		negotiationID,
 		"accepted",
 	); err != nil {
+		// Put the offer back so the participants can try again.
+		_ = s.msgRepo.UpdateOfferStatus(offerID, "pending", "accepted")
 		return err
-	}
-	if s.eventRepo != nil {
-		uid := negotiation.BuyerID
-		cid := negotiation.CropID
-		_ = s.eventRepo.Record(&models.MarketEvent{EventType: "negotiation_accepted", CropID: &cid, UserID: &uid, Metadata: fmt.Sprintf(`{"quantity":%g}`, negotiation.Quantity)})
 	}
 
 	// --------------------------------------------------------
@@ -620,7 +629,18 @@ func (s *NegotiationService) Accept(
 		negotiation,
 		offer.OfferPrice,
 	); err != nil {
+		// An accepted negotiation with nothing in the cart cannot be checked
+		// out. Restore both records so the acceptance can be retried or the
+		// product can be corrected.
+		_ = s.repo.UpdateStatus(negotiationID, "open")
+		_ = s.msgRepo.UpdateOfferStatus(offerID, "pending", "accepted")
 		return err
+	}
+
+	if s.eventRepo != nil {
+		uid := negotiation.BuyerID
+		cid := negotiation.CropID
+		_ = s.eventRepo.Record(&models.MarketEvent{EventType: "negotiation_accepted", CropID: &cid, UserID: &uid, Metadata: fmt.Sprintf(`{"quantity":%g}`, negotiation.Quantity)})
 	}
 
 	// ========================================================
@@ -784,7 +804,13 @@ func (s *NegotiationService) Reject(
 	if err := s.msgRepo.UpdateOfferStatus(
 		offerID,
 		"rejected",
+		"pending",
 	); err != nil {
+		if errors.Is(err, repository.ErrOfferStatusConflict) {
+			return errors.New(
+				"this offer is no longer pending",
+			)
+		}
 		return err
 	}
 	if s.eventRepo != nil {

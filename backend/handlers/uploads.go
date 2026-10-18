@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -10,6 +12,42 @@ import (
 	"strings"
 	"time"
 )
+
+// Upload failures that callers should explain to the user in their own words
+// rather than treating like an internal error.
+var (
+	ErrUploadTooLarge        = errors.New("uploaded file is too large")
+	ErrUploadUnsupportedType = errors.New("uploaded file is not a supported image")
+)
+
+// uploadErrorMessage turns a save error into a short message that is safe to
+// show on the page. It never includes a filesystem path or other internals.
+func uploadErrorMessage(err error) string {
+	switch {
+	case errors.Is(err, ErrUploadTooLarge):
+		return "That image is too large. Choose a file no bigger than 10 MB."
+	case errors.Is(err, ErrUploadUnsupportedType):
+		return "That file isn't a supported image. Upload a JPG, PNG or WEBP photo."
+	default:
+		return "We couldn't save that image. Please try again."
+	}
+}
+
+// acceptedImageSubtype sniffs the first bytes of an upload and returns the
+// canonical MIME type when they are a supported image. The browser-supplied
+// Content-Type is not trusted on its own.
+func acceptedImageSubtype(head []byte) (string, bool) {
+	switch strings.ToLower(http.DetectContentType(head)) {
+	case "image/jpeg":
+		return "image/jpeg", true
+	case "image/png":
+		return "image/png", true
+	case "image/webp":
+		return "image/webp", true
+	default:
+		return "", false
+	}
+}
 
 // saveUploadedFiles saves one or more uploaded files.
 //
@@ -91,7 +129,8 @@ func saveOneUploadedFile(
 
 	if header.Size > maxFileSize {
 		return "", fmt.Errorf(
-			"file %q is too large; maximum size is 10 MB",
+			"%w: file %q is too large; maximum size is 10 MB",
+			ErrUploadTooLarge,
 			header.Filename,
 		)
 	}
@@ -113,14 +152,34 @@ func saveOneUploadedFile(
 		"image/webp": ".webp",
 	}
 
-	extension, ok := allowedTypes[contentType]
-
-	if !ok {
+	if _, ok := allowedTypes[contentType]; !ok {
 		return "", fmt.Errorf(
-			"unsupported image type %q; allowed types are JPG, PNG and WEBP",
+			"%w: unsupported image type %q; allowed types are JPG, PNG and WEBP",
+			ErrUploadUnsupportedType,
 			contentType,
 		)
 	}
+
+	// The declared Content-Type is supplied by the browser and can be wrong or
+	// forged, so sniff the actual bytes too. This stops a renamed text or HTML
+	// file from being stored and served as a photo.
+	head := make([]byte, 512)
+	read, readErr := io.ReadFull(file, head)
+	if readErr != nil && readErr != io.ErrUnexpectedEOF && readErr != io.EOF {
+		return "", fmt.Errorf("could not read uploaded file: %w", readErr)
+	}
+	head = head[:read]
+
+	sniffed, ok := acceptedImageSubtype(head)
+	if !ok {
+		return "", fmt.Errorf(
+			"%w: file content is %q; allowed types are JPG, PNG and WEBP",
+			ErrUploadUnsupportedType,
+			http.DetectContentType(head),
+		)
+	}
+	contentType = sniffed
+	extension := allowedTypes[contentType]
 
 	// --------------------------------------------------------
 	// Create upload directory
@@ -178,11 +237,9 @@ func saveOneUploadedFile(
 	// Copy uploaded file
 	// --------------------------------------------------------
 
-	if _, err := io.Copy(output, file); err != nil {
-		return "", fmt.Errorf(
-			"could not save uploaded file: %w",
-			err,
-		)
+	// Write the bytes consumed for sniffing, then the rest of the file.
+	if _, err := io.Copy(output, io.MultiReader(bytes.NewReader(head), file)); err != nil {
+		return "", fmt.Errorf("could not save uploaded file: %w", err)
 	}
 
 	// --------------------------------------------------------

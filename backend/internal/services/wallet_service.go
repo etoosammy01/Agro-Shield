@@ -383,7 +383,7 @@ type walletStore interface {
 	ListAdminIDs(ctx context.Context) ([]int, error)
 	ListAdminAccounts(ctx context.Context) ([]models.AdminAccount, error)
 	SetAdmin(ctx context.Context, farmerID int, admin bool) (bool, error)
-	PayForOrder(ctx context.Context, buyerID, cropID int, quantity float64, commissionBasisPoints int64) (int64, error)
+	PayForOrder(ctx context.Context, buyerID, cropID int, quantity float64, checkoutToken string, commissionBasisPoints int64) (int64, bool, error)
 	PlatformRevenueTotal(ctx context.Context) (string, int, error)
 }
 
@@ -1835,8 +1835,8 @@ func (s *WalletService) RejectTransfer(ctx context.Context, transferID int64, ad
 // PayForOrder settles a marketplace purchase. The commission rate comes from
 // this service rather than the caller, so the two purchase entry points need no
 // knowledge of it.
-func (s *WalletService) PayForOrder(ctx context.Context, buyerID, cropID int, quantity float64) (int64, error) {
-	return s.repo.PayForOrder(ctx, buyerID, cropID, quantity, s.commissionBasisPoints)
+func (s *WalletService) PayForOrder(ctx context.Context, buyerID, cropID int, quantity float64, checkoutToken string) (int64, bool, error) {
+	return s.repo.PayForOrder(ctx, buyerID, cropID, quantity, checkoutToken, s.commissionBasisPoints)
 }
 
 // CommissionBasisPoints exposes the configured rate for display.

@@ -403,7 +403,7 @@ func (h *WalletHandler) Withdraw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.wallet.PreflightWithdrawal(r.Context(), farmer.ID, r.FormValue("amount")); err != nil {
-		http.Redirect(w, r, "/wallet?error="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/wallet?error="+url.QueryEscape(walletUserMessage(err)), http.StatusSeeOther)
 		return
 	}
 	// No money moves without proof of control of the account's phone.
@@ -425,7 +425,7 @@ func (h *WalletHandler) Withdraw(w http.ResponseWriter, r *http.Request) {
 				err.Error()+". Update your bank payout details and try again."), http.StatusSeeOther)
 			return
 		}
-		http.Redirect(w, r, "/wallet?error="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/wallet?error="+url.QueryEscape(walletUserMessage(err)), http.StatusSeeOther)
 		return
 	}
 	http.Redirect(w, r, "/wallet?success="+url.QueryEscape("Withdrawal request submitted for admin approval."), http.StatusSeeOther)
@@ -442,7 +442,7 @@ func walletUserMessage(err error) string {
 		errors.Is(err, services.ErrTransferUnavailable):
 		return "That could not be completed because of a technical issue. Check your wallet history before retrying; anything already on hold is listed there."
 	default:
-		return err.Error()
+		return userError(err, "That could not be completed. Check your wallet history before retrying; anything already on hold is listed there.")
 	}
 }
 
@@ -598,7 +598,7 @@ func (h *WalletHandler) SaveBankDetails(w http.ResponseWriter, r *http.Request) 
 	)
 	if err != nil {
 		log.Printf("save wallet payout details for user %d: %v", farmer.ID, err)
-		http.Redirect(w, r, "/wallet?error="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/wallet?error="+url.QueryEscape(walletUserMessage(err)), http.StatusSeeOther)
 		return
 	}
 	http.Redirect(w, r, "/wallet?success="+url.QueryEscape("Bank payout details saved."), http.StatusSeeOther)
@@ -632,7 +632,7 @@ func (h *WalletHandler) LookupAccount(w http.ResponseWriter, r *http.Request) {
 		// A malformed account number is the user's to fix and is worth saying so;
 		// anything else is ours, and is logged rather than shown.
 		log.Printf("bank lookup for user %d: %v", farmer.ID, err)
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": userError(err, "We couldn't look up that account number right now. Please try again.")})
 		return
 	}
 	if matches == nil {

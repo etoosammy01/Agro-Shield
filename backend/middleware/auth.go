@@ -70,6 +70,20 @@ func DeleteSession(sessionID string) {
 	store.mu.Unlock()
 }
 
+// DeleteFarmerSessions removes every session belonging to a farmer. Used when
+// an account is closed: the account's own tab must not keep a working session,
+// and any other signed-in device must be signed out too.
+func DeleteFarmerSessions(farmerID int) {
+	store.mu.Lock()
+	for sessionID, sessionFarmerID := range store.sessions {
+		if sessionFarmerID == farmerID {
+			delete(store.sessions, sessionID)
+		}
+	}
+	delete(store.lastSeen, farmerID)
+	store.mu.Unlock()
+}
+
 // MarkFarmerOnline records recent authenticated activity for presence checks.
 func MarkFarmerOnline(farmerID int) {
 	store.mu.Lock()

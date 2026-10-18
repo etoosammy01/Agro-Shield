@@ -223,6 +223,19 @@ func RegisterRoutes(
 		),
 	)
 
+	// Closing an account is POST-only, inside the handler, because it needs the
+	// parsed confirmation fields to decide whether to act.
+	http.HandleFunc(
+		"/profile/delete",
+		middleware.OnlyPath(
+			"/profile/delete",
+			middleware.RequireAuth(
+				container.FarmerRepo,
+				profileEditHandler.DeleteHandler,
+			),
+		),
+	)
+
 	// ========================================================
 	// STORAGE
 	// ========================================================
@@ -248,7 +261,7 @@ func RegisterRoutes(
 	// MARKETPLACE
 	// ========================================================
 
-	marketplaceHandler := handlers.NewMarketplaceHandler(container.Crop, container.Wallet, container.MarketEvents)
+	marketplaceHandler := handlers.NewMarketplaceHandler(container.Crop, container.Wallet, container.MarketEvents, container.Notification)
 
 	http.HandleFunc(
 		"/marketplace",

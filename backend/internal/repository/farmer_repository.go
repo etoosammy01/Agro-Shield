@@ -1,11 +1,19 @@
 package repository
 
 import (
+<<<<<<< HEAD
     "context"
     "database/sql"
     "errors"
     "fmt"
     "strings"
+=======
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"strings"
+>>>>>>> c92735d (wallet creation and account number generation done successfully)
 
     "backend/internal/models"
 
@@ -212,6 +220,7 @@ func (r *FarmerRepository) ListForChat(excludeID int, search string) ([]models.F
 
 // UpdateProfile updates the editable personal details.
 func (r *FarmerRepository) UpdateProfile(id int, fullName, phone, email, community, lga, state, country string) error {
+<<<<<<< HEAD
     query := `
     UPDATE farmers
     SET full_name = $1, phone = $2, email = $3, location = $4, lga = $5, state = $6, country = $7, updated_at = CURRENT_TIMESTAMP
@@ -219,6 +228,23 @@ func (r *FarmerRepository) UpdateProfile(id int, fullName, phone, email, communi
     `
     _, err := r.db.Exec(query, fullName, phone, email, community, lga, state, country, id)
     return err
+=======
+	query := `
+	UPDATE farmers
+	SET full_name = $1, phone = $2, email = $3, location = $4, lga = $5, state = $6, country = $7, updated_at = CURRENT_TIMESTAMP
+	WHERE id = $8
+	`
+	_, err := r.db.Exec(query, fullName, phone, email, community, lga, state, country, id)
+	if err != nil {
+		// Another account already holds this number. The caller shows a message
+		// about the phone field rather than the database's constraint text.
+		if isUniqueViolation(err) {
+			return ErrPhoneExists
+		}
+		return err
+	}
+	return nil
+>>>>>>> c92735d (wallet creation and account number generation done successfully)
 }
 
 // UpdatePhoto sets the farmer's passport photograph URL.
@@ -331,6 +357,7 @@ func (r *FarmerRepository) DeleteAccount(ctx context.Context, farmerID int) erro
         return ErrAccountHasFundingAccount
     }
 
+<<<<<<< HEAD
     // Personal data with no record-keeping value is removed outright. Cart rows
     // are transient; negotiations are the conversation around an offer, and the
     // order itself keeps the agreed price and quantity.
@@ -355,6 +382,32 @@ func (r *FarmerRepository) DeleteAccount(ctx context.Context, farmerID int) erro
             return err
         }
     }
+=======
+	// Personal data with no record-keeping value is removed outright. Cart rows
+	// are transient; negotiations are the conversation around an offer, and the
+	// order itself keeps the agreed price and quantity.
+	for _, stmt := range []string{
+		`DELETE FROM cart_items WHERE buyer_id = $1`,
+		`DELETE FROM negotiations WHERE buyer_id = $1 OR farmer_id = $1`,
+		`DELETE FROM negotiation_messages WHERE sender_id = $1`,
+		// Other buyers may still hold this seller's produce in a cart. The
+		// listing cannot stay purchasable once the account closes, and the
+		// cart row would block removing it.
+		`DELETE FROM cart_items WHERE crop_id IN (SELECT id FROM crops WHERE farmer_id = $1)`,
+		`DELETE FROM chat_messages WHERE sender_id = $1`,
+		`DELETE FROM conversation_members WHERE user_id = $1`,
+		`DELETE FROM notifications WHERE user_id = $1`,
+		`DELETE FROM feedback WHERE user_id = $1`,
+		`DELETE FROM diagnoses WHERE farmer_id = $1`,
+		`DELETE FROM otp_codes WHERE farmer_id = $1`,
+		`UPDATE market_events SET user_id = NULL WHERE user_id = $1`,
+		`UPDATE marketplace_searches SET user_id = NULL WHERE user_id = $1`,
+	} {
+		if _, err := tx.ExecContext(ctx, stmt, farmerID); err != nil {
+			return err
+		}
+	}
+>>>>>>> c92735d (wallet creation and account number generation done successfully)
 
     // Listings nobody has ordered can go. A crop that appears in an order or
     // delivery is kept for that record, but is taken off the marketplace so a
@@ -372,6 +425,7 @@ func (r *FarmerRepository) DeleteAccount(ctx context.Context, farmerID int) erro
         return err
     }
 
+<<<<<<< HEAD
     // The phone number is freed for a future registration. The placeholder is
     // unique because it includes the id, and it can never pass the Nigerian
     // phone rules used by login and OTP.
@@ -399,6 +453,35 @@ func (r *FarmerRepository) DeleteAccount(ctx context.Context, farmerID int) erro
     ); err != nil {
         return err
     }
+=======
+	// The phone number is freed for a future registration. The placeholder is
+	// unique because it includes the id, and it can never pass the Nigerian
+	// phone rules used by login and OTP.
+	placeholderPhone := fmt.Sprintf("deleted-%d", farmerID)
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE farmers
+		SET full_name = 'Deleted account',
+			phone = $2,
+			email = NULL,
+			password_hash = 'deleted',
+			location = 'Deleted account',
+			lga = NULL,
+			state = NULL,
+			country = 'Nigeria',
+			photo_url = $3,
+			bank_name = NULL,
+			bank_code = NULL,
+			account_name = NULL,
+			account_number = NULL,
+			is_admin = FALSE,
+			deleted_at = CURRENT_TIMESTAMP,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1 AND deleted_at IS NULL`,
+		farmerID, placeholderPhone, defaultPhotoURL,
+	); err != nil {
+		return err
+	}
+>>>>>>> c92735d (wallet creation and account number generation done successfully)
 
     return tx.Commit()
 }

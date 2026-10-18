@@ -124,13 +124,13 @@ func (h *ForgotPassword) resetPassword(w http.ResponseWriter, r *http.Request, p
 
 	if err := h.otp.Verify(r.Context(), farmer.ID, models.OTPPurposePasswordReset, code); err != nil {
 		log.Printf("verify password reset code for user %d: %v", farmer.ID, err)
-		h.renderPage(w, phone, ForgotPasswordPageData{Error: otpUserMessage(err), CodeSent: true})
+		h.renderPage(w, phone, ForgotPasswordPageData{Error: resetCodeMessage(err), CodeSent: true})
 		return
 	}
 
 	if err := h.auth.ResetPassword(phone, newPassword); err != nil {
 		log.Printf("reset password for user %d: %v", farmer.ID, err)
-		h.renderPage(w, phone, ForgotPasswordPageData{Error: err.Error(), CodeSent: true})
+		h.renderPage(w, phone, ForgotPasswordPageData{Error: userError(err, "We couldn't reset that password right now. Please try again."), CodeSent: true})
 		return
 	}
 
@@ -146,6 +146,24 @@ func otpUserMessage(err error) string {
 		return err.Error()
 	default:
 		return "We couldn't send a verification code right now. Please try again in a moment."
+	}
+}
+
+// resetCodeMessage explains a failed password-reset check. These errors only
+// occur after the account lookup, so they reveal nothing about registration;
+// saying "we couldn't send a code" here would be both wrong and unhelpful.
+func resetCodeMessage(err error) string {
+	switch {
+	case errors.Is(err, services.ErrOTPInvalid):
+		return "That verification code is not correct. Check it and try again."
+	case errors.Is(err, services.ErrOTPUnavailable):
+		return "That verification code has expired or was already used. Request a new one."
+	case errors.Is(err, services.ErrOTPTooManyAttempts):
+		return "Too many incorrect attempts. Request a new verification code."
+	case errors.Is(err, services.ErrOTPRateLimited):
+		return "You have requested too many codes. Please wait a few minutes and try again."
+	default:
+		return "We couldn't verify that code right now. Please try again in a moment."
 	}
 }
 

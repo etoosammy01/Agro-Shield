@@ -3,11 +3,59 @@
 // nav instead of losing it entirely.
 document.documentElement.classList.add("js");
 
+// ==========================================================
+// ONE SUBMISSION PER FORM
+//
+// A second click while a POST is still in flight can duplicate
+// an order, a payment, or a negotiation acceptance. Disabling
+// the submit button on the next tick keeps the browser's own
+// submitter and form data intact, while the flag stops a second
+// submit event in the same page. The admin console has its own
+// confirmation flow and is left to it.
+// ==========================================================
+document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll("form").forEach(form => {
+        if ((form.getAttribute("method") || "get").toLowerCase() !== "post") return;
+        if (form.dataset.confirm) return;
+
+        form.addEventListener("submit", event => {
+            // A validation handler on the form may already have refused this
+            // attempt; leave its message and its button alone.
+            if (event.defaultPrevented) return;
+            if (form.dataset.submitting === "true") {
+                event.preventDefault();
+                return;
+            }
+            form.dataset.submitting = "true";
+            window.setTimeout(() => {
+                form.querySelectorAll('button[type="submit"], button:not([type])').forEach(button => {
+                    button.disabled = true;
+                    if (!button.dataset.originalLabel) {
+                        button.dataset.originalLabel = button.textContent;
+                    }
+                    button.textContent = "Working…";
+                });
+            }, 0);
+        });
+    });
+
+    window.addEventListener("pageshow", event => {
+        if (!event.persisted) return;
+        document.querySelectorAll("form[data-submitting]").forEach(form => {
+            delete form.dataset.submitting;
+        });
+        document.querySelectorAll("form button[disabled][data-original-label]").forEach(button => {
+            button.disabled = false;
+            button.textContent = button.dataset.originalLabel;
+        });
+    });
+});
+
+
 document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll(".navbar").forEach(navbar => {
         const nav = navbar.querySelector("nav");
         if (!nav || navbar.querySelector(".nav-toggle")) return;
-
         const toggle = document.createElement("button");
         const quickActions = document.createElement("div");
         quickActions.className = "nav-quick-actions";

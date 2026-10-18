@@ -52,7 +52,12 @@ func (h *CompleteProfile) Handler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		photoURL, err := saveUploadedFile(r, "profile_picture", "farmers")
-		if err != nil || photoURL == "" {
+		if err != nil {
+			log.Println("profile photo upload failed:", err)
+			h.renderWithError(w, farmer, uploadErrorMessage(err))
+			return
+		}
+		if photoURL == "" {
 			h.renderWithError(w, farmer, "A profile photo is required to continue")
 			return
 		}

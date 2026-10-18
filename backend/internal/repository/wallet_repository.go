@@ -872,18 +872,43 @@ func (r *WalletRepository) CreateWithdrawal(ctx context.Context, farmerID int, r
 // ways and the parts have to add up exactly, so the seller's share is derived
 // by subtracting the fee from the total rather than being rounded separately.
 // That makes buyer debit == seller credit + fee true by construction.
-func (r *WalletRepository) PayForOrder(ctx context.Context, buyerID, cropID int, quantity float64, commissionBasisPoints int64) (int64, error) {
+func (r *WalletRepository) PayForOrder(ctx context.Context, buyerID, cropID int, quantity float64, checkoutToken string, commissionBasisPoints int64) (int64, bool, error) {
 	if buyerID <= 0 || cropID <= 0 {
-		return 0, fmt.Errorf("invalid buyer or crop")
+		return 0, false, fmt.Errorf("invalid buyer or crop")
 	}
 	if quantity <= 0 || math.IsNaN(quantity) || math.IsInf(quantity, 0) {
-		return 0, fmt.Errorf("quantity must be a valid positive number")
+		return 0, false, fmt.Errorf("quantity must be a valid positive number")
+	}
+	checkoutToken = strings.TrimSpace(checkoutToken)
+	if checkoutToken == "" {
+		return 0, false, fmt.Errorf("checkout token is required")
 	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
 	defer tx.Rollback()
+
+	// A repeated submission of the same rendered checkout form (double click,
+	// browser retry, second tab) carries the same token. Serialise on it so the
+	// second call waits for the first to commit, then returns that order instead
+	// of charging the buyer again. The lock is transaction-scoped and released
+	// by the commit or rollback below.
+	if _, err := tx.ExecContext(ctx,
+		`SELECT pg_advisory_xact_lock(hashtext($1))`, checkoutToken,
+	); err != nil {
+		return 0, false, err
+	}
+	var existingOrderID int64
+	err = tx.QueryRowContext(ctx,
+		`SELECT id FROM orders WHERE checkout_token = $1`, checkoutToken,
+	).Scan(&existingOrderID)
+	if err == nil {
+		return existingOrderID, true, tx.Commit()
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return 0, false, err
+	}
 
 	var sellerID int
 	var available float64
@@ -893,16 +918,16 @@ func (r *WalletRepository) PayForOrder(ctx context.Context, buyerID, cropID int,
 		FROM crops WHERE id = $1 FOR UPDATE`, cropID,
 	).Scan(&sellerID, &available, &listed)
 	if errors.Is(err, sql.ErrNoRows) {
-		return 0, fmt.Errorf("this produce is not available for purchase")
+		return 0, false, fmt.Errorf("this produce is not available for purchase")
 	}
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
 	if !listed || quantity > available {
-		return 0, fmt.Errorf("this produce is not available in the requested quantity")
+		return 0, false, fmt.Errorf("this produce is not available in the requested quantity")
 	}
 	if sellerID == buyerID {
-		return 0, fmt.Errorf("you can't buy your own produce")
+		return 0, false, fmt.Errorf("you can't buy your own produce")
 	}
 
 	// The total is rounded to whole kobo in SQL and returned as an integer, so
@@ -919,10 +944,10 @@ func (r *WalletRepository) PayForOrder(ctx context.Context, buyerID, cropID int,
 		buyerID, cropID, quantity,
 	).Scan(&buyerWalletID, &sellerWalletID, &totalKobo)
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
 	if totalKobo <= 0 {
-		return 0, fmt.Errorf("order total must be greater than zero")
+		return 0, false, fmt.Errorf("order total must be greater than zero")
 	}
 
 	feeKobo, netKobo := splitCommission(totalKobo, commissionBasisPoints)
@@ -934,24 +959,24 @@ func (r *WalletRepository) PayForOrder(ctx context.Context, buyerID, cropID int,
 		UPDATE wallets SET balance = balance - $1::numeric, updated_at = $2
 		WHERE id = $3 AND balance >= $1::numeric`, total, time.Now(), buyerWalletID)
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
 	affected, err := result.RowsAffected()
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
 	if affected != 1 {
-		return 0, ErrInsufficientBalance
+		return 0, false, ErrInsufficientBalance
 	}
 
 	var orderID int64
 	err = tx.QueryRowContext(ctx, `
-		INSERT INTO orders (buyer_id, crop_id, quantity, total_price, status)
-		VALUES ($1, $2, $3, $4::numeric, 'completed')
-		RETURNING id`, buyerID, cropID, quantity, total,
+		INSERT INTO orders (buyer_id, crop_id, quantity, total_price, status, checkout_token)
+		VALUES ($1, $2, $3, $4::numeric, 'completed', $5)
+		RETURNING id`, buyerID, cropID, quantity, total, checkoutToken,
 	).Scan(&orderID)
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
 	result, err = tx.ExecContext(ctx, `
 		UPDATE crops SET quantity = quantity - $1,
@@ -959,21 +984,21 @@ func (r *WalletRepository) PayForOrder(ctx context.Context, buyerID, cropID int,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = $2 AND quantity >= $1`, quantity, cropID)
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
 	affected, err = result.RowsAffected()
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
 	if affected != 1 {
-		return 0, fmt.Errorf("produce quantity changed during checkout")
+		return 0, false, fmt.Errorf("produce quantity changed during checkout")
 	}
 
 	// The seller's ledger records what actually landed, not the order total.
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE wallets SET balance = balance + $1::numeric, updated_at = $2 WHERE id = $3`,
 		net, time.Now(), sellerWalletID); err != nil {
-		return 0, err
+		return 0, false, err
 	}
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO wallet_transactions (wallet_id, reference, type, amount)
@@ -981,7 +1006,7 @@ func (r *WalletRepository) PayForOrder(ctx context.Context, buyerID, cropID int,
 		buyerWalletID, fmt.Sprintf("order-payment:%d", orderID), total,
 		sellerWalletID, fmt.Sprintf("sale-credit:%d", orderID), net,
 	); err != nil {
-		return 0, err
+		return 0, false, err
 	}
 
 	// With commission off there is no row at all, so a zero rate leaves no
@@ -993,10 +1018,10 @@ func (r *WalletRepository) PayForOrder(ctx context.Context, buyerID, cropID int,
 			orderID, fmt.Sprintf("commission:%d", orderID), total, fee,
 			FormatBasisPoints(commissionBasisPoints),
 		); err != nil {
-			return 0, err
+			return 0, false, err
 		}
 	}
-	return orderID, tx.Commit()
+	return orderID, false, tx.Commit()
 }
 
 // PlatformRevenueTotal returns the commission collected so far and how many

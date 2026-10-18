@@ -9,9 +9,11 @@ import (
 	"backend/render"
 )
 
-// LoginPageData is passed to login.html so it can show an error message.
+// LoginPageData is passed to login.html so it can show an error message or a
+// one-time notice (for example after an account was closed).
 type LoginPageData struct {
-	Error string
+	Error  string
+	Notice string
 }
 
 type Login struct {
@@ -28,7 +30,11 @@ func (h *Login) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		log.Println("User Visited Login Page")
-		if err := render.RenderTemplates(w, "login.html", LoginPageData{}); err != nil {
+		data := LoginPageData{}
+		if r.URL.Query().Get("deleted") == "1" {
+			data.Notice = "Your account has been closed. Your order and payment history is kept for record-keeping."
+		}
+		if err := render.RenderTemplates(w, "login.html", data); err != nil {
 			log.Println("Render Error")
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return

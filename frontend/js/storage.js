@@ -21,7 +21,7 @@ function validateImageFile(file) {
     if (!file) return { valid: false, error: "No file selected." };
 
     if (!VALID_IMAGE_TYPES.includes(file.type)) {
-        return { valid: false, error: "Invalid image type. Please upload JPG, PNG, WEBP, or GIF." };
+        return { valid: false, error: "Invalid image type. Please upload JPG, PNG, or WEBP." };
     }
 
     if (file.size > MAX_IMAGE_SIZE) {

@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -291,7 +292,7 @@ func (h *ChatHandler) ListHandler(
 			w,
 			farmer,
 			nil,
-			err.Error(),
+			userError(err, "We couldn't complete that chat request. Please try again."),
 		)
 		return
 	}
@@ -384,7 +385,7 @@ func (h *ChatHandler) ViewHandler(
 	if err != nil {
 		http.Error(
 			w,
-			err.Error(),
+			userError(err, "We couldn't complete that chat request. Please try again."),
 			http.StatusForbidden,
 		)
 		return
@@ -540,7 +541,7 @@ func (h *ChatHandler) SendMessageHandler(
 			r,
 			"/chat/view?id="+strconv.Itoa(conversationID)+
 				"&error="+
-				err.Error(),
+				url.QueryEscape(userError(err, "We couldn't send that message. Please try again.")),
 			http.StatusSeeOther,
 		)
 
@@ -615,7 +616,7 @@ func (h *ChatHandler) CreateGroupHandler(
 			w,
 			farmer,
 			nil,
-			err.Error(),
+			userError(err, "We couldn't complete that chat request. Please try again."),
 		)
 
 		return
@@ -707,7 +708,7 @@ func (h *ChatHandler) CreatePrivateChatHandler(
 
 		http.Error(
 			w,
-			err.Error(),
+			userError(err, "We couldn't complete that chat request. Please try again."),
 			http.StatusBadRequest,
 		)
 
@@ -811,7 +812,7 @@ func (h *ChatHandler) AddMemberHandler(
 
 		http.Error(
 			w,
-			err.Error(),
+			userError(err, "We couldn't complete that chat request. Please try again."),
 			http.StatusBadRequest,
 		)
 
@@ -901,7 +902,7 @@ func (h *ChatHandler) RemoveMemberHandler(
 
 		http.Error(
 			w,
-			err.Error(),
+			userError(err, "We couldn't complete that chat request. Please try again."),
 			http.StatusBadRequest,
 		)
 
@@ -979,7 +980,7 @@ func (h *ChatHandler) LeaveGroupHandler(
 
 		http.Error(
 			w,
-			err.Error(),
+			userError(err, "We couldn't complete that chat request. Please try again."),
 			http.StatusBadRequest,
 		)
 
@@ -1055,7 +1056,7 @@ func (h *ChatHandler) DeleteMessageHandler(
 
 		http.Error(
 			w,
-			err.Error(),
+			userError(err, "We couldn't complete that chat request. Please try again."),
 			http.StatusBadRequest,
 		)
 

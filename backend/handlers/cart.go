@@ -172,7 +172,7 @@ func (h *Cart) Handler(w http.ResponseWriter, r *http.Request) {
 				h.render(
 					w,
 					farmer.ID,
-					err.Error(),
+					userError(err, "We couldn't remove that item. Please try again."),
 				)
 
 				return
@@ -240,7 +240,7 @@ func (h *Cart) render(
 			err,
 		)
 
-		errMsg = err.Error()
+		errMsg = userError(err, "We couldn't load your cart right now. Please refresh and try again.")
 	}
 
 	// ========================================================

@@ -142,8 +142,8 @@ func (h *OrderHandler) Place(w http.ResponseWriter, r *http.Request) {
 	cropID, _ := strconv.Atoi(r.FormValue("crop_id"))
 	quantity, _ := strconv.ParseFloat(r.FormValue("quantity"), 64)
 
-	if _, err := h.wallet.PayForOrder(r.Context(), farmer.ID, cropID, quantity); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	if _, _, err := h.wallet.PayForOrder(r.Context(), farmer.ID, cropID, quantity, r.FormValue("checkout_token")); err != nil {
+		http.Error(w, userError(err, "We couldn't place that order. No order was placed; check the quantity and your wallet balance, then try again."), http.StatusBadRequest)
 		return
 	}
 

@@ -137,6 +137,7 @@
 
                 <form method="POST" action="/marketplace" class="buy-form">
                     <input type="hidden" name="crop_id" value="{{.ID}}">
+                    <input type="hidden" name="checkout_token" value="{{index $.CheckoutTokens .ID}}">
                     <input type="number" name="quantity" min="0.01" max="{{.Quantity}}" step="0.01" placeholder="Qty"
                         required>
                     <button type="submit">Pay with wallet</button>

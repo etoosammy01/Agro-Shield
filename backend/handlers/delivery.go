@@ -192,7 +192,7 @@ func (h *DeliveryHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.deliveryService.UpdateStatus(id, farmer.ID, r.FormValue("status")); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, userError(err, "We couldn't update that delivery. Please try again."), http.StatusBadRequest)
 		return
 	}
 
@@ -229,7 +229,7 @@ func (h *DeliveryHandler) UpdateTracking(w http.ResponseWriter, r *http.Request)
 		r.FormValue("vehicle_info"),
 	)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, userError(err, "We couldn't update that delivery. Please try again."), http.StatusBadRequest)
 		return
 	}
 
@@ -258,7 +258,7 @@ func (h *DeliveryHandler) MarkDelivered(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := h.deliveryService.MarkDelivered(id, farmer.ID, r.FormValue("proof_url")); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, userError(err, "We couldn't update that delivery. Please try again."), http.StatusBadRequest)
 		return
 	}
 
@@ -287,7 +287,7 @@ func (h *DeliveryHandler) MarkFailed(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.deliveryService.MarkFailed(id, farmer.ID, r.FormValue("reason")); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, userError(err, "We couldn't update that delivery. Please try again."), http.StatusBadRequest)
 		return
 	}
 
@@ -311,7 +311,7 @@ func (h *DeliveryHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.deliveryService.Cancel(id, farmer.ID); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, userError(err, "We couldn't update that delivery. Please try again."), http.StatusBadRequest)
 		return
 	}
 
