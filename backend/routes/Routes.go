@@ -13,7 +13,10 @@ import (
 	"backend/ussd"
 )
 
-func RegisterRoutes(container *app.Container) {
+func RegisterRoutes(
+	container *app.Container,
+	emailSender services.EmailSender,
+) {
 	// USSD gateways post menu selections to this provider-neutral endpoint.
 	ussdHandler := ussd.NewHandler(container.FarmerRepo, container.Crop, services.NewWeatherService(), container.Order, container.Notification)
 	http.Handle("/ussd", ussdHandler)
@@ -85,6 +88,7 @@ func RegisterRoutes(container *app.Container) {
 
 	registerHandler := handlers.NewRegisterHandler(
 		container.Auth,
+		emailSender,
 	)
 
 	http.HandleFunc(

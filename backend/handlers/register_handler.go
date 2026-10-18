@@ -3,13 +3,16 @@ package handlers
 import "backend/internal/services"
 
 type Register struct {
-	service *services.AuthService
+	service     *services.AuthService
+	emailSender services.EmailSender
 }
 
-func NewRegisterHandler(service *services.AuthService) *Register {
-
+func NewRegisterHandler(
+	service *services.AuthService,
+	emailSender services.EmailSender,
+) *Register {
 	return &Register{
-		service: service,
+		service:     service,
+		emailSender: emailSender,
 	}
-
 }

@@ -277,8 +277,15 @@ func main() {
 	// 6. REGISTER ROUTES
 	// ============================================================
 
-	routes.RegisterRoutes(container)
+	emailSender := services.NewBrevoEmailSender(
+		cfg.BrevoSMTPHost,
+		cfg.BrevoSMTPLogin,
+		cfg.BrevoSMTPKey,
+		cfg.BrevoFromEmail,
+		cfg.BrevoFromName,
+	)
 
+	routes.RegisterRoutes(container, emailSender)
 	// Health checks are deliberately outside the application router so they
 	// remain cheap and are not affected by page-level middleware decisions.
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
