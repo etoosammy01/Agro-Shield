@@ -547,6 +547,12 @@ func notFoundMessage(message string) bool {
 	if strings.Contains(lowered, "invalid account") {
 		return true
 	}
+	// A bank code the provider does not recognise cannot hold an account in
+	// this directory. Treat it as a negative answer for that bank so one stale
+	// shortlist entry does not make every otherwise-complete sweep look broken.
+	if strings.Contains(lowered, "unknown bank code") || strings.Contains(lowered, "invalid bank code") {
+		return true
+	}
 	// The verify-by-reference endpoint answers a reference it never issued with
 	// HTTP 400 "No transaction was found for this id" - observed against the
 	// test key. Without this, an abandoned checkout is reported as an

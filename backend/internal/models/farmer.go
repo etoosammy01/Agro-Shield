@@ -19,6 +19,11 @@ type Farmer struct {
 	BankCode      string
 	AccountName   string
 	AccountNumber string
+
+	// WalletNumber is the permanent Agro-Shield identifier a member can share
+	// to receive wallet-to-wallet transfers. It is independent of the bank
+	// account used for payouts.
+	WalletNumber string
 }
 
 func (f *Farmer) IsBuyer() bool {

@@ -20,7 +20,10 @@ func StaticCache(next http.Handler) http.Handler {
 		default:
 			switch strings.ToLower(path.Ext(requestPath)) {
 			case ".css", ".js":
-				w.Header().Set("Cache-Control", "public, max-age=3600")
+				// Revalidate code assets on every load. This app serves them
+				// straight from disk with no content hash, so a one-hour cache
+				// can leave a browser running an old form against a new server.
+				w.Header().Set("Cache-Control", "no-cache")
 			case ".png", ".jpg", ".jpeg", ".webp", ".gif", ".ico", ".svg":
 				w.Header().Set("Cache-Control", "public, max-age=86400")
 			case ".woff", ".woff2", ".ttf", ".eot":

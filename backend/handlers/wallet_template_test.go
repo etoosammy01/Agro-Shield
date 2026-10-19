@@ -71,7 +71,8 @@ func TestWalletPageRendersWithoutTransfers(t *testing.T) {
 
 func TestWalletPageResolvesTransferRecipientAutomatically(t *testing.T) {
 	data := WalletPageData{
-		Wallet: &models.Wallet{ID: 1, FarmerID: 7, Balance: "5000.00", Currency: "NGN"},
+		Wallet:       &models.Wallet{ID: 1, FarmerID: 7, Balance: "5000.00", Currency: "NGN"},
+		WalletNumber: "8000000007",
 	}
 
 	recorder := httptest.NewRecorder()
@@ -84,8 +85,11 @@ func TestWalletPageResolvesTransferRecipientAutomatically(t *testing.T) {
 		`id="transfer-recipient" name="recipient"`,
 		`id="transfer-recipient-name" placeholder="Completed after the account is found" readonly`,
 		`id="transfer-submit" disabled`,
-		"phone or Agro-Shield account number",
+		"phone or Agro-Shield wallet number",
 		"We confirm the account name automatically",
+		`id="wallet-number"`,
+		"8000000007",
+		`data-copy-target="wallet-number"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the transfer form did not render %q", want)
@@ -777,6 +781,35 @@ func TestWalletPageFundsThroughADebitCardOrBankTransferDialog(t *testing.T) {
 		if strings.Contains(body, unwanted) {
 			t.Errorf("the removed top-up card still rendered %q", unwanted)
 		}
+	}
+}
+
+// Flutterwave can return the narration with its hyphen, spacing and casing
+// stripped. The wallet page should still show the branded account name built
+// from the member's profile, not the provider's run-together version.
+func TestWalletPageShowsBrandedFundingAccountName(t *testing.T) {
+	data := WalletPageData{
+		Wallet:   &models.Wallet{ID: 1, FarmerID: 7, Balance: "1500.00", Currency: "NGN"},
+		FullName: "James Inalegwu",
+		VirtualAccount: &models.WalletVirtualAccount{
+			ID: 1, FarmerID: 7, TxRef: "AGRO-VA-7",
+			AccountNumber: "0123456789", BankName: "Flutterwave MFB",
+			AccountName: "agroshieldjames inalegwu", Currency: "NGN",
+			Status: models.VirtualAccountActive,
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+	if err := render.RenderTemplates(recorder, "wallet.html", data); err != nil {
+		t.Fatalf("render wallet.html: %v", err)
+	}
+	body := recorder.Body.String()
+
+	if !strings.Contains(body, "AgroShield-James Inalegwu") {
+		t.Fatal("the funding account did not use the branded profile name")
+	}
+	if strings.Contains(body, "agroshieldjames inalegwu") {
+		t.Error("the funding account still rendered the provider's run-together name")
 	}
 }
 

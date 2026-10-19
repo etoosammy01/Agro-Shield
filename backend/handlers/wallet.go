@@ -47,6 +47,7 @@ type WalletPageData struct {
 	BankCode      string
 	AccountName   string
 	AccountNumber string
+	WalletNumber  string
 	FullName      string
 	Error         string
 	Success       string
@@ -140,8 +141,9 @@ func (h *WalletHandler) Page(w http.ResponseWriter, r *http.Request) {
 		Withdrawals: withdrawals, Transfers: transfers,
 		BankName: farmer.BankName, BankCode: farmer.BankCode,
 		AccountName: farmer.AccountName, AccountNumber: farmer.AccountNumber,
-		FullName: strings.Join(strings.Fields(farmer.FullName), " "),
-		Error:    r.URL.Query().Get("error"), Success: r.URL.Query().Get("success"),
+		WalletNumber: farmer.WalletNumber,
+		FullName:     strings.Join(strings.Fields(farmer.FullName), " "),
+		Error:        r.URL.Query().Get("error"), Success: r.URL.Query().Get("success"),
 		IsAdmin:        h.wallet.IsAdmin(farmer.ID),
 		VirtualAccount: virtualAccount,
 		HasEmail:       strings.TrimSpace(farmer.Email) != "",
@@ -473,6 +475,8 @@ func (h *WalletHandler) LookupTransferRecipient(w http.ResponseWriter, r *http.R
 		switch {
 		case errors.Is(err, services.ErrTransferRecipientNotFound):
 			status = http.StatusNotFound
+		case errors.Is(err, services.ErrTransferRecipientAmbiguous):
+			status = http.StatusConflict
 		case errors.Is(err, services.ErrTransferUnavailable):
 			status = http.StatusServiceUnavailable
 		}
@@ -483,7 +487,7 @@ func (h *WalletHandler) LookupTransferRecipient(w http.ResponseWriter, r *http.R
 }
 
 // Transfer reserves money from the sender's wallet for a recipient identified
-// by phone number or Agro-Shield account number.
+// by phone number, Agro-Shield wallet number, or saved account number.
 //
 // The money leaves the sender immediately but does not reach the recipient
 // until an admin approves it, so a mistyped or fraudulent transfer can be
@@ -705,6 +709,12 @@ func (h *WalletHandler) LookupAccount(w http.ResponseWriter, r *http.Request) {
 		// A malformed account number is the user's to fix and is worth saying so;
 		// anything else is ours, and is logged rather than shown.
 		log.Printf("bank lookup for user %d: %v", farmer.ID, err)
+		if errors.Is(err, services.ErrBankLookupIncomplete) {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+				"error": "We couldn't check every bank just now. Search and choose your bank below, or try again.",
+			})
+			return
+		}
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": userError(err, "We couldn't look up that account number right now. Please try again.")})
 		return
 	}

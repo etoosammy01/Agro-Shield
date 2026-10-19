@@ -51,6 +51,14 @@ func (f *fakeFarmerStore) GetByPhone(phone string) (*models.Farmer, error) {
 	return f.GetByID(0)
 }
 
+func (f *fakeFarmerStore) GetByWalletNumber(walletNumber string) (*models.Farmer, error) {
+	return f.GetByID(0)
+}
+
+func (f *fakeFarmerStore) FindByAccountNumber(string) ([]*models.Farmer, error) {
+	return nil, f.err
+}
+
 func (f *fakeFarmerStore) UpdateBankDetails(id int, bankName, bankCode, accountName, accountNumber string) error {
 	return nil
 }

@@ -21,8 +21,8 @@ if (connectionStatus) {
   });
 }
 
-// Wallet-to-wallet transfer: the recipient is identified by phone number or
-// Agro-Shield account number. A successful lookup fills the read-only account
+// Wallet-to-wallet transfer: the recipient is identified by phone number,
+// Agro-Shield wallet number, or saved bank account number. A successful lookup fills the read-only account
 // name; the server resolves the identifier again when the transfer is submitted,
 // so this confirmation never becomes the authority for where money goes.
 (() => {
@@ -64,7 +64,7 @@ if (connectionStatus) {
     const current = ++sequence;
 
     if (!completeIdentifier(digits)) {
-      reset(identifier === "" ? "" : "Enter a complete phone number or 10-digit Agro-Shield account number.");
+      reset(identifier === "" ? "" : "Enter a complete phone number, Agro-Shield wallet number, or 10-digit account number.");
       return;
     }
 
@@ -104,7 +104,7 @@ if (connectionStatus) {
     reset();
     if (recipient.value.trim() === "") return;
     if (!completeIdentifier(digits)) {
-      setStatus("Enter a complete phone number or 10-digit Agro-Shield account number.");
+      setStatus("Enter a complete phone number, Agro-Shield wallet number, or 10-digit account number.");
       return;
     }
     setStatus("Confirming the account name…");
@@ -134,6 +134,7 @@ if (bankSearch && bankCode && bankStatus && bankPicker && bankMenu && bankListbo
   let selectedBank = null;
   let suggestedBanks = [];
   let bankAutoFilled = false;
+  let bankChosenByUser = false;
   let visibleBanks = [];
   let activeIndex = -1;
   let banksLoading = true;
@@ -291,6 +292,7 @@ if (bankSearch && bankCode && bankStatus && bankPicker && bankMenu && bankListbo
     const changed = bank.code !== bankCode.value || bank.name !== bankSearch.value;
     selectedBank = bank;
     bankAutoFilled = false;
+    bankChosenByUser = true;
     suggestedBanks = [];
     bankSearch.value = bank.name;
     bankCode.value = bank.code;
@@ -312,6 +314,7 @@ if (bankSearch && bankCode && bankStatus && bankPicker && bankMenu && bankListbo
   const applySuggestedBank = (match) => {
     selectedBank = bankDirectory.find((bank) => bank.code === match.code) || match;
     bankAutoFilled = true;
+    bankChosenByUser = false;
     suggestedBanks = [match];
     bankSearch.value = match.name;
     bankCode.value = match.code;
@@ -379,6 +382,7 @@ if (bankSearch && bankCode && bankStatus && bankPicker && bankMenu && bankListbo
     } catch (error) {
       if (sequence !== lookupSequence) return;
       suggestedBanks = [];
+      setBankStatus("");
       setAccountNameVerified(false);
       accountName.value = "";
       setAccountNumberStatus(error.message);
@@ -462,6 +466,7 @@ if (bankSearch && bankCode && bankStatus && bankPicker && bankMenu && bankListbo
     if (!selectedBank || bankSearch.value.trim() !== selectedBank.name) {
       selectedBank = null;
       bankCode.value = "";
+      bankChosenByUser = false;
       resetResolvedName();
     }
     openMenu();
@@ -507,7 +512,7 @@ if (bankSearch && bankCode && bankStatus && bankPicker && bankMenu && bankListbo
     if (accountNumber.value !== digits) accountNumber.value = digits;
     accountNumber.removeAttribute("aria-invalid");
 
-    if (bankAutoFilled) {
+    if (bankAutoFilled || !bankChosenByUser) {
       bankAutoFilled = false;
       selectedBank = null;
       bankCode.value = "";
@@ -517,6 +522,7 @@ if (bankSearch && bankCode && bankStatus && bankPicker && bankMenu && bankListbo
     suggestedBanks = [];
     resetResolvedName();
     setAccountNumberStatus("");
+    setBankStatus("");
 
     if (digits === "") {
       return;
@@ -558,6 +564,10 @@ if (bankSearch && bankCode && bankStatus && bankPicker && bankMenu && bankListbo
 
   setAccountNameVerified(accountName.value.trim() !== "");
   syncSaveState();
+  if (!bankCode.value && /^[0-9]{10}$/.test(accountNumber.value.trim())) {
+    setAccountNumberStatus("Finding the bank for this account number…");
+    scheduleLookup();
+  }
 
   fetch("/wallet/banks", { headers: { Accept: "application/json" } })
     .then((response) => {

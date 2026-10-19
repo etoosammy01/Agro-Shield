@@ -215,6 +215,8 @@ type walletStore interface {
 type farmerStore interface {
 	GetByID(id int) (*models.Farmer, error)
 	GetByPhone(phone string) (*models.Farmer, error)
+	GetByWalletNumber(walletNumber string) (*models.Farmer, error)
+	FindByAccountNumber(accountNumber string) ([]*models.Farmer, error)
 	UpdateBankDetails(id int, bankName, bankCode, accountName, accountNumber string) error
 }
 
@@ -1657,8 +1659,9 @@ func (s *WalletService) RequestWithdrawal(ctx context.Context, farmerID int, amo
 // different words in the UI: a malformed number is the sender's typo, whereas
 // an unknown number means no account matched.
 var (
-	ErrTransferRecipientInvalid  = errors.New("enter a valid Nigerian phone number or Agro-Shield account number")
-	ErrTransferRecipientNotFound = errors.New("no Agro-Shield account uses that phone or account number")
+	ErrTransferRecipientInvalid   = errors.New("enter a valid Nigerian phone number, Agro-Shield wallet number, or account number")
+	ErrTransferRecipientNotFound  = errors.New("no Agro-Shield member uses that phone, wallet number, or saved account number; check the number and try again")
+	ErrTransferRecipientAmbiguous = errors.New("more than one Agro-Shield member uses that account number; use their phone or wallet number instead")
 
 	// ErrTransferUnavailable wraps infrastructure failures. Handlers test for
 	// it so a database error never reaches the page as raw internal text.
@@ -1714,8 +1717,10 @@ func recipientPhoneForms(phone string) []string {
 	return []string{normalized, "0" + subscriber, subscriber}
 }
 
-// ResolveTransferRecipient turns the phone number or Agro-Shield account number
-// a sender typed into the account that will be credited.
+// ResolveTransferRecipient turns the phone number or account number a sender
+// typed into the account that will be credited. A ten-digit value may be an
+// Agro-Shield wallet number, an active Flutterwave funding account, or the
+// member's saved payout account.
 //
 // This necessarily reveals whether a number is registered, which a
 // deliberately vague error could hide — but a transfer feature where the sender
@@ -1723,10 +1728,12 @@ func recipientPhoneForms(phone string) []string {
 // without a one-time passcode and an admin approval. The lookup is therefore
 // reachable only from an authenticated session.
 //
-// A ten-digit value is checked as a virtual account number first and then as a
-// phone number. Flutterwave account numbers and Nigerian subscriber numbers can
-// both be ten digits, so the account number wins when it exists; an eleven-digit
-// local phone or a 234-prefixed international phone skips the account lookup.
+// A ten-digit value is checked as an Agro-Shield wallet number first, then as a
+// virtual account number and saved payout account, and finally as a phone
+// number. Wallet numbers are issued by Agro-Shield and belong to exactly one
+// member, so they win when they match. Flutterwave account numbers and Nigerian
+// subscriber numbers can both be ten digits; an eleven-digit local phone or a
+// 234-prefixed international phone skips the account lookups.
 func (s *WalletService) ResolveTransferRecipient(ctx context.Context, senderID int, identifier string) (*models.Farmer, error) {
 	if senderID <= 0 {
 		return nil, errors.New("invalid wallet owner")
@@ -1741,6 +1748,17 @@ func (s *WalletService) ResolveTransferRecipient(ctx context.Context, senderID i
 	}, identifier)
 
 	if len(digits) == 10 {
+		// Every member gets a permanent Agro-Shield wallet number, whether or
+		// not they have linked a bank account. It therefore works as a
+		// recipient identifier before any provider-backed lookup.
+		recipient, lookupErr := s.farmers.GetByWalletNumber(digits)
+		if lookupErr != nil {
+			return nil, fmt.Errorf("%w: look up transfer recipient: %v", ErrTransferUnavailable, lookupErr)
+		}
+		if recipient != nil {
+			return transferRecipient(senderID, recipient)
+		}
+
 		account, err := s.repo.GetVirtualAccountByAccountNumber(ctx, digits)
 		switch {
 		case err == nil:
@@ -1753,6 +1771,24 @@ func (s *WalletService) ResolveTransferRecipient(ctx context.Context, senderID i
 			}
 		case !errors.Is(err, repository.ErrVirtualAccountNotFound):
 			return nil, fmt.Errorf("%w: look up transfer account number: %v", ErrTransferUnavailable, err)
+		}
+
+		// Most users do not have a Flutterwave funding account, but they do
+		// have the account number saved for payouts. Treating that as an
+		// identifier is what makes "phone or account number" work for everyone.
+		// A bank account number is not globally unique, so only an unambiguous
+		// match may receive money.
+		recipients, lookupErr := s.farmers.FindByAccountNumber(digits)
+		if lookupErr != nil {
+			return nil, fmt.Errorf("%w: look up transfer account number: %v", ErrTransferUnavailable, lookupErr)
+		}
+		switch len(recipients) {
+		case 1:
+			return transferRecipient(senderID, recipients[0])
+		case 0:
+			// Fall through to the phone forms below.
+		default:
+			return nil, ErrTransferRecipientAmbiguous
 		}
 	}
 
@@ -2081,7 +2117,20 @@ var bankLookupShortlist = []Bank{
 // bankLookupConcurrency caps how many banks are probed at once. Each probe is a
 // separate HTTP request to Flutterwave, so this is the knob that decides how
 // hard one user's lookup pushes on the provider's rate limit.
-const bankLookupConcurrency = 6
+const bankLookupConcurrency = 3
+
+// A failed probe is retried once. Flutterwave occasionally resets a connection
+// or briefly refuses a bank under concurrent load; without this, the one bank
+// that holds the account can fail while every other bank answers "no", and the
+// form is told no suggestion exists. The retry is only for infrastructure
+// failures - a bank that says the account is not there is a final answer.
+const bankLookupRetryDelay = 200 * time.Millisecond
+
+// ErrBankLookupIncomplete means the sweep could not get an answer from every
+// bank it tried, so an empty result is not evidence that the account exists
+// nowhere. The caller should offer the manual bank picker and ask the user to
+// try again rather than claim no bank matched.
+var ErrBankLookupIncomplete = errors.New("bank lookup could not check every bank")
 
 // LookupAccountBanks finds which banks an account number belongs to and returns
 // the registered holder's name for each.
@@ -2148,8 +2197,12 @@ func (s *WalletService) LookupAccountBanks(ctx context.Context, accountNumber st
 		if err := s.lookups.SaveMiss(ctx, accountNumber); err != nil {
 			log.Printf("cache empty bank lookup for %s: %v", maskAccountNumber(accountNumber), err)
 		}
+		return nil, nil
 	}
-	return nil, nil
+	if ctx.Err() != nil {
+		return nil, nil
+	}
+	return nil, ErrBankLookupIncomplete
 }
 
 // sweepBanks probes the shortlist concurrently and returns every bank that
@@ -2194,7 +2247,7 @@ func (s *WalletService) sweepBanks(ctx context.Context, accountNumber string) ([
 				return
 			}
 
-			resolved, err := s.resolver.ResolveAccount(accountNumber, bank.Code)
+			resolved, err := s.resolveBankAccount(ctx, accountNumber, bank.Code)
 			if err != nil {
 				if errors.Is(err, ErrAccountNotResolved) {
 					// The expected path for every bank that does not hold this
@@ -2234,6 +2287,25 @@ func (s *WalletService) sweepBanks(ctx context.Context, accountNumber string) ([
 		}
 	}
 	return matches, complete
+}
+
+// resolveBankAccount retries a probe once when the provider could not answer.
+// ErrAccountNotResolved is an answer, not a failure, so it is returned at once.
+func (s *WalletService) resolveBankAccount(ctx context.Context, accountNumber, bankCode string) (*ResolvedAccount, error) {
+	resolved, err := s.resolver.ResolveAccount(accountNumber, bankCode)
+	if err == nil || errors.Is(err, ErrAccountNotResolved) {
+		return resolved, err
+	}
+
+	timer := time.NewTimer(bankLookupRetryDelay)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+
+	return s.resolver.ResolveAccount(accountNumber, bankCode)
 }
 
 func bankMatchesFromLookups(cached []repository.BankLookup) []BankMatch {

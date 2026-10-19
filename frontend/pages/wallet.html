@@ -39,6 +39,17 @@
                     <strong><span class="wallet-currency">₦</span>{{money .Wallet.Balance}}</strong>
                     <small>{{.Wallet.Currency}} · ready to use</small>
                 </div>
+                {{if .WalletNumber}}
+                <div class="wallet-number-card">
+                    <span class="wallet-number-label">Your Agro-Shield wallet number</span>
+                    <span class="wallet-account-number-row">
+                        <span class="wallet-account-number" id="wallet-number">{{.WalletNumber}}</span>
+                        <button class="wallet-copy-button" type="button" data-copy-target="wallet-number" data-copy-status="wallet-number-copy-status" aria-label="Copy your Agro-Shield wallet number">Copy number</button>
+                    </span>
+                    <small>Share this number so another member can send money straight to your wallet.</small>
+                    <span class="wallet-inline-status" id="wallet-number-copy-status" role="status" aria-live="polite"></span>
+                </div>
+                {{end}}
                 <button type="button" class="wallet-hero-fund-card" data-open-funding>
                     <span class="wallet-hero-fund-icon" aria-hidden="true">+</span>
                     <span class="wallet-hero-fund-copy">
@@ -84,7 +95,7 @@
                         </div>
                         <div>
                             <dt>Account name</dt>
-                            <dd>{{if .VirtualAccount.AccountName}}{{.VirtualAccount.AccountName}}{{else if .FullName}}AgroShield-{{.FullName}}{{else}}<span class="wallet-muted">Add your full name to your profile to display it here</span>{{end}}</dd>
+                            <dd>{{if .FullName}}AgroShield-{{.FullName}}{{else if .VirtualAccount.AccountName}}{{.VirtualAccount.AccountName}}{{else}}<span class="wallet-muted">Add your full name to your profile to display it here</span>{{end}}</dd>
                         </div>
                     </dl>
                     <p class="wallet-verification-status wallet-verification-active" role="status">
@@ -221,10 +232,10 @@
                 <div class="wallet-card-icon wallet-icon-pink" aria-hidden="true">⇄</div>
                 <p class="wallet-card-kicker">Send money</p>
                 <h2>Transfer to another wallet</h2>
-                <p>Send to another Agro-Shield member using their phone number or Agro-Shield account number. An admin approves it before the money lands, so a mistake can be put right.</p>
+                <p>Send to another Agro-Shield member using their phone number or their Agro-Shield wallet number. An admin approves it before the money lands, so a mistake can be put right.</p>
                 <form method="POST" action="/wallet/transfer">
-                    <label class="wallet-label" for="transfer-recipient">Recipient’s phone or Agro-Shield account number</label>
-                    <input id="transfer-recipient" name="recipient" type="text" inputmode="tel" maxlength="20" placeholder="0801 234 5678 or 0123456789" aria-describedby="transfer-recipient-status" autocomplete="off" spellcheck="false" required>
+                    <label class="wallet-label" for="transfer-recipient">Recipient’s phone or Agro-Shield wallet number</label>
+                    <input id="transfer-recipient" name="recipient" type="text" inputmode="tel" maxlength="20" placeholder="0801 234 5678 or 8000 000 042" aria-describedby="transfer-recipient-status" autocomplete="off" spellcheck="false" required>
                     <p class="wallet-inline-status" id="transfer-recipient-status" role="status" aria-live="polite"></p>
 
                     <label class="wallet-label" for="transfer-recipient-name">Account name</label>
@@ -456,7 +467,7 @@
                     </div>
                     <div>
                         <dt>Account name</dt>
-                        <dd>{{if .VirtualAccount.AccountName}}{{.VirtualAccount.AccountName}}{{else if .FullName}}AgroShield-{{.FullName}}{{else}}Your registered name{{end}}</dd>
+                        <dd>{{if .FullName}}AgroShield-{{.FullName}}{{else if .VirtualAccount.AccountName}}{{.VirtualAccount.AccountName}}{{else}}Your registered name{{end}}</dd>
                     </div>
                 </dl>
                 <p class="wallet-footnote">Your wallet is credited only after Flutterwave confirms the transfer.</p>
@@ -491,7 +502,7 @@
             </footer>
         </div>
     </div>
-    <script src="/static/js/wallet.js"></script>
+    <script src="/static/js/wallet.js?v=20261019"></script>
     <script src="/static/js/navigation.js"></script>
 </body>
 </html>

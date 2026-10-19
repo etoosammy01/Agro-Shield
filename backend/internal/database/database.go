@@ -109,10 +109,12 @@ CREATE TABLE IF NOT EXISTS farmers (
 	bank_name TEXT,
 	account_name TEXT,
 	account_number VARCHAR(10),
+	wallet_number VARCHAR(10),
 	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT farmers_photo_url_nonblank CHECK (BTRIM(photo_url) <> ''),
-	CONSTRAINT farmers_account_number_valid CHECK (account_number IS NULL OR account_number = '' OR account_number ~ '^[0-9]{10}$')
+	CONSTRAINT farmers_account_number_valid CHECK (account_number IS NULL OR account_number = '' OR account_number ~ '^[0-9]{10}$'),
+	CONSTRAINT farmers_wallet_number_valid CHECK (wallet_number IS NULL OR wallet_number ~ '^[0-9]{10}$')
 );
 CREATE INDEX IF NOT EXISTS idx_farmers_role ON farmers(role);
 CREATE INDEX IF NOT EXISTS idx_farmers_state_lga ON farmers(state, lga);
@@ -121,6 +123,32 @@ CREATE INDEX IF NOT EXISTS idx_farmers_state_lga ON farmers(state, lga);
 	}
 	if _, err := db.Exec(`ALTER TABLE farmers ADD COLUMN IF NOT EXISTS bank_code TEXT`); err != nil {
 		return fmt.Errorf("farmer bank code migration: %w", err)
+	}
+	// Every member gets a permanent Agro-Shield wallet number, independent of
+	// whether they have saved bank details or opened a Flutterwave funding
+	// account. The prefix keeps it visually distinct from a bank account while
+	// remaining a 10-digit value the transfer form already accepts.
+	if _, err := db.Exec(`ALTER TABLE farmers ADD COLUMN IF NOT EXISTS wallet_number VARCHAR(10)`); err != nil {
+		return fmt.Errorf("farmer wallet number migration: %w", err)
+	}
+	if _, err := db.Exec(`
+		UPDATE farmers
+		SET wallet_number = '8' || LPAD(id::text, 9, '0')
+		WHERE wallet_number IS NULL OR wallet_number = ''`); err != nil {
+		return fmt.Errorf("backfill farmer wallet numbers: %w", err)
+	}
+	if _, err := db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_farmers_wallet_number ON farmers(wallet_number) WHERE wallet_number IS NOT NULL`); err != nil {
+		return fmt.Errorf("farmer wallet number index migration: %w", err)
+	}
+	if _, err := db.Exec(`
+		DO $$
+		BEGIN
+			IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'farmers_wallet_number_valid') THEN
+				ALTER TABLE farmers ADD CONSTRAINT farmers_wallet_number_valid
+					CHECK (wallet_number IS NULL OR wallet_number ~ '^[0-9]{10}$');
+			END IF;
+		END $$`); err != nil {
+		return fmt.Errorf("farmer wallet number constraint migration: %w", err)
 	}
 	// Who may act on wallet approvals is a property of the account, so an admin
 	// can be added with a data change instead of a deployment and a restart.

@@ -377,7 +377,8 @@ func TestStaticCacheSetsHeaders(t *testing.T) {
 	}{
 		{"/static/pages/index.html", "no-cache", "noindex, nofollow"},
 		{"/static/uploads/photo.jpg", "public, max-age=86400", ""},
-		{"/static/css/style.css", "public, max-age=3600", ""},
+		{"/static/css/style.css", "no-cache", ""},
+		{"/static/js/wallet.js", "no-cache", ""},
 		{"/static/assets/images/Farmer1.jpeg", "public, max-age=86400", ""},
 		{"/static/assets/fonts/x.woff2", "public, max-age=2592000", ""},
 	}

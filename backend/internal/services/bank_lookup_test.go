@@ -23,6 +23,11 @@ type fakeResolver struct {
 	// for a timeout or a provider error.
 	errs map[string]error
 
+	// retryErrs fails a code once, then lets the next call answer. It models a
+	// transient provider failure that should be retried by the sweep.
+	retryErrs  map[string]error
+	retryTried map[string]bool
+
 	mu    sync.Mutex
 	calls []string
 }
@@ -30,7 +35,19 @@ type fakeResolver struct {
 func (f *fakeResolver) ResolveAccount(accountNumber, bankCode string) (*ResolvedAccount, error) {
 	f.mu.Lock()
 	f.calls = append(f.calls, bankCode)
+	retryErr := f.retryErrs[bankCode]
+	alreadyTried := f.retryTried[bankCode]
+	if retryErr != nil && !alreadyTried {
+		if f.retryTried == nil {
+			f.retryTried = map[string]bool{}
+		}
+		f.retryTried[bankCode] = true
+	}
 	f.mu.Unlock()
+
+	if retryErr != nil && !alreadyTried {
+		return nil, retryErr
+	}
 
 	if err := f.errs[bankCode]; err != nil {
 		return nil, err
@@ -373,8 +390,8 @@ func TestLookupAccountBanksDoesNotCacheAMissWhenEveryProbeFails(t *testing.T) {
 	service := testBankService(resolver, store)
 
 	matches, err := service.LookupAccountBanks(context.Background(), "0690000032")
-	if err != nil {
-		t.Fatalf("LookupAccountBanks() error = %v", err)
+	if !errors.Is(err, ErrBankLookupIncomplete) {
+		t.Fatalf("LookupAccountBanks() error = %v, want ErrBankLookupIncomplete", err)
 	}
 	if len(matches) != 0 {
 		t.Fatalf("LookupAccountBanks() = %+v, want nothing while the provider is down", matches)
@@ -395,14 +412,32 @@ func TestLookupAccountBanksDoesNotCacheAMissWhenOneProbeFails(t *testing.T) {
 	store := newFakeLookupStore()
 
 	matches, err := testBankService(resolver, store).LookupAccountBanks(context.Background(), "0690000032")
-	if err != nil {
-		t.Fatalf("LookupAccountBanks() error = %v", err)
+	if !errors.Is(err, ErrBankLookupIncomplete) {
+		t.Fatalf("LookupAccountBanks() error = %v, want ErrBankLookupIncomplete", err)
 	}
 	if len(matches) != 0 {
 		t.Fatalf("LookupAccountBanks() = %+v, want nothing", matches)
 	}
 	if store.savedMisses != 0 {
 		t.Errorf("cached %d misses for a partly-failed sweep, want 0", store.savedMisses)
+	}
+}
+
+// A transient provider failure is retried instead of ending the sweep with a
+// misleading "no bank matched".
+func TestLookupAccountBanksRetriesATransientFailure(t *testing.T) {
+	resolver := &fakeResolver{
+		holders:   map[string]string{"044": "ADAEZE OKONKWO"},
+		retryErrs: map[string]error{"044": errors.New("connection reset")},
+	}
+	store := newFakeLookupStore()
+
+	matches, err := testBankService(resolver, store).LookupAccountBanks(context.Background(), "0690000032")
+	if err != nil {
+		t.Fatalf("LookupAccountBanks() error = %v", err)
+	}
+	if len(matches) != 1 || matches[0].Code != "044" {
+		t.Fatalf("LookupAccountBanks() = %+v, want the retried Access Bank match", matches)
 	}
 }
 
