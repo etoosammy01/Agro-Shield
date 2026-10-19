@@ -241,18 +241,46 @@
             </article>
         </section>
 
-        <section class="wallet-history">
+        <section class="wallet-history" id="activity">
             <div class="wallet-section-heading">
                 <div><p class="wallet-card-kicker">Your money at a glance</p><h2>Recent activity</h2></div>
                 <span class="wallet-history-count">{{len .Transactions}} entries</span>
             </div>
+
+            <div class="wallet-summary" aria-label="Money in and out">
+                <article class="wallet-summary-card wallet-summary-in">
+                    <span class="wallet-summary-icon" aria-hidden="true">↓</span>
+                    <div>
+                        <p class="wallet-summary-label">Money in</p>
+                        <strong id="summary-inflow">₦0</strong>
+                        <small>Deposits, sales &amp; refunds</small>
+                    </div>
+                </article>
+                <article class="wallet-summary-card wallet-summary-out">
+                    <span class="wallet-summary-icon" aria-hidden="true">↑</span>
+                    <div>
+                        <p class="wallet-summary-label">Money out</p>
+                        <strong id="summary-outflow">₦0</strong>
+                        <small>Payments, transfers &amp; payouts</small>
+                    </div>
+                </article>
+                <article class="wallet-summary-card wallet-summary-net">
+                    <span class="wallet-summary-icon" aria-hidden="true">Σ</span>
+                    <div>
+                        <p class="wallet-summary-label">Net movement</p>
+                        <strong id="summary-net">₦0</strong>
+                        <small>In minus out, shown below</small>
+                    </div>
+                </article>
+            </div>
+
             <div class="wallet-history-grid">
                 <article class="wallet-card wallet-history-card">
                     <h3><span class="wallet-history-icon">↗</span> Deposits</h3>
                 {{if .Deposits}}
                 <div class="table-wrap">
                     <table class="table-cards">
-                        <thead><tr><th>When</th><th>Amount</th><th>Status</th></tr></thead>
+                        <thead><tr><th>When</th><th>Amount</th><th>Status</th><th>Receipt</th></tr></thead>
                         <tbody>
                             {{range .Deposits}}
                             <tr>
@@ -260,6 +288,9 @@
                                 <td data-label="Amount" class="wallet-table-amount">₦{{money .Amount}}</td>
                                 <td data-label="Status"><span class="wallet-status wallet-status-{{.Status}}">{{.Status}}</span>
                                     {{if eq .Status "pending"}}<span class="wallet-pending-note">Pending since {{.CreatedAt.Format "15:04"}} — waiting for the payment provider</span>{{end}}
+                                </td>
+                                <td data-label="Receipt">
+                                    <button type="button" class="wallet-receipt-btn" data-receipt='{"kind":"Deposit","title":"Deposit receipt","direction":"in","amount":"₦{{money .Amount}}","currency":"{{.Currency}}","status":"{{.Status}}","reference":"{{.Reference}}","date":"{{.CreatedAt.Format "02 Jan 2006 · 15:04"}}","provider":"{{.Provider}}","verified":"{{.VerifiedAmount}}","from":"Funding account / bank transfer"}'>View receipt</button>
                                 </td>
                             </tr>
                             {{end}}
@@ -274,7 +305,7 @@
                 {{if .Withdrawals}}
                 <div class="table-wrap">
                     <table class="table-cards">
-                        <thead><tr><th>When</th><th>Amount</th><th>Status</th></tr></thead>
+                        <thead><tr><th>When</th><th>Amount</th><th>Status</th><th>Receipt</th></tr></thead>
                         <tbody>
                             {{range .Withdrawals}}
                             <tr>
@@ -289,6 +320,9 @@
                                     </form>
                                     {{end}}
                                 </td>
+                                <td data-label="Receipt">
+                                    <button type="button" class="wallet-receipt-btn" data-receipt='{"kind":"Withdrawal","title":"Withdrawal receipt","direction":"out","amount":"₦{{money .Amount}}","currency":"{{.Currency}}","status":"{{.Status}}","reference":"{{.Reference}}","date":"{{.CreatedAt.Format "02 Jan 2006 · 15:04"}}","bank":"{{.BankName}}","accountName":"{{.AccountName}}","accountNumber":"{{.AccountNumber}}","from":"Your Agro-Shield wallet","to":"{{.BankName}} · {{.AccountNumber}}"}'>View receipt</button>
+                                </td>
                             </tr>
                             {{end}}
                         </tbody>
@@ -302,7 +336,7 @@
                 {{if .Transfers}}
                 <div class="table-wrap">
                     <table class="table-cards">
-                        <thead><tr><th>When</th><th>With</th><th>Amount</th><th>Status</th></tr></thead>
+                        <thead><tr><th>When</th><th>With</th><th>Amount</th><th>Status</th><th>Receipt</th></tr></thead>
                         <tbody>
                             {{range .Transfers}}
                             <tr>
@@ -321,6 +355,9 @@
                                     </form>
                                     {{end}}
                                 </td>
+                                <td data-label="Receipt">
+                                    <button type="button" class="wallet-receipt-btn" data-receipt='{"kind":"Transfer","title":"Transfer receipt","direction":"{{if .IsIncoming $.Wallet.FarmerID}}in{{else}}out{{end}}","amount":"₦{{money .Amount}}","currency":"{{.Currency}}","status":"{{.Status}}","reference":"{{.Reference}}","date":"{{.CreatedAt.Format "02 Jan 2006 · 15:04"}}","from":"{{.SenderName}}","to":"{{.RecipientName}}","note":"{{.Note}}"}'>View receipt</button>
+                                </td>
                             </tr>
                             {{end}}
                         </tbody>
@@ -334,14 +371,18 @@
                 {{if .Transactions}}
                 <div class="table-wrap">
                     <table class="table-cards">
-                        <thead><tr><th>When</th><th>Activity</th><th>Amount</th><th>Reference</th></tr></thead>
+                        <thead><tr><th>When</th><th>Activity</th><th>Direction</th><th>Amount</th><th>Reference</th><th>Receipt</th></tr></thead>
                         <tbody>
                             {{range .Transactions}}
                             <tr>
                                 <td data-label="When">{{.CreatedAt.Format "02 Jan · 15:04"}}</td>
                                 <td data-label="Activity">{{.Type}}</td>
+                                <td data-label="Direction"><span class="wallet-direction wallet-direction-{{receiptDirection .Type}}">{{receiptArrow .Type}}</span></td>
                                 <td data-label="Amount" class="wallet-table-amount">₦{{money .Amount}}</td>
                                 <td data-label="Reference">{{.Reference}}</td>
+                                <td data-label="Receipt">
+                                    <button type="button" class="wallet-receipt-btn" data-receipt='{"kind":"Activity","title":"Wallet activity receipt","direction":"{{receiptDirection .Type}}","amount":"₦{{money .Amount}}","currency":"{{$.Wallet.Currency}}","status":"Recorded","reference":"{{.Reference}}","date":"{{.CreatedAt.Format "02 Jan 2006 · 15:04"}}","activity":"{{.Type}}","from":"Agro-Shield ledger","to":"Your wallet"}'>View receipt</button>
+                                </td>
                             </tr>
                             {{end}}
                         </tbody>
@@ -352,6 +393,30 @@
             </div>
         </section>
     </main>
+
+    <div class="wallet-receipt-overlay" id="receipt-overlay" hidden aria-hidden="true">
+        <div class="wallet-receipt" role="dialog" aria-modal="true" aria-labelledby="receipt-title">
+            <header class="wallet-receipt-header">
+                <p class="wallet-receipt-brand">AGRO-SHIELD</p>
+                <h2 id="receipt-title">Receipt</h2>
+                <button type="button" class="wallet-receipt-close" id="receipt-close" aria-label="Close receipt">✕</button>
+            </header>
+            <div class="wallet-receipt-stamp" id="receipt-stamp" aria-hidden="true">PAID</div>
+            <dl class="wallet-receipt-meta" id="receipt-meta"></dl>
+            <div class="wallet-receipt-amount" id="receipt-amount-row">
+                <span>Amount</span>
+                <strong id="receipt-amount">₦0</strong>
+            </div>
+            <p class="wallet-receipt-note" id="receipt-note"></p>
+            <footer class="wallet-receipt-footer">
+                <p>Keep this receipt for your records. Agro-Shield does not move money from this screen; the ledger entry above is already committed.</p>
+                <div class="wallet-receipt-actions">
+                    <button type="button" class="wallet-button wallet-button-secondary" id="receipt-print">Print / save as PDF</button>
+                    <button type="button" class="wallet-button wallet-button-secondary" id="receipt-done">Done</button>
+                </div>
+            </footer>
+        </div>
+    </div>
     <script src="/static/js/wallet.js"></script>
     <script src="/static/js/navigation.js"></script>
 </body>

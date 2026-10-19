@@ -132,16 +132,39 @@ func Since(t time.Time) string {
 	}
 }
 
+// receiptDirection maps a wallet_transactions type to the direction money
+// moved: "in" credits the wallet, "out" debits it. The ledger type is the
+// single source of truth, so the badge class and the receipt payload both
+// derive from this one mapping.
+func receiptDirection(transactionType string) string {
+	switch transactionType {
+	case "deposit", "sale_credit", "withdrawal_refund", "transfer_in", "transfer_refund":
+		return "in"
+	default:
+		return "out"
+	}
+}
+
+// receiptArrow returns the label shown inside the direction badge.
+func receiptArrow(transactionType string) string {
+	if receiptDirection(transactionType) == "in" {
+		return "↓ In"
+	}
+	return "↑ Out"
+}
+
 func loadTemplates() *template.Template {
 	funcs := template.FuncMap{
-		"money": Money,
+		"money":            Money,
 		// money0 predates the single-format rule. It is kept registered so the
 		// templates that still call it keep working, and renders identically to
 		// money — including kobo.
-		"money0":         Money,
-		"comma":          func(v int) string { return commaNumber(float64(v), 0) },
-		"hasCoordinates": hasCoordinates,
-		"since":          Since,
+		"money0":           Money,
+		"comma":            func(v int) string { return commaNumber(float64(v), 0) },
+		"hasCoordinates":   hasCoordinates,
+		"since":            Since,
+		"receiptDirection": receiptDirection,
+		"receiptArrow":     receiptArrow,
 	}
 	for _, pattern := range []string{"../frontend/pages/*.html", "../../frontend/pages/*.html", "frontend/pages/*.html"} {
 		if matches, err := os.ReadDir("."); err == nil && matches != nil {

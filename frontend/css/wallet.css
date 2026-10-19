@@ -2139,3 +2139,405 @@
     }
 }
 
+
+/* ==========================================================================
+   WALLET SUMMARY — money in / out / net
+   ========================================================================== */
+
+.wallet-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    margin: 0 0 1.35rem;
+}
+
+.wallet-summary-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.15rem 1.25rem;
+    border: 1px solid #e7e9e6;
+    border-radius: 18px;
+    background: #fff;
+    box-shadow: 0 8px 24px rgb(29 58 38 / 5%);
+    transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.wallet-summary-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 30px rgb(29 58 38 / 9%);
+}
+
+.wallet-summary-icon {
+    display: grid;
+    width: 46px;
+    height: 46px;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: 14px;
+    font-size: 1.35rem;
+    font-weight: 800;
+}
+
+.wallet-summary-in .wallet-summary-icon {
+    background: #eaf6eb;
+    color: #2d7542;
+}
+
+.wallet-summary-out .wallet-summary-icon {
+    background: #fff0f6;
+    color: #ca548d;
+}
+
+.wallet-summary-net .wallet-summary-icon {
+    background: #fff8e9;
+    color: #a6781c;
+}
+
+.wallet-summary-label {
+    margin: 0;
+    color: #78867c;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.wallet-summary-card strong {
+    display: block;
+    margin: 0.15rem 0 0.2rem;
+    color: #173d29;
+    font-size: 1.4rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+.wallet-summary-card small {
+    color: #839087;
+    font-size: 0.72rem;
+}
+
+/* ==========================================================================
+   DIRECTION BADGES — money in vs out in the activity table
+   ========================================================================== */
+
+.wallet-direction {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+.wallet-direction-in {
+    background: #e9f7eb;
+    color: #28663a;
+}
+
+.wallet-direction-out {
+    background: #fff0f4;
+    color: #a23f62;
+}
+
+/* ==========================================================================
+   RECEIPT BUTTON + MODAL
+   ========================================================================== */
+
+.wallet-receipt-btn {
+    padding: 0.4rem 0.8rem;
+    border: 1px solid #cfe4d2;
+    border-radius: 999px;
+    background: #fff;
+    color: #2d7542;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.76rem;
+    font-weight: 800;
+    transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.wallet-receipt-btn:hover {
+    background: #eef8ef;
+    border-color: #9cc9a3;
+    transform: translateY(-1px);
+}
+
+.wallet-receipt-btn:focus-visible {
+    outline: 3px solid rgb(99 168 108 / 28%);
+    outline-offset: 2px;
+}
+
+.wallet-receipt-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: grid;
+    place-items: center;
+    padding: 1.25rem;
+    background: rgb(15 30 22 / 55%);
+    backdrop-filter: blur(6px);
+}
+
+.wallet-receipt-overlay[hidden] {
+    display: none;
+}
+
+.wallet-receipt {
+    position: relative;
+    width: min(100%, 520px);
+    max-height: min(88vh, 720px);
+    overflow-y: auto;
+    padding: 1.6rem 1.7rem 1.4rem;
+    border: 1px solid #e7e9e6;
+    border-radius: 22px;
+    background: #fff;
+    box-shadow: 0 30px 70px rgb(20 50 35 / 25%);
+    animation: wallet-receipt-rise 220ms ease;
+}
+
+@keyframes wallet-receipt-rise {
+    from { opacity: 0; transform: translateY(14px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.wallet-receipt-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.1rem;
+    padding-bottom: 0.9rem;
+    border-bottom: 1px dashed #dcebdc;
+}
+
+.wallet-receipt-brand {
+    margin: 0;
+    color: #2d7542;
+    font-size: 0.74rem;
+    font-weight: 900;
+    letter-spacing: 0.2em;
+}
+
+.wallet-receipt-header h2 {
+    margin: 0.15rem 0 0;
+    color: #173d29;
+    font-size: 1.35rem;
+    letter-spacing: -0.03em;
+}
+
+.wallet-receipt-close {
+    width: 36px;
+    height: 36px;
+    border: 1px solid #e7e9e6;
+    border-radius: 10px;
+    background: #fbfcfb;
+    color: #5e7164;
+    cursor: pointer;
+    font: inherit;
+    font-size: 1rem;
+    transition: background 160ms ease, color 160ms ease;
+}
+
+.wallet-receipt-close:hover {
+    background: #f0f2ef;
+    color: #183d29;
+}
+
+.wallet-receipt-stamp {
+    position: absolute;
+    top: 1.4rem;
+    right: 1.4rem;
+    padding: 0.3rem 0.7rem;
+    border: 2px solid #2d7542;
+    border-radius: 8px;
+    color: #2d7542;
+    font-size: 0.76rem;
+    font-weight: 900;
+    letter-spacing: 0.14em;
+    transform: rotate(8deg);
+}
+
+.wallet-receipt-stamp-paid,
+.wallet-receipt-stamp-completed {
+    border-color: #2d7542;
+    color: #2d7542;
+    background: #eef8ef;
+}
+
+.wallet-receipt-stamp-pending,
+.wallet-receipt-stamp-processing,
+.wallet-receipt-stamp-recorded {
+    border-color: #c79a3a;
+    color: #8a6418;
+    background: #fff8e9;
+}
+
+.wallet-receipt-stamp-failed,
+.wallet-receipt-stamp-rejected {
+    border-color: #c44772;
+    color: #a23f62;
+    background: #fff0f4;
+}
+
+.wallet-receipt-stamp-cancelled,
+.wallet-receipt-stamp-expired,
+.wallet-receipt-stamp-reversed {
+    border-color: #8a948d;
+    color: #6a766d;
+    background: #f2f5f2;
+}
+
+.wallet-receipt-meta {
+    display: grid;
+    margin: 0 0 1.2rem;
+}
+
+.wallet-receipt-meta > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.55rem 0;
+    border-bottom: 1px dashed #eef1ed;
+}
+
+.wallet-receipt-meta dt {
+    color: #78867c;
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.wallet-receipt-meta dd {
+    margin: 0;
+    color: #173d28;
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-align: right;
+    word-break: break-word;
+}
+
+.wallet-receipt-amount {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 1rem 1.2rem;
+    border-radius: 14px;
+    background: #f0f9ef;
+}
+
+.wallet-receipt-amount span {
+    color: #6a766d;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.wallet-receipt-amount strong {
+    color: #173d28;
+    font-size: 1.5rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+.wallet-receipt-amount-out {
+    background: #fff0f4;
+}
+
+.wallet-receipt-amount-out strong {
+    color: #a23f62;
+}
+
+.wallet-receipt-amount-in strong {
+    color: #28663a;
+}
+
+.wallet-receipt-note {
+    margin: 0.7rem 0 0;
+    color: #5e7164;
+    font-style: italic;
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+
+.wallet-receipt-footer {
+    margin-top: 1.3rem;
+    padding-top: 1rem;
+    border-top: 1px dashed #eef1ed;
+    color: #7a847d;
+    font-size: 0.76rem;
+    line-height: 1.5;
+}
+
+.wallet-receipt-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin-top: 0.9rem;
+}
+
+.wallet-receipt-actions .wallet-button {
+    width: auto;
+    margin-top: 0;
+    flex: 1 1 160px;
+    justify-content: center;
+}
+
+body.wallet-receipt-open {
+    overflow: hidden;
+}
+
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
+
+@media (max-width: 760px) {
+    .wallet-summary {
+        grid-template-columns: 1fr;
+    }
+
+    .wallet-summary-card strong {
+        font-size: 1.25rem;
+    }
+}
+
+@media (max-width: 560px) {
+    .wallet-receipt {
+        padding: 1.3rem 1.2rem 1.2rem;
+    }
+
+    .wallet-receipt-stamp {
+        top: 1rem;
+        right: 1rem;
+    }
+
+    .wallet-receipt-meta > div {
+        flex-direction: column;
+        gap: 0.2rem;
+    }
+
+    .wallet-receipt-meta dd {
+        text-align: left;
+    }
+
+    .wallet-receipt-actions {
+        flex-direction: column;
+    }
+
+    .wallet-receipt-actions .wallet-button {
+        width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .wallet-summary-card,
+    .wallet-receipt {
+        transition: none;
+        animation: none;
+    }
+}

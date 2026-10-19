@@ -330,6 +330,206 @@ document.querySelectorAll(".wallet-check-form").forEach((form) => {
   });
 });
 
+// ---------- Receipt modal ----------
+//
+// Every transaction row carries its details as a JSON blob on data-receipt.
+// The modal is populated from that blob only — it never recomputes anything,
+// never calls the server, and never moves money. The print path opens the
+// same receipt in a clean window so the browser's print dialog can save it
+// as a PDF.
+(() => {
+  const overlay = document.getElementById("receipt-overlay");
+  if (!overlay) return;
+  const receipt = overlay.querySelector(".wallet-receipt");
+  const titleEl = document.getElementById("receipt-title");
+  const metaEl = document.getElementById("receipt-meta");
+  const amountEl = document.getElementById("receipt-amount");
+  const stampEl = document.getElementById("receipt-stamp");
+  const noteEl = document.getElementById("receipt-note");
+  const closeBtn = document.getElementById("receipt-close");
+  const doneBtn = document.getElementById("receipt-done");
+  const printBtn = document.getElementById("receipt-print");
+
+  let lastFocus = null;
+
+  const PRETTY = {
+    deposit: "Deposit", deposit_reversal: "Deposit reversal",
+    sale_credit: "Sale credit", order_payment: "Order payment",
+    withdrawal_reserved: "Withdrawal reserved", withdrawal_refund: "Withdrawal refund",
+    transfer_in: "Transfer received", transfer_out: "Transfer sent",
+    transfer_refund: "Transfer refund",
+    Deposit: "Deposit", Withdrawal: "Withdrawal", Transfer: "Transfer", Activity: "Wallet activity",
+  };
+
+  const STATUS_STAMP = {
+    successful: "PAID", paid: "PAID", completed: "COMPLETED",
+    pending: "PENDING", processing: "PROCESSING",
+    failed: "FAILED", rejected: "REJECTED",
+    cancelled: "CANCELLED", expired: "EXPIRED",
+    reversed: "REVERSED", Recorded: "RECORDED",
+  };
+
+  const pretty = (v) => (v && PRETTY[v]) || v || "—";
+
+  const buildMeta = (data) => {
+    const rows = [];
+    rows.push(["Date", data.date]);
+    rows.push(["Type", pretty(data.kind === "Activity" ? data.activity : data.kind)]);
+    rows.push(["Direction", data.direction === "in" ? "Money in" : "Money out"]);
+    rows.push(["Status", pretty(data.status)]);
+    rows.push(["Reference", data.reference]);
+    if (data.provider) rows.push(["Provider", data.provider]);
+    if (data.verified) rows.push(["Verified amount", `₦${data.verified}`]);
+    if (data.from) rows.push(["From", data.from]);
+    if (data.to) rows.push(["To", data.to]);
+    if (data.bank) rows.push(["Bank", data.bank]);
+    if (data.accountName) rows.push(["Account name", data.accountName]);
+    if (data.accountNumber) rows.push(["Account number", data.accountNumber]);
+    if (data.note) rows.push(["Note", data.note]);
+    return rows.filter(([, v]) => v && v !== "" && v !== "—");
+  };
+
+  const render = (data) => {
+    titleEl.textContent = data.title || "Receipt";
+    metaEl.replaceChildren();
+    for (const [k, v] of buildMeta(data)) {
+      const div = document.createElement("div");
+      const dt = document.createElement("dt");
+      dt.textContent = k;
+      const dd = document.createElement("dd");
+      dd.textContent = v;
+      div.append(dt, dd);
+      metaEl.append(div);
+    }
+    amountEl.textContent = data.amount || "₦0";
+    amountEl.classList.toggle("wallet-receipt-amount-in", data.direction === "in");
+    amountEl.classList.toggle("wallet-receipt-amount-out", data.direction === "out");
+    const stamp = STATUS_STAMP[data.status] || "RECORDED";
+    stampEl.textContent = stamp;
+    stampEl.className = `wallet-receipt-stamp wallet-receipt-stamp-${stamp.toLowerCase()}`;
+    noteEl.textContent = data.note ? `“${data.note}”` : "";
+    noteEl.hidden = !data.note;
+  };
+
+  const open = (data, source) => {
+    lastFocus = source;
+    render(data);
+    overlay.hidden = false;
+    overlay.setAttribute("aria-hidden", "false");
+    document.body.classList.add("wallet-receipt-open");
+    closeBtn?.focus();
+  };
+
+  const close = () => {
+    overlay.hidden = true;
+    overlay.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("wallet-receipt-open");
+    lastFocus?.focus?.();
+    lastFocus = null;
+  };
+
+  document.querySelectorAll(".wallet-receipt-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      let data = {};
+      try {
+        data = JSON.parse(btn.dataset.receipt || "{}");
+      } catch (e) {
+        return;
+      }
+      open(data, btn);
+    });
+  });
+
+  closeBtn?.addEventListener("click", close);
+  doneBtn?.addEventListener("click", close);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) close();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !overlay.hidden) close();
+  });
+
+  printBtn?.addEventListener("click", () => {
+    const html = `<!doctype html><html><head><meta charset="utf-8">
+      <title>${titleEl.textContent} — Agro-Shield</title>
+      <style>
+        body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #183d29; background: #f8faf8; padding: 2rem; }
+        .receipt { max-width: 540px; margin: 0 auto; background: #fff; border: 1px solid #e7e9e6; border-radius: 18px; padding: 2rem; position: relative; box-shadow: 0 10px 30px rgb(29 58 38 / 6%); }
+        .brand { margin: 0; color: #2d7542; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.18em; }
+        h1 { margin: 0.3rem 0 1.2rem; color: #173d29; font-size: 1.6rem; letter-spacing: -0.03em; }
+        dl { display: grid; margin: 0 0 1.4rem; }
+        dl > div { display: flex; justify-content: space-between; gap: 1rem; padding: 0.5rem 0; border-bottom: 1px dashed #dcebdc; }
+        dt { color: #6a766d; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
+        dd { margin: 0; color: #173d28; font-size: 0.92rem; font-weight: 700; text-align: right; word-break: break-word; }
+        .amount { display: flex; justify-content: space-between; align-items: baseline; padding: 1rem 1.2rem; border-radius: 14px; background: #f0f9ef; }
+        .amount span { color: #6a766d; font-size: 0.85rem; font-weight: 700; }
+        .amount strong { color: #173d28; font-size: 1.5rem; }
+        .stamp { position: absolute; top: 1.4rem; right: 1.4rem; padding: 0.3rem 0.7rem; border: 2px solid #2d7542; border-radius: 8px; color: #2d7542; font-size: 0.78rem; font-weight: 900; letter-spacing: 0.14em; transform: rotate(8deg); }
+        .foot { margin-top: 1.4rem; color: #7a847d; font-size: 0.78rem; line-height: 1.5; }
+        .note { margin: 0.6rem 0 0; color: #5e7164; font-style: italic; font-size: 0.88rem; }
+      </style></head><body>
+      <div class="receipt">
+        <p class="brand">AGRO-SHIELD</p>
+        <h1>${titleEl.textContent}</h1>
+        <div class="stamp">${stampEl.textContent}</div>
+        <dl>${metaEl.innerHTML}</dl>
+        <div class="amount"><span>Amount</span><strong>${amountEl.textContent}</strong></div>
+        ${noteEl.textContent ? `<p class="note">${noteEl.textContent}</p>` : ""}
+        <p class="foot">This receipt was generated from your Agro-Shield wallet history. The ledger entry above is already committed; this screen does not move money.</p>
+      </div>
+      <script>window.onload = () => setTimeout(() => window.print(), 250);</script>
+      </body></html>`;
+    const win = window.open("", "_blank", "width=640,height=720");
+    if (!win) {
+      noteEl.textContent = "Pop-ups are blocked. Allow pop-ups for this site to print or save the receipt.";
+      noteEl.hidden = false;
+      return;
+    }
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+  });
+})();
+
+// ---------- Inflow / outflow summary ----------
+//
+// The wallet_transactions table already records direction in its type. The
+// summary reads the rendered activity rows (which carry the direction in the
+// badge class) and totals the amounts, so the farmer sees money in vs money
+// out at a glance without any backend change.
+(() => {
+  const inflowEl = document.getElementById("summary-inflow");
+  const outflowEl = document.getElementById("summary-outflow");
+  const netEl = document.getElementById("summary-net");
+  const table = document.querySelector(".wallet-full-history .table-cards");
+  if (!table || !inflowEl || !outflowEl || !netEl) return;
+
+  const parseAmount = (text) => {
+    const m = text.replace(/[^0-9.]/g, "");
+    const n = parseFloat(m);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  let inflow = 0;
+  let outflow = 0;
+  table.querySelectorAll("tbody tr").forEach((row) => {
+    const badge = row.querySelector(".wallet-direction");
+    const amountCell = row.querySelector(".wallet-table-amount");
+    if (!badge || !amountCell) return;
+    const amt = parseAmount(amountCell.textContent);
+    if (badge.classList.contains("wallet-direction-in")) inflow += amt;
+    else outflow += amt;
+  });
+
+  const fmt = (n) => `₦${n.toLocaleString("en-NG", { maximumFractionDigits: 2 })}`;
+  inflowEl.textContent = fmt(inflow);
+  outflowEl.textContent = fmt(outflow);
+  const net = inflow - outflow;
+  netEl.textContent = fmt(Math.abs(net));
+  netEl.classList.toggle("wallet-receipt-amount-in", net >= 0);
+  netEl.classList.toggle("wallet-receipt-amount-out", net < 0);
+})();
+
 // ---------- Committed wallet refresh ----------
 //
 // A transfer can be confirmed after this page was rendered: the webhook
