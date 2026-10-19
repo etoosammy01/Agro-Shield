@@ -464,6 +464,17 @@ func (r *WalletRepository) GetVirtualAccountByTxRef(ctx context.Context, txRef s
 		FROM wallet_virtual_accounts WHERE tx_ref = $1`, txRef))
 }
 
+// GetVirtualAccountByAccountNumber finds the active Agro-Shield funding account
+// with this number. It is how an internal transfer identifies a recipient who
+// gave an account number instead of a phone number.
+func (r *WalletRepository) GetVirtualAccountByAccountNumber(ctx context.Context, accountNumber string) (*models.WalletVirtualAccount, error) {
+	return scanVirtualAccount(r.db.QueryRowContext(ctx, `
+		SELECT `+virtualAccountColumns+`
+		FROM wallet_virtual_accounts
+		WHERE account_number = $1 AND status = 'active'
+		LIMIT 1`, accountNumber))
+}
+
 // EnsureVirtualAccountAttempt creates the one row a farmer may have, or returns
 // the row another caller already created. The bool reports whether this call
 // inserted it. Two simultaneous requests therefore agree on one tx_ref instead

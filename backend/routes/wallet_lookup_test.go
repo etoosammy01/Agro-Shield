@@ -30,10 +30,10 @@ func TestWalletLookupAccountPathMatchesTheFrontend(t *testing.T) {
 	}
 }
 
-// The order of the payout fields is the feature, not a layout preference: the
-// account number is what identifies the bank, and the bank is what identifies
-// the registered name. If the name were asked for first, the user would be
-// typing the very thing the lookup exists to verify.
+// The account number comes first because it can identify the bank on its own.
+// Flutterwave still needs the bank code to resolve the holder, so the form
+// either fills that in from a successful lookup or lets the user search for it.
+// Asking for a free-text name would undermine the verification.
 func TestWalletPayoutFormAsksForNumberThenBankThenName(t *testing.T) {
 	page := readFrontendFile(t, "../../frontend/pages/wallet.html")
 
@@ -53,6 +53,16 @@ func TestWalletPayoutFormAsksForNumberThenBankThenName(t *testing.T) {
 			t.Errorf("the payout form asks for %s out of order", field)
 		}
 		previous = at
+	}
+
+	if !strings.Contains(form, `role="combobox"`) || !strings.Contains(form, `role="listbox"`) {
+		t.Error("the bank field is not a searchable combobox backed by the full provider list")
+	}
+	if !strings.Contains(form, `id="account-number-status"`) {
+		t.Error("the account number has no status line for automatic bank suggestions")
+	}
+	if !strings.Contains(form, `id="account-name" name="account_name"`) || !strings.Contains(form, "readonly") {
+		t.Error("the account name must be a read-only value filled in by verification")
 	}
 
 	// The bank code is submitted, not the bank name: the server rejects a code

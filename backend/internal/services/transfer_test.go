@@ -1,8 +1,13 @@
 package services
 
 import (
+	"context"
+	"errors"
 	"strings"
 	"testing"
+
+	"backend/internal/models"
+	"backend/internal/repository"
 )
 
 func TestRecipientPhoneForms(t *testing.T) {
@@ -90,5 +95,111 @@ func TestNormalizeTransferNoteCountsRunes(t *testing.T) {
 	}
 	if got != note {
 		t.Fatal("normalizeTransferNote() altered a note within the limit")
+	}
+}
+
+type transferFarmerLookup struct {
+	byPhone   map[string]*models.Farmer
+	byID      map[int]*models.Farmer
+	phoneHits int
+}
+
+func (f *transferFarmerLookup) GetByID(id int) (*models.Farmer, error) {
+	return f.byID[id], nil
+}
+
+func (f *transferFarmerLookup) GetByPhone(phone string) (*models.Farmer, error) {
+	f.phoneHits++
+	return f.byPhone[phone], nil
+}
+
+func (f *transferFarmerLookup) UpdateBankDetails(int, string, string, string, string) error {
+	return nil
+}
+
+type transferAccountLookup struct {
+	walletStore
+	account *models.WalletVirtualAccount
+	err     error
+}
+
+func (f *transferAccountLookup) GetVirtualAccountByAccountNumber(context.Context, string) (*models.WalletVirtualAccount, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.account == nil {
+		return nil, repository.ErrVirtualAccountNotFound
+	}
+	return f.account, nil
+}
+
+func TestResolveTransferRecipientByAgroShieldAccountNumber(t *testing.T) {
+	accounts := &transferAccountLookup{account: &models.WalletVirtualAccount{
+		FarmerID: 42, AccountNumber: "0106787237", Status: models.VirtualAccountActive,
+	}}
+	farmers := &transferFarmerLookup{byID: map[int]*models.Farmer{
+		42: {ID: 42, FullName: "James Inalegwu"},
+	}}
+
+	recipient, err := (&WalletService{repo: accounts, farmers: farmers}).ResolveTransferRecipient(
+		context.Background(), 7, "0106787237",
+	)
+	if err != nil {
+		t.Fatalf("ResolveTransferRecipient() error = %v", err)
+	}
+	if recipient.ID != 42 || recipient.FullName != "James Inalegwu" {
+		t.Fatalf("ResolveTransferRecipient() = %+v, want the account number's owner", recipient)
+	}
+	if farmers.phoneHits != 0 {
+		t.Errorf("made %d phone lookups for an account number, want 0", farmers.phoneHits)
+	}
+}
+
+func TestResolveTransferRecipientFallsBackToPhoneNumber(t *testing.T) {
+	accounts := &transferAccountLookup{}
+	farmers := &transferFarmerLookup{byPhone: map[string]*models.Farmer{
+		"08012345678": {ID: 42, FullName: "Ada Obi"},
+	}}
+
+	recipient, err := (&WalletService{repo: accounts, farmers: farmers}).ResolveTransferRecipient(
+		context.Background(), 7, "0801 234 5678",
+	)
+	if err != nil {
+		t.Fatalf("ResolveTransferRecipient() error = %v", err)
+	}
+	if recipient.ID != 42 {
+		t.Fatalf("ResolveTransferRecipient() = %+v, want the phone number's owner", recipient)
+	}
+}
+
+func TestResolveTransferRecipientPrefersAnExistingTenDigitAccountNumber(t *testing.T) {
+	accounts := &transferAccountLookup{account: &models.WalletVirtualAccount{
+		FarmerID: 42, AccountNumber: "8012345678", Status: models.VirtualAccountActive,
+	}}
+	farmers := &transferFarmerLookup{
+		byID:    map[int]*models.Farmer{42: {ID: 42, FullName: "Account Holder"}},
+		byPhone: map[string]*models.Farmer{"2348012345678": {ID: 99, FullName: "Phone Holder"}},
+	}
+
+	recipient, err := (&WalletService{repo: accounts, farmers: farmers}).ResolveTransferRecipient(
+		context.Background(), 7, "8012345678",
+	)
+	if err != nil {
+		t.Fatalf("ResolveTransferRecipient() error = %v", err)
+	}
+	if recipient.ID != 42 {
+		t.Fatalf("ResolveTransferRecipient() chose account %d, want account number 42", recipient.ID)
+	}
+}
+
+func TestResolveTransferRecipientReportsAnUnknownIdentifier(t *testing.T) {
+	accounts := &transferAccountLookup{}
+	farmers := &transferFarmerLookup{}
+
+	_, err := (&WalletService{repo: accounts, farmers: farmers}).ResolveTransferRecipient(
+		context.Background(), 7, "0106787237",
+	)
+	if !errors.Is(err, ErrTransferRecipientNotFound) {
+		t.Fatalf("ResolveTransferRecipient() error = %v, want ErrTransferRecipientNotFound", err)
 	}
 }

@@ -162,6 +162,7 @@ type walletStore interface {
 
 	GetVirtualAccount(ctx context.Context, farmerID int) (*models.WalletVirtualAccount, error)
 	GetVirtualAccountByTxRef(ctx context.Context, txRef string) (*models.WalletVirtualAccount, error)
+	GetVirtualAccountByAccountNumber(ctx context.Context, accountNumber string) (*models.WalletVirtualAccount, error)
 	EnsureVirtualAccountAttempt(ctx context.Context, farmerID int, provider, txRef, identityKind, consentVersion string, now time.Time) (*models.WalletVirtualAccount, bool, error)
 	ResetVirtualAccountAttempt(ctx context.Context, farmerID int, identityKind, consentVersion string, now time.Time) error
 	ActivateVirtualAccount(ctx context.Context, farmerID int, orderRef, providerRef, accountNumber, bankName, accountName, currency string, now time.Time) error
@@ -685,14 +686,19 @@ func (s *WalletService) InitiateDeposit(ctx context.Context, farmer *models.Farm
 	if err := s.repo.CreateDeposit(ctx, farmer.ID, models.ProviderFlutterwave, reference, amount); err != nil {
 		return nil, fmt.Errorf("create wallet deposit: %w", err)
 	}
+	accountName := virtualAccountName(farmer.FullName)
+	if accountName == "" {
+		accountName = "AgroShield"
+	}
 	checkoutURL, err := s.flutter.InitializePayment(InitializePaymentRequest{
-		Reference:     reference,
-		Amount:        amount,
-		Currency:      "NGN",
-		CustomerEmail: farmer.Email,
-		CustomerName:  farmer.FullName,
-		Title:         "Agro-Shield Wallet Deposit",
-		Description:   "Wallet deposit",
+		Reference:      reference,
+		Amount:         amount,
+		Currency:       "NGN",
+		CustomerEmail:  farmer.Email,
+		CustomerName:   farmer.FullName,
+		Title:          accountName,
+		Description:    accountName,
+		PaymentOptions: "card",
 	})
 	if err != nil {
 		// The provider may have accepted the request even if its response timed out.
@@ -810,6 +816,19 @@ type VirtualAccountSetup struct {
 	IdentityKind   string
 	IdentityNumber string
 	Consent        bool
+}
+
+const virtualAccountNamePrefix = "AgroShield-"
+
+// virtualAccountName is the name Flutterwave displays when this funding account
+// is resolved by another bank. Flutterwave's narration field controls that
+// name, so it must identify both Agro-Shield and the account holder.
+func virtualAccountName(fullName string) string {
+	fullName = strings.Join(strings.Fields(fullName), " ")
+	if fullName == "" {
+		return ""
+	}
+	return virtualAccountNamePrefix + fullName
 }
 
 func isWalletAccountNumber(number string) bool {
@@ -946,6 +965,7 @@ func (s *WalletService) SetupVirtualAccount(ctx context.Context, farmer *models.
 	if first == "" {
 		return nil, ErrVirtualAccountNameRequired
 	}
+	accountName := virtualAccountName(farmer.FullName)
 
 	now := time.Now()
 	txRef := fmt.Sprintf("AGRO-VA-%d", farmer.ID)
@@ -1005,7 +1025,7 @@ func (s *WalletService) SetupVirtualAccount(ctx context.Context, farmer *models.
 		Phone:          farmer.Phone,
 		FirstName:      first,
 		LastName:       last,
-		Narration:      "Agro-Shield wallet funding",
+		Narration:      accountName,
 		IdentityKind:   identityKind,
 		IdentityNumber: identityNumber,
 	})
@@ -1032,6 +1052,11 @@ func (s *WalletService) SetupVirtualAccount(ctx context.Context, farmer *models.
 	if details == nil || !isWalletAccountNumber(strings.TrimSpace(details.AccountNumber)) {
 		log.Printf("create virtual account for user %d returned incomplete details", farmer.ID)
 		return s.repo.GetVirtualAccount(ctx, farmer.ID)
+	}
+	// The provider may omit account_name even though the narration above is the
+	// name it will show when another bank resolves this account.
+	if strings.TrimSpace(details.AccountName) == "" {
+		details.AccountName = accountName
 	}
 	if err := s.activateVirtualAccount(ctx, farmer.ID, details, now); err != nil {
 		return nil, err
@@ -1632,8 +1657,8 @@ func (s *WalletService) RequestWithdrawal(ctx context.Context, farmerID int, amo
 // different words in the UI: a malformed number is the sender's typo, whereas
 // an unknown number means no account matched.
 var (
-	ErrTransferRecipientInvalid  = errors.New("enter a valid Nigerian phone number for the recipient")
-	ErrTransferRecipientNotFound = errors.New("no Agro-Shield account uses that phone number")
+	ErrTransferRecipientInvalid  = errors.New("enter a valid Nigerian phone number or Agro-Shield account number")
+	ErrTransferRecipientNotFound = errors.New("no Agro-Shield account uses that phone or account number")
 
 	// ErrTransferUnavailable wraps infrastructure failures. Handlers test for
 	// it so a database error never reaches the page as raw internal text.
@@ -1689,20 +1714,56 @@ func recipientPhoneForms(phone string) []string {
 	return []string{normalized, "0" + subscriber, subscriber}
 }
 
-// ResolveTransferRecipient turns the phone number a sender typed into the
-// account that will be credited.
+// ResolveTransferRecipient turns the phone number or Agro-Shield account number
+// a sender typed into the account that will be credited.
 //
 // This necessarily reveals whether a number is registered, which a
 // deliberately vague error could hide — but a transfer feature where the sender
 // cannot tell a typo from an unknown person is unusable, and no money moves
 // without a one-time passcode and an admin approval. The lookup is therefore
 // reachable only from an authenticated session.
-func (s *WalletService) ResolveTransferRecipient(ctx context.Context, senderID int, phone string) (*models.Farmer, error) {
+//
+// A ten-digit value is checked as a virtual account number first and then as a
+// phone number. Flutterwave account numbers and Nigerian subscriber numbers can
+// both be ten digits, so the account number wins when it exists; an eleven-digit
+// local phone or a 234-prefixed international phone skips the account lookup.
+func (s *WalletService) ResolveTransferRecipient(ctx context.Context, senderID int, identifier string) (*models.Farmer, error) {
 	if senderID <= 0 {
 		return nil, errors.New("invalid wallet owner")
 	}
-	forms := recipientPhoneForms(phone)
+
+	identifier = strings.TrimSpace(identifier)
+	digits := strings.Map(func(r rune) rune {
+		if r >= '0' && r <= '9' {
+			return r
+		}
+		return -1
+	}, identifier)
+
+	if len(digits) == 10 {
+		account, err := s.repo.GetVirtualAccountByAccountNumber(ctx, digits)
+		switch {
+		case err == nil:
+			recipient, lookupErr := s.farmers.GetByID(account.FarmerID)
+			if lookupErr != nil {
+				return nil, fmt.Errorf("%w: look up transfer recipient: %v", ErrTransferUnavailable, lookupErr)
+			}
+			if recipient != nil {
+				return transferRecipient(senderID, recipient)
+			}
+		case !errors.Is(err, repository.ErrVirtualAccountNotFound):
+			return nil, fmt.Errorf("%w: look up transfer account number: %v", ErrTransferUnavailable, err)
+		}
+	}
+
+	forms := recipientPhoneForms(identifier)
 	if len(forms) == 0 {
+		// A ten-digit value is a valid Agro-Shield account-number shape even
+		// when it is not also a valid local phone form. If the account lookup
+		// above found nothing, that is an unknown recipient rather than a typo.
+		if len(digits) == 10 {
+			return nil, ErrTransferRecipientNotFound
+		}
 		return nil, ErrTransferRecipientInvalid
 	}
 	for _, form := range forms {
@@ -1713,12 +1774,16 @@ func (s *WalletService) ResolveTransferRecipient(ctx context.Context, senderID i
 		if recipient == nil {
 			continue
 		}
-		if recipient.ID == senderID {
-			return nil, errors.New("you cannot transfer to your own wallet")
-		}
-		return recipient, nil
+		return transferRecipient(senderID, recipient)
 	}
 	return nil, ErrTransferRecipientNotFound
+}
+
+func transferRecipient(senderID int, recipient *models.Farmer) (*models.Farmer, error) {
+	if recipient.ID == senderID {
+		return nil, errors.New("you cannot transfer to your own wallet")
+	}
+	return recipient, nil
 }
 
 // normalizeTransferNote trims and bounds the free-text note. The note is shown
@@ -1945,15 +2010,47 @@ type BankMatch struct {
 	AccountName string `json:"account_name"`
 }
 
+// ResolvePayoutAccount confirms the holder of an account at one selected bank.
+//
+// This is the payout flow's primary path. The full Flutterwave directory gives
+// the form a bank code, so one direct resolve is enough: there is no need to
+// guess at a shortlist and no bank outside that shortlist becomes unsupported.
+// LookupAccountBanks remains for callers that only have a number. The payout
+// form uses it to suggest a bank when the account number is entered first, then
+// sends the chosen code to ResolvePayoutAccount.
+func (s *WalletService) ResolvePayoutAccount(ctx context.Context, accountNumber, bankCode string) (string, error) {
+	accountNumber = strings.TrimSpace(accountNumber)
+	bankCode = strings.TrimSpace(bankCode)
+	if err := validateAccountNumber(accountNumber); err != nil {
+		return "", err
+	}
+	if err := validateBankCode(bankCode); err != nil {
+		return "", err
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+
+	resolved, err := s.resolver.ResolveAccount(accountNumber, bankCode)
+	if err != nil {
+		return "", err
+	}
+	if resolved == nil || strings.TrimSpace(resolved.AccountName) == "" {
+		return "", errors.New("the bank returned no account name")
+	}
+	return strings.TrimSpace(resolved.AccountName), nil
+}
+
 // bankLookupShortlist is the set of banks a lookup fans out over, in
 // market-share order so the most likely match is probed first and a truncated
 // sweep degrades to the banks most users actually use.
 //
-// A shortlist rather than the full bank directory is a deliberate trade: the
-// full directory is 200+ banks, and probing all of it per lookup would burn the
-// provider's rate limit long before we had thousands of users. Coverage comes
-// from the cache (each number is swept once, ever) plus the manual bank search
-// in the payout form, which is the fallback whenever a number resolves nowhere.
+// A shortlist rather than the full bank directory is a deliberate trade for
+// callers that have no bank code: the full directory is 200+ banks, and probing
+// all of it per lookup would burn the provider's rate limit. The payout form
+// uses this sweep only to suggest a bank; once a code is chosen it calls
+// ResolvePayoutAccount directly, so every provider in the directory is
+// supported.
 //
 // Tune this from real lookup data: a bank that never answers costs a request on
 // every uncached number, and a bank that is missing costs its users the

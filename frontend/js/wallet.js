@@ -1,11 +1,15 @@
 const bankSearch = document.getElementById("bank-search");
 const bankCode = document.getElementById("bank-code");
 const bankStatus = document.getElementById("bank-status");
-const bankSuggestions = document.getElementById("bank-suggestions");
-const bankOptions = document.getElementById("bank-options");
+const bankPicker = document.getElementById("bank-picker");
+const bankMenu = document.getElementById("bank-menu");
+const bankListbox = document.getElementById("bank-listbox");
+const bankNoResults = document.getElementById("bank-no-results");
 const accountNumber = document.getElementById("account-number");
+const accountNumberStatus = document.getElementById("account-number-status");
 const accountName = document.getElementById("account-name");
 const accountNameStatus = document.getElementById("account-name-status");
+const payoutSave = document.getElementById("payout-save");
 const connectionStatus = document.getElementById("connection-status");
 
 if (connectionStatus) {
@@ -17,211 +21,570 @@ if (connectionStatus) {
   });
 }
 
-// Payout details form.
-//
-// The bank is identified from the account number rather than the other way
-// round: Flutterwave can only tell us whose name is on an account once it
-// knows which bank to ask, and it has no reverse lookup. So typing a full
-// account number triggers a server-side sweep which returns the banks that
-// number belongs to, and each of those carries the registered account name.
-//
-// The search field is the fallback. A number at a bank outside the server's
-// shortlist resolves nowhere, and that user still has to be able to save their
-// details by finding their bank by name.
-if (bankSearch && bankCode && bankStatus && accountNumber && accountName) {
-  // The full provider bank directory, used only for search and to turn a typed
-  // name back into a code. Never sent back to the server except as bank_code.
-  let bankDirectory = [];
+// Wallet-to-wallet transfer: the recipient is identified by phone number or
+// Agro-Shield account number. A successful lookup fills the read-only account
+// name; the server resolves the identifier again when the transfer is submitted,
+// so this confirmation never becomes the authority for where money goes.
+(() => {
+  const recipient = document.getElementById("transfer-recipient");
+  const submitButton = document.getElementById("transfer-submit");
+  const status = document.getElementById("transfer-recipient-status");
+  const name = document.getElementById("transfer-recipient-name");
+  if (!recipient || !submitButton || !status || !name) return;
 
-  const setAccountNameStatus = (text, tone) => {
-    if (!accountNameStatus) return;
-    accountNameStatus.textContent = text;
-    accountNameStatus.dataset.tone = tone ?? "";
+  const form = recipient.closest("form");
+  let resolved = false;
+  let sequence = 0;
+  let lookupTimer = null;
+
+  const setStatus = (message, tone = "") => {
+    status.textContent = message;
+    status.dataset.tone = tone;
   };
 
-  const clearSuggestions = () => {
-    if (!bankSuggestions) return;
-    bankSuggestions.replaceChildren();
-    bankSuggestions.hidden = true;
+  const reset = (message = "", tone = "") => {
+    sequence += 1;
+    window.clearTimeout(lookupTimer);
+    resolved = false;
+    submitButton.disabled = true;
+    name.value = "";
+    name.classList.remove("wallet-input-verified");
+    setStatus(message, tone);
   };
 
-  // The account name is the one an admin reads when approving a payout, so
-  // once the provider has told us what it is, it stops being editable. Only a
-  // bank the provider could not resolve leaves it open for typing.
-  const setAccountNameVerified = (verified) => {
-    accountName.readOnly = verified;
-    accountName.classList.toggle("wallet-input-verified", verified);
-  };
+  const completeIdentifier = (digits) => (
+    digits.length === 10 ||
+    (digits.length === 11 && digits.startsWith("0")) ||
+    (digits.length === 13 && digits.startsWith("234"))
+  );
 
-  const selectBank = (name, code, resolvedName) => {
-    bankSearch.value = name;
-    bankCode.value = code ?? "";
-    // Marks the code as derived from the lookup rather than typed, so changing
-    // the account number afterwards can clear it instead of leaving a code
-    // that belongs to the previous number's bank.
-    bankCode.dataset.fromLookup = "true";
-    if (resolvedName) {
-      accountName.value = resolvedName;
-      setAccountNameVerified(true);
-      setAccountNameStatus("Name confirmed with your bank.", "ok");
-    } else {
-      setAccountNameVerified(false);
-      setAccountNameStatus("We could not confirm the name on this account. Type it exactly as your bank has it.", "warn");
-    }
-    clearSuggestions();
-  };
+  async function resolveRecipient() {
+    const identifier = recipient.value.trim();
+    const digits = identifier.replace(/[^0-9]/g, "");
+    const current = ++sequence;
 
-  const renderSuggestions = (matches) => {
-    if (!bankSuggestions) return;
-    bankSuggestions.replaceChildren();
-    if (!matches.length) {
-      bankSuggestions.hidden = true;
+    if (!completeIdentifier(digits)) {
+      reset(identifier === "" ? "" : "Enter a complete phone number or 10-digit Agro-Shield account number.");
       return;
     }
 
-    const label = document.createElement("p");
-    label.className = "wallet-bank-suggestions-label";
-    label.textContent = matches.length === 1
-      ? "This account number belongs to:"
-      : "This account number is registered at more than one bank. Choose yours:";
-    bankSuggestions.append(label);
+    setStatus("Confirming the account name…");
+    try {
+      const response = await fetch("/wallet/transfer/recipient", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
+        },
+        body: new URLSearchParams({ recipient: identifier }).toString(),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (current !== sequence) return;
+      if (!response.ok) {
+        throw new Error(payload.error || "We could not find that Agro-Shield account.");
+      }
 
-    matches.forEach((match) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "wallet-bank-suggestion";
+      const recipientName = String(payload.name || "").trim();
+      if (recipientName === "") {
+        throw new Error("The account name was not returned. Try again.");
+      }
+      resolved = true;
+      name.value = recipientName;
+      name.classList.add("wallet-input-verified");
+      submitButton.disabled = false;
+      setStatus("Account name confirmed.", "ok");
+    } catch (error) {
+      if (current !== sequence) return;
+      reset(error.message);
+    }
+  }
 
-      const name = document.createElement("span");
-      name.className = "wallet-bank-suggestion-name";
-      name.textContent = match.name;
+  recipient.addEventListener("input", () => {
+    const digits = recipient.value.replace(/[^0-9]/g, "");
+    reset();
+    if (recipient.value.trim() === "") return;
+    if (!completeIdentifier(digits)) {
+      setStatus("Enter a complete phone number or 10-digit Agro-Shield account number.");
+      return;
+    }
+    setStatus("Confirming the account name…");
+    lookupTimer = window.setTimeout(resolveRecipient, 450);
+  });
 
-      const holder = document.createElement("span");
-      holder.className = "wallet-bank-suggestion-holder";
-      holder.textContent = match.account_name;
-
-      button.append(name, holder);
-      button.addEventListener("click", () => selectBank(match.name, match.code, match.account_name));
-      bankSuggestions.append(button);
+  if (form) {
+    form.addEventListener("submit", (event) => {
+      if (resolved) return;
+      event.preventDefault();
+      setStatus("Wait for the Agro-Shield account name to be confirmed before sending.", "warn");
+      recipient.focus();
     });
+  }
+})();
 
-    bankSuggestions.hidden = false;
-  };
-
-  // A sweep is several provider calls, so it is only worth starting on a
-  // complete number, and only after typing pauses. The sequence guard stops a
-  // slow response for an old number from overwriting a newer one.
+// Payout details form.
+//
+// Flutterwave resolves an account name only when given both the account number
+// and the bank code. When the user enters a number without choosing a bank, the
+// server sweeps its bank shortlist and returns the matches: one match is filled
+// in automatically, several are offered as suggestions, and none leaves the
+// searchable full-directory picker as the fallback. Once a bank is chosen, one
+// direct resolve fills in the verified name. No free-text account name is used.
+if (bankSearch && bankCode && bankStatus && bankPicker && bankMenu && bankListbox && accountNumber && accountNumberStatus && accountName && accountNameStatus && payoutSave) {
+  let bankDirectory = [];
+  let selectedBank = null;
+  let suggestedBanks = [];
+  let bankAutoFilled = false;
+  let visibleBanks = [];
+  let activeIndex = -1;
+  let banksLoading = true;
   let lookupTimer = null;
   let lookupSequence = 0;
 
-  const lookupAccountBanks = () => {
+  const normalize = (value) => value.toLowerCase().replace(/\s+/g, " ").trim();
+
+  const setBankStatus = (text, tone = "") => {
+    bankStatus.textContent = text;
+    bankStatus.dataset.tone = tone;
+  };
+
+  const setAccountNameStatus = (text, tone = "") => {
+    accountNameStatus.textContent = text;
+    accountNameStatus.dataset.tone = tone;
+  };
+
+  const setAccountNumberStatus = (text, tone = "") => {
+    accountNumberStatus.textContent = text;
+    accountNumberStatus.dataset.tone = tone;
+  };
+
+  const setAccountNameVerified = (verified) => {
+    accountName.readOnly = true;
+    accountName.classList.toggle("wallet-input-verified", verified);
+  };
+
+  const syncSaveState = () => {
+    payoutSave.disabled = !(
+      bankCode.value !== "" &&
+      bankSearch.value.trim() !== "" &&
+      /^[0-9]{10}$/.test(accountNumber.value.trim()) &&
+      accountName.value.trim() !== ""
+    );
+  };
+
+  const resetResolvedName = (message = "", tone = "") => {
+    lookupSequence += 1;
+    window.clearTimeout(lookupTimer);
+    accountName.value = "";
+    setAccountNameVerified(false);
+    setAccountNameStatus(message, tone);
+    syncSaveState();
+  };
+
+  const optionID = (code) => `bank-option-${code.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+
+  const setActiveOption = (index) => {
+    const options = bankListbox.querySelectorAll('[role="option"]');
+    if (!options.length) {
+      activeIndex = -1;
+      bankSearch.removeAttribute("aria-activedescendant");
+      return;
+    }
+    activeIndex = Math.max(0, Math.min(index, options.length - 1));
+    options.forEach((option, optionIndex) => {
+      option.classList.toggle("is-active", optionIndex === activeIndex);
+    });
+    const active = options[activeIndex];
+    bankSearch.setAttribute("aria-activedescendant", active.id);
+    active.scrollIntoView({ block: "nearest" });
+  };
+
+  const closeMenu = () => {
+    bankMenu.hidden = true;
+    bankPicker.classList.remove("is-open");
+    bankSearch.setAttribute("aria-expanded", "false");
+    bankSearch.removeAttribute("aria-activedescendant");
+    activeIndex = -1;
+  };
+
+  const matchingBanks = (query) => {
+    const needle = normalize(query);
+    const suggestedCodes = new Set(suggestedBanks.map((bank) => bank.code));
+    const isSuggested = (bank) => suggestedCodes.has(bank.code);
+
+    if (needle === "") {
+      return bankDirectory.slice().sort((a, b) => Number(isSuggested(b)) - Number(isSuggested(a)));
+    }
+
+    return bankDirectory
+      .filter((bank) => normalize(bank.name).includes(needle) || bank.code.startsWith(needle))
+      .sort((a, b) => {
+        const aName = normalize(a.name);
+        const bName = normalize(b.name);
+        const aSuggestion = isSuggested(a) ? 0 : 1;
+        const bSuggestion = isSuggested(b) ? 0 : 1;
+        const aRank = aName.startsWith(needle) ? 0 : aName.split(" ").some((word) => word.startsWith(needle)) ? 1 : 2;
+        const bRank = bName.startsWith(needle) ? 0 : bName.split(" ").some((word) => word.startsWith(needle)) ? 1 : 2;
+        return aSuggestion - bSuggestion || aRank - bRank || aName.localeCompare(bName);
+      });
+  };
+
+  const renderOptions = (query = "") => {
+    visibleBanks = matchingBanks(query);
+    const fragment = document.createDocumentFragment();
+
+    visibleBanks.forEach((bank) => {
+      const option = document.createElement("li");
+      option.id = optionID(bank.code);
+      option.className = "wallet-bank-option";
+      option.setAttribute("role", "option");
+      option.setAttribute("aria-selected", bank.code === bankCode.value ? "true" : "false");
+      option.dataset.code = bank.code;
+
+      const name = document.createElement("span");
+      name.className = "wallet-bank-option-name";
+      name.textContent = bank.name;
+
+      const code = document.createElement("small");
+      code.className = "wallet-bank-option-code";
+      code.textContent = bank.code;
+
+      option.append(name, code);
+      option.addEventListener("mousedown", (event) => event.preventDefault());
+      option.addEventListener("click", () => selectBank(bank));
+      option.addEventListener("mousemove", () => {
+        const index = visibleBanks.indexOf(bank);
+        if (index !== activeIndex) setActiveOption(index);
+      });
+      fragment.append(option);
+    });
+
+    bankListbox.replaceChildren(fragment);
+    bankNoResults.hidden = visibleBanks.length > 0;
+    activeIndex = -1;
+    bankSearch.removeAttribute("aria-activedescendant");
+
+    const selectedIndex = visibleBanks.findIndex((bank) => bank.code === bankCode.value);
+    if (selectedIndex >= 0) setActiveOption(selectedIndex);
+  };
+
+  const openMenu = () => {
+    if (!bankDirectory.length) {
+      if (!banksLoading && bankStatus.textContent === "") {
+        setBankStatus("The bank list is not available yet. Check your connection and refresh the page.", "warn");
+      }
+      return;
+    }
+    const query = selectedBank && bankSearch.value.trim() === selectedBank.name ? "" : bankSearch.value;
+    renderOptions(query);
+    bankMenu.hidden = false;
+    bankPicker.classList.add("is-open");
+    bankSearch.setAttribute("aria-expanded", "true");
+  };
+
+  const scheduleLookup = () => {
+    window.clearTimeout(lookupTimer);
+    lookupTimer = window.setTimeout(resolveAccountName, 320);
+  };
+
+  function selectBank(bank) {
+    if (!bank) return;
+    const changed = bank.code !== bankCode.value || bank.name !== bankSearch.value;
+    selectedBank = bank;
+    bankAutoFilled = false;
+    suggestedBanks = [];
+    bankSearch.value = bank.name;
+    bankCode.value = bank.code;
+    bankSearch.removeAttribute("aria-invalid");
+    setBankStatus("");
+    setAccountNumberStatus("");
+    closeMenu();
+
+    if (changed) {
+      resetResolvedName();
+      if (/^[0-9]{10}$/.test(accountNumber.value.trim())) {
+        setAccountNameStatus("Confirming the account name with your bank…");
+        scheduleLookup();
+      }
+    }
+    syncSaveState();
+  }
+
+  const applySuggestedBank = (match) => {
+    selectedBank = bankDirectory.find((bank) => bank.code === match.code) || match;
+    bankAutoFilled = true;
+    suggestedBanks = [match];
+    bankSearch.value = match.name;
+    bankCode.value = match.code;
+    bankSearch.removeAttribute("aria-invalid");
+    setBankStatus(`Bank found from the account number: ${match.name}.`, "ok");
+    setAccountNumberStatus("");
+    closeMenu();
+
+    if (match.accountName) {
+      accountName.value = match.accountName;
+      setAccountNameVerified(true);
+      setAccountNameStatus(`Account name confirmed with ${match.name}.`, "ok");
+    } else {
+      accountName.value = "";
+      setAccountNameVerified(false);
+      setAccountNameStatus("Confirming the account name with your bank…");
+      scheduleLookup();
+    }
+    syncSaveState();
+  };
+
+  async function suggestBankForAccount(number, sequence) {
+    setAccountNameVerified(false);
+    accountName.value = "";
+    setAccountNumberStatus("Finding the bank for this account number…");
+    setAccountNameStatus("");
+    syncSaveState();
+
+    try {
+      const response = await fetch("/wallet/lookup-account", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
+        },
+        body: new URLSearchParams({ account_number: number }).toString(),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (sequence !== lookupSequence) return;
+      if (!response.ok) throw new Error(payload.error || "We could not find the bank for that account number.");
+
+      const matches = (Array.isArray(payload.banks) ? payload.banks : [])
+        .map((match) => ({
+          name: String((match && match.name) || "").trim(),
+          code: String((match && match.code) || "").trim(),
+          accountName: String((match && match.account_name) || "").trim(),
+        }))
+        .filter((match) => match.name !== "" && match.code !== "");
+
+      if (matches.length === 0) {
+        suggestedBanks = [];
+        setAccountNumberStatus("No bank was found automatically. Search and choose your bank below.", "warn");
+        return;
+      }
+      if (matches.length === 1) {
+        applySuggestedBank(matches[0]);
+        return;
+      }
+
+      suggestedBanks = matches;
+      const names = matches.map((match) => match.name).join(", ");
+      setAccountNumberStatus("This account number matches more than one bank. Choose the right one below.", "warn");
+      setBankStatus(`Suggested banks: ${names}.`, "warn");
+      if (document.activeElement === bankSearch) openMenu();
+    } catch (error) {
+      if (sequence !== lookupSequence) return;
+      suggestedBanks = [];
+      setAccountNameVerified(false);
+      accountName.value = "";
+      setAccountNumberStatus(error.message);
+    } finally {
+      if (sequence === lookupSequence) syncSaveState();
+    }
+  }
+
+  async function resolveAccountName() {
     const number = accountNumber.value.trim();
+    const code = bankCode.value.trim();
     const sequence = ++lookupSequence;
 
     if (!/^[0-9]{10}$/.test(number)) {
-      clearSuggestions();
-      // An incomplete number used to clear the status and stop, so typing nine
-      // digits looked like nothing was happening until the browser blocked the
-      // submit. Say the rule as soon as the number is not one.
-      bankStatus.textContent = number === "" ? "" : "Nigerian bank account numbers must contain 10 digits.";
+      setAccountNameVerified(false);
+      setAccountNameStatus(number === "" ? "" : "Nigerian bank account numbers must contain 10 digits.");
       if (number === "") {
         accountNumber.removeAttribute("aria-invalid");
       } else {
         accountNumber.setAttribute("aria-invalid", "true");
       }
+      syncSaveState();
       return;
     }
 
     accountNumber.removeAttribute("aria-invalid");
-
-    bankStatus.textContent = "Finding the bank for this account number…";
-    clearSuggestions();
-
-    fetch("/wallet/lookup-account", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
-      },
-      body: new URLSearchParams({ account_number: number }).toString(),
-    })
-      .then(async (response) => {
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(payload.error || "We could not look up that account number.");
-        return payload;
-      })
-      .then((payload) => {
-        if (sequence !== lookupSequence) return;
-        const matches = payload.banks ?? [];
-        if (matches.length) {
-          bankStatus.textContent = "";
-          renderSuggestions(matches);
-          return;
-        }
-        bankStatus.textContent = "We could not identify the bank for this number. Search for your bank below.";
-        bankSearch.focus();
-      })
-      .catch((error) => {
-        if (sequence !== lookupSequence) return;
-        bankStatus.textContent = error.message;
-      });
-  };
-
-  accountNumber.addEventListener("input", () => {
-    window.clearTimeout(lookupTimer);
-    // Changing the number invalidates everything the previous lookup produced:
-    // the bank it identified, and the name registered there. Leaving the name
-    // behind would submit a verified-looking name against a different account.
-    if (bankCode.dataset.fromLookup === "true") {
-      bankCode.value = "";
-      bankCode.dataset.fromLookup = "false";
-      accountName.value = "";
-      setAccountNameVerified(false);
-      setAccountNameStatus("", "");
-    }
-    lookupTimer = window.setTimeout(lookupAccountBanks, 350);
-  });
-
-  // Typing a bank name must keep bank_code in step: the server rejects a code
-  // that is not the Flutterwave code for the selected bank, and there is no
-  // way to recover the code from the name alone on the server side.
-  bankSearch.addEventListener("input", () => {
-    const typed = bankSearch.value.trim().toLowerCase();
-    const match = bankDirectory.find((bank) => bank.name.toLowerCase() === typed);
-    bankCode.value = match ? match.code : "";
-    bankCode.dataset.fromLookup = "false";
-
-    if (!match) {
-      setAccountNameVerified(false);
-      setAccountNameStatus("", "");
+    if (!code) {
+      await suggestBankForAccount(number, sequence);
       return;
     }
-    // Selecting a bank by hand leaves the name unverified, so the field stays
-    // open, but say so plainly rather than letting the user assume it checked.
-    setAccountNameStatus("We could not confirm the name on this account. Type it exactly as your bank has it.", "warn");
+
+    setAccountNameVerified(false);
+    accountName.value = "";
+    setAccountNameStatus("Confirming the account name with your bank…");
+    syncSaveState();
+
+    let responseStatus = 0;
+    try {
+      const response = await fetch("/wallet/lookup-account", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
+        },
+        body: new URLSearchParams({ account_number: number, bank_code: code }).toString(),
+      });
+      responseStatus = response.status;
+      const payload = await response.json().catch(() => ({}));
+      if (sequence !== lookupSequence) return;
+      if (!response.ok) throw new Error(payload.error || "We could not confirm that account with your bank.");
+
+      const resolvedName = String(payload.account_name || "").trim();
+      if (resolvedName === "") throw new Error("Your bank did not return an account name. Try again.");
+      accountName.value = resolvedName;
+      setAccountNameVerified(true);
+      setAccountNameStatus("Account name confirmed with your bank.", "ok");
+    } catch (error) {
+      if (sequence !== lookupSequence) return;
+      // A selected bank that does not hold this number is usually a stale saved
+      // bank or an accidental selection, not a reason to make the user clear the
+      // field by hand. Ask the shortlist for the right bank instead.
+      if (responseStatus === 422 && !bankAutoFilled) {
+        await suggestBankForAccount(number, lookupSequence);
+        return;
+      }
+      accountName.value = "";
+      setAccountNameVerified(false);
+      setAccountNameStatus(error.message);
+    } finally {
+      if (sequence === lookupSequence) syncSaveState();
+    }
+  }
+
+  bankSearch.addEventListener("focus", openMenu);
+  bankSearch.addEventListener("click", () => {
+    if (bankMenu.hidden) openMenu();
   });
+  bankSearch.addEventListener("input", () => {
+    bankSearch.removeAttribute("aria-invalid");
+    setBankStatus("");
+    if (!selectedBank || bankSearch.value.trim() !== selectedBank.name) {
+      selectedBank = null;
+      bankCode.value = "";
+      resetResolvedName();
+    }
+    openMenu();
+    syncSaveState();
+  });
+
+  bankSearch.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      if (bankMenu.hidden) openMenu();
+      if (!visibleBanks.length) return;
+      const next = event.key === "ArrowDown"
+        ? (activeIndex < 0 ? 0 : activeIndex + 1)
+        : (activeIndex < 0 ? visibleBanks.length - 1 : activeIndex - 1);
+      setActiveOption((next + visibleBanks.length) % visibleBanks.length);
+      return;
+    }
+    if (event.key === "Enter" && !bankMenu.hidden && activeIndex >= 0) {
+      event.preventDefault();
+      selectBank(visibleBanks[activeIndex]);
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeMenu();
+      return;
+    }
+    if (event.key === "Home" && !bankMenu.hidden) {
+      event.preventDefault();
+      setActiveOption(0);
+      return;
+    }
+    if (event.key === "End" && !bankMenu.hidden) {
+      event.preventDefault();
+      setActiveOption(visibleBanks.length - 1);
+      return;
+    }
+    if (event.key === "Tab") closeMenu();
+  });
+
+  accountNumber.addEventListener("input", () => {
+    const digits = accountNumber.value.replace(/[^0-9]/g, "").slice(0, 10);
+    if (accountNumber.value !== digits) accountNumber.value = digits;
+    accountNumber.removeAttribute("aria-invalid");
+
+    if (bankAutoFilled) {
+      bankAutoFilled = false;
+      selectedBank = null;
+      bankCode.value = "";
+      bankSearch.value = "";
+      setBankStatus("");
+    }
+    suggestedBanks = [];
+    resetResolvedName();
+    setAccountNumberStatus("");
+
+    if (digits === "") {
+      return;
+    }
+    if (digits.length < 10) {
+      setAccountNumberStatus("Enter all 10 digits of your account number.");
+      return;
+    }
+
+    if (bankCode.value) {
+      setAccountNameStatus("Confirming the account name with your bank…");
+    }
+    scheduleLookup();
+  });
+
+  document.addEventListener("pointerdown", (event) => {
+    if (!bankPicker.contains(event.target)) closeMenu();
+  });
+
+  const payoutForm = bankSearch.closest("form");
+  if (payoutForm) {
+    payoutForm.addEventListener("submit", (event) => {
+      if (!payoutSave.disabled) return;
+      event.preventDefault();
+      if (!bankCode.value) {
+        setBankStatus("Choose your bank or payment provider, or wait for the automatic bank suggestion.", "warn");
+        bankSearch.focus();
+        openMenu();
+        return;
+      }
+      if (!/^[0-9]{10}$/.test(accountNumber.value.trim())) {
+        setAccountNumberStatus("Enter all 10 digits of your account number.");
+        accountNumber.focus();
+        return;
+      }
+      setAccountNameStatus("Wait for your bank to confirm the account name before saving.", "warn");
+    });
+  }
+
+  setAccountNameVerified(accountName.value.trim() !== "");
+  syncSaveState();
 
   fetch("/wallet/banks", { headers: { Accept: "application/json" } })
     .then((response) => {
-      if (!response.ok) throw new Error("The payment provider bank list is unavailable.");
+      if (!response.ok) throw new Error("The bank list could not be loaded. Check your connection and refresh the page.");
       return response.json();
     })
     .then((banks) => {
-      bankDirectory = banks;
-      if (bankOptions) {
-        bankOptions.replaceChildren(...banks.map((bank) => new Option(bank.name, bank.name)));
-      }
-      if (banks.length) return;
+      banksLoading = false;
+      const seenCodes = new Set();
+      bankDirectory = (Array.isArray(banks) ? banks : []).filter((bank) => {
+        if (!bank || !bank.code || !bank.name || seenCodes.has(bank.code)) return false;
+        seenCodes.add(bank.code);
+        return true;
+      });
 
-      if (bankStatus.textContent === "") {
-        bankStatus.textContent = "No supported banks were returned. Try again in a moment.";
+      selectedBank = bankDirectory.find((bank) => bank.code === bankCode.value) || null;
+      if (!selectedBank && bankSearch.value.trim() !== "") {
+        selectedBank = bankDirectory.find((bank) => normalize(bank.name) === normalize(bankSearch.value)) || null;
+        if (selectedBank) bankCode.value = selectedBank.code;
       }
+      setBankStatus(bankDirectory.length ? "" : "No banks or payment providers are available right now.", bankDirectory.length ? "" : "warn");
+      syncSaveState();
+      if (document.activeElement === bankSearch) openMenu();
     })
     .catch((error) => {
-      // The search field is the fallback when a lookup resolves nothing, so a
-      // failure here only matters if it is the only thing that worked.
-      if (bankStatus.textContent === "") {
-        bankStatus.textContent = error.message;
-      }
+      banksLoading = false;
+      setBankStatus(error.message, "warn");
     });
 }
 
@@ -268,7 +631,7 @@ document.querySelectorAll("[data-otp-purpose]").forEach((button) => {
 document.querySelectorAll("[data-copy-target]").forEach((button) => {
   button.addEventListener("click", async () => {
     const source = document.getElementById(button.dataset.copyTarget);
-    const status = document.getElementById("funding-copy-status");
+    const status = document.getElementById(button.dataset.copyStatus || "funding-copy-status");
     if (!source) return;
 
     const value = source.textContent.trim();
@@ -301,6 +664,52 @@ document.querySelectorAll("[data-copy-target]").forEach((button) => {
     }
   });
 });
+
+// Fund account: choose a method first. The amount is only asked on the debit
+// card path; bank transfer shows the permanent account details immediately.
+(() => {
+  const dialog = document.getElementById("fund-account-dialog");
+  if (!dialog) return;
+
+  const views = Array.from(dialog.querySelectorAll("[data-funding-view]"));
+  const show = (name) => {
+    views.forEach((view) => {
+      view.hidden = view.dataset.fundingView !== name;
+    });
+  };
+  const open = () => {
+    show("choose");
+    if (typeof dialog.showModal === "function") {
+      dialog.showModal();
+    } else {
+      dialog.setAttribute("open", "");
+    }
+  };
+  const close = () => {
+    if (typeof dialog.close === "function") {
+      dialog.close();
+    } else {
+      dialog.removeAttribute("open");
+    }
+  };
+
+  document.querySelectorAll("[data-open-funding]").forEach((button) => {
+    button.addEventListener("click", open);
+  });
+  dialog.querySelectorAll("[data-funding-close]").forEach((button) => {
+    button.addEventListener("click", close);
+  });
+  dialog.querySelectorAll("[data-funding-choice]").forEach((button) => {
+    button.addEventListener("click", () => show(button.dataset.fundingChoice));
+  });
+  dialog.querySelectorAll("[data-funding-back]").forEach((button) => {
+    button.addEventListener("click", () => show("choose"));
+  });
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) close();
+  });
+  dialog.addEventListener("close", () => show("choose"));
+})();
 
 // Identity forms submit as a normal POST so the server can redirect back with
 // an honest result. Disabling the button only prevents a double tap; the form

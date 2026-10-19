@@ -625,6 +625,13 @@ func TestVirtualAccountAttemptIsUniquePerFarmer(t *testing.T) {
 	if !active.Ready() || active.AccountNumber != "0123456789" || active.FarmerID != farmer.ID {
 		t.Fatalf("active account = %+v, want the farmer's confirmed account", active)
 	}
+	byNumber, err := repo.GetVirtualAccountByAccountNumber(ctx, "0123456789")
+	if err != nil {
+		t.Fatalf("look up by account number: %v", err)
+	}
+	if byNumber.FarmerID != farmer.ID {
+		t.Fatalf("account number resolved to farmer %d, want %d", byNumber.FarmerID, farmer.ID)
+	}
 
 	// A late response for a different account must not redirect the farmer's
 	// money to it.

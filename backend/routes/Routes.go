@@ -956,6 +956,10 @@ func RegisterRoutes(
 		"/wallet/transfer",
 		middleware.RequireAuth(container.FarmerRepo, walletHandler.Transfer),
 	))
+	http.HandleFunc("/wallet/transfer/recipient", middleware.OnlyPath(
+		"/wallet/transfer/recipient",
+		middleware.RequireAuth(container.FarmerRepo, walletHandler.LookupTransferRecipient),
+	))
 	// A user may release their own request while it is still pending. The
 	// service refuses once an admin has started paying it, because the money may
 	// already be on its way.

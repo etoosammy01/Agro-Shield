@@ -123,6 +123,59 @@ func testBankService(resolver accountResolver, lookups bankLookupStore) *WalletS
 	return &WalletService{resolver: resolver, lookups: lookups}
 }
 
+// The payout form knows the selected bank, so confirmation must ask that bank
+// directly. One call is the whole difference between a provider that is merely
+// listed and one that actually works in the form.
+func TestResolvePayoutAccountUsesOnlyTheSelectedBank(t *testing.T) {
+	resolver := &fakeResolver{holders: map[string]string{"50515": "JAMES ADAH INALEGWU"}}
+
+	name, err := testBankService(resolver, newFakeLookupStore()).ResolvePayoutAccount(
+		context.Background(), "0106787237", "50515",
+	)
+	if err != nil {
+		t.Fatalf("ResolvePayoutAccount() error = %v", err)
+	}
+	if name != "JAMES ADAH INALEGWU" {
+		t.Errorf("ResolvePayoutAccount() = %q, want the name registered at the selected bank", name)
+	}
+	if resolver.callCount() != 1 {
+		t.Fatalf("probed %d banks, want only the selected bank", resolver.callCount())
+	}
+	if resolver.calls[0] != "50515" {
+		t.Errorf("probed bank %q, want 50515", resolver.calls[0])
+	}
+}
+
+// A bank answering "no such account" is an answer the form can explain, not an
+// outage and not a reason to sweep every other provider.
+func TestResolvePayoutAccountReportsAnAccountMissingAtTheSelectedBank(t *testing.T) {
+	resolver := &fakeResolver{}
+
+	_, err := testBankService(resolver, newFakeLookupStore()).ResolvePayoutAccount(
+		context.Background(), "0106787237", "50515",
+	)
+	if !errors.Is(err, ErrAccountNotResolved) {
+		t.Fatalf("ResolvePayoutAccount() error = %v, want ErrAccountNotResolved", err)
+	}
+	if resolver.callCount() != 1 {
+		t.Errorf("probed %d banks, want only the selected bank", resolver.callCount())
+	}
+}
+
+func TestResolvePayoutAccountRejectsAMalformedNumberBeforeCallingTheProvider(t *testing.T) {
+	resolver := &fakeResolver{holders: map[string]string{"044": "ADAEZE OKONKWO"}}
+
+	_, err := testBankService(resolver, newFakeLookupStore()).ResolvePayoutAccount(
+		context.Background(), "12345", "044",
+	)
+	if err == nil {
+		t.Fatal("ResolvePayoutAccount() accepted a five-digit account number")
+	}
+	if resolver.callCount() != 0 {
+		t.Errorf("made %d provider calls for a malformed number, want 0", resolver.callCount())
+	}
+}
+
 // The common case: a number belongs to exactly one bank on the shortlist, and
 // the user should be shown that bank together with the registered name.
 func TestLookupAccountBanksFindsTheOneMatchingBank(t *testing.T) {

@@ -39,6 +39,14 @@
                     <strong><span class="wallet-currency">₦</span>{{money .Wallet.Balance}}</strong>
                     <small>{{.Wallet.Currency}} · ready to use</small>
                 </div>
+                <button type="button" class="wallet-hero-fund-card" data-open-funding>
+                    <span class="wallet-hero-fund-icon" aria-hidden="true">+</span>
+                    <span class="wallet-hero-fund-copy">
+                        <strong>Fund account</strong>
+                        <small>Debit card or bank transfer</small>
+                    </span>
+                    <span class="wallet-hero-fund-arrow" aria-hidden="true">→</span>
+                </button>
             </div>
             <div class="wallet-hero-art" aria-hidden="true">
                 <span class="wallet-art-sparkle">✦</span>
@@ -76,7 +84,7 @@
                         </div>
                         <div>
                             <dt>Account name</dt>
-                            <dd>{{if .VirtualAccount.AccountName}}{{.VirtualAccount.AccountName}}{{else}}<span class="wallet-muted">Not returned by Flutterwave — use your registered name</span>{{end}}</dd>
+                            <dd>{{if .VirtualAccount.AccountName}}{{.VirtualAccount.AccountName}}{{else if .FullName}}AgroShield-{{.FullName}}{{else}}<span class="wallet-muted">Add your full name to your profile to display it here</span>{{end}}</dd>
                         </div>
                     </dl>
                     <p class="wallet-verification-status wallet-verification-active" role="status">
@@ -158,41 +166,35 @@
         </section>
 
         <section class="wallet-actions" aria-label="Wallet actions">
-            <article class="wallet-card wallet-action-card wallet-deposit-card">
-                <div class="wallet-card-icon" aria-hidden="true">↗</div>
-                <p class="wallet-card-kicker">Add funds</p>
-                <h2>Top up your wallet</h2>
-                <p>Make a secure deposit. We’ll add the money after the payment provider confirms it.</p>
-                <form method="POST" action="/wallet/deposit">
-                    <label class="wallet-label" for="deposit-amount">How much would you like to add?</label>
-                    <div class="wallet-input-wrap"><span>₦</span><input id="deposit-amount" name="amount" type="number" min="0.01" step="0.01" placeholder="5,000.00" required></div>
-                    <button class="wallet-button wallet-button-primary" type="submit">Continue to secure deposit <span aria-hidden="true">→</span></button>
-                </form>
-                <p class="wallet-footnote"><span aria-hidden="true">🔒</span> Payments are securely handled by Flutterwave.</p>
-            </article>
-
-            <article class="wallet-card wallet-action-card">
+            <article class="wallet-card wallet-action-card wallet-payout-card">
                 <div class="wallet-card-icon wallet-icon-pink" aria-hidden="true">♡</div>
                 <p class="wallet-card-kicker">Your payout details</p>
                 <h2>Bank account</h2>
-                <p>Save the account where you’d like approved withdrawals to land.</p>
-                <form method="POST" action="/wallet/bank">
+                <p>Enter your account number and we’ll suggest your bank. You can also search and choose it yourself.</p>
+                <form method="POST" action="/wallet/bank" id="payout-details-form">
                     <label class="wallet-label" for="account-number">Account number</label>
-                    <input id="account-number" name="account_number" value="{{.AccountNumber}}" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" autocomplete="off" placeholder="10 digits" required>
+                    <input id="account-number" name="account_number" value="{{.AccountNumber}}" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" autocomplete="off" placeholder="10-digit account number" required>
+                    <p class="wallet-inline-status" id="account-number-status" role="status" aria-live="polite"></p>
 
+                    <label class="wallet-label" for="bank-search">Bank or payment provider</label>
+                    <div class="wallet-bank-picker" id="bank-picker">
+                        <div class="wallet-bank-control">
+                            <input id="bank-search" name="bank_name" value="{{.BankName}}" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="bank-listbox" aria-haspopup="listbox" aria-describedby="bank-status" autocomplete="off" spellcheck="false" placeholder="Search all banks and providers" required>
+                            <span class="wallet-bank-chevron" aria-hidden="true">⌄</span>
+                        </div>
+                        <div class="wallet-bank-menu" id="bank-menu" hidden>
+                            <ul class="wallet-bank-listbox" id="bank-listbox" role="listbox" aria-label="Banks and payment providers"></ul>
+                            <p class="wallet-bank-empty" id="bank-no-results" hidden>No bank or payment provider matches that search.</p>
+                        </div>
+                    </div>
                     <p class="wallet-inline-status" id="bank-status" role="status" aria-live="polite"></p>
-                    <div class="wallet-bank-suggestions" id="bank-suggestions" hidden></div>
-
-                    <label class="wallet-label" for="bank-search">Bank Name</label>
-                    <input id="bank-search" name="bank_name" value="{{.BankName}}" list="bank-options" autocomplete="off" placeholder="Type to search your bank" required>
-                    <datalist id="bank-options"></datalist>
                     <input id="bank-code" name="bank_code" type="hidden" value="{{.BankCode}}">
 
                     <label class="wallet-label" for="account-name">Account name</label>
-                    <input id="account-name" name="account_name" value="{{.AccountName}}" placeholder="Name on your account" required>
+                    <input id="account-name" name="account_name" value="{{.AccountName}}" placeholder="Completed after your account is verified" readonly aria-readonly="true" autocomplete="off" required>
                     <p class="wallet-inline-status" id="account-name-status" role="status" aria-live="polite"></p>
 
-                    <button class="wallet-button wallet-button-secondary" type="submit">Save payout details</button>
+                    <button class="wallet-button wallet-button-secondary" id="payout-save" type="submit" disabled>Save payout details</button>
                 </form>
             </article>
 
@@ -219,10 +221,14 @@
                 <div class="wallet-card-icon wallet-icon-pink" aria-hidden="true">⇄</div>
                 <p class="wallet-card-kicker">Send money</p>
                 <h2>Transfer to another wallet</h2>
-                <p>Send to another Agro-Shield member using the phone number on their account. An admin approves it before the money lands, so a mistake can be put right.</p>
+                <p>Send to another Agro-Shield member using their phone number or Agro-Shield account number. An admin approves it before the money lands, so a mistake can be put right.</p>
                 <form method="POST" action="/wallet/transfer">
-                    <label class="wallet-label" for="transfer-phone">Recipient’s phone number</label>
-                    <input id="transfer-phone" name="recipient_phone" type="tel" inputmode="tel" placeholder="0801 234 5678" required>
+                    <label class="wallet-label" for="transfer-recipient">Recipient’s phone or Agro-Shield account number</label>
+                    <input id="transfer-recipient" name="recipient" type="text" inputmode="tel" maxlength="20" placeholder="0801 234 5678 or 0123456789" aria-describedby="transfer-recipient-status" autocomplete="off" spellcheck="false" required>
+                    <p class="wallet-inline-status" id="transfer-recipient-status" role="status" aria-live="polite"></p>
+
+                    <label class="wallet-label" for="transfer-recipient-name">Account name</label>
+                    <input id="transfer-recipient-name" placeholder="Completed after the account is found" readonly aria-readonly="true" autocomplete="off">
 
                     <label class="wallet-label" for="transfer-amount">Amount</label>
                     <div class="wallet-input-wrap"><span>₦</span><input id="transfer-amount" name="amount" type="number" min="0.01" step="0.01" placeholder="2,500.00" required></div>
@@ -235,9 +241,9 @@
                     <button class="wallet-button wallet-button-secondary" type="button" data-otp-purpose="transfer" data-otp-target="transfer-code" data-otp-status="transfer-otp-status">Send code</button>
                     <p class="wallet-inline-status" id="transfer-otp-status" role="status" aria-live="polite"></p>
 
-                    <button class="wallet-button wallet-button-secondary" type="submit">Send transfer <span aria-hidden="true">→</span></button>
+                    <button class="wallet-button wallet-button-secondary" type="submit" id="transfer-submit" disabled>Send transfer <span aria-hidden="true">→</span></button>
                 </form>
-                <p class="wallet-footnote">The amount leaves your balance right away and is held until an admin approves it. If it’s rejected, it comes straight back.</p>
+                <p class="wallet-footnote">We confirm the account name automatically. The amount then leaves your balance and is held until an admin approves it; if it’s rejected, it comes straight back.</p>
             </article>
         </section>
 
@@ -393,6 +399,74 @@
             </div>
         </section>
     </main>
+
+    <dialog class="wallet-fund-dialog" id="fund-account-dialog" aria-labelledby="fund-account-title">
+        <div class="wallet-fund-dialog-shell">
+            <button type="button" class="wallet-fund-dialog-close" data-funding-close aria-label="Close funding options">✕</button>
+
+            <div data-funding-view="choose">
+                <p class="wallet-card-kicker">Fund your account</p>
+                <h2 id="fund-account-title">How would you like to add money?</h2>
+                <p class="wallet-fund-dialog-lead">Choose debit card for a secure checkout, or bank transfer to use your permanent account details.</p>
+                <div class="wallet-fund-methods">
+                    <button type="button" class="wallet-fund-method" data-funding-choice="card">
+                        <span class="wallet-fund-method-icon" aria-hidden="true">▣</span>
+                        <span><strong>Debit card</strong><small>Enter an amount, then pay securely through Flutterwave.</small></span>
+                        <span aria-hidden="true">→</span>
+                    </button>
+                    <button type="button" class="wallet-fund-method" data-funding-choice="banktransfer">
+                        <span class="wallet-fund-method-icon" aria-hidden="true">⇄</span>
+                        <span><strong>Bank transfer</strong><small>Get your account details and transfer any amount from your bank app.</small></span>
+                        <span aria-hidden="true">→</span>
+                    </button>
+                </div>
+            </div>
+
+            <div data-funding-view="card" hidden>
+                <button type="button" class="wallet-fund-back" data-funding-back>← Back</button>
+                <p class="wallet-card-kicker">Debit card</p>
+                <h2>Fund with your debit card</h2>
+                <p class="wallet-fund-dialog-lead">Enter the amount first. Flutterwave will then ask for your card number and verification on its secure page.</p>
+                <form method="POST" action="/wallet/deposit" class="wallet-fund-form">
+                    <label class="wallet-label" for="deposit-amount">How much would you like to add?</label>
+                    <div class="wallet-input-wrap"><span>₦</span><input id="deposit-amount" name="amount" type="number" min="0.01" step="0.01" placeholder="5,000.00" required></div>
+                    <button class="wallet-button wallet-button-primary" type="submit">Continue to secure card checkout <span aria-hidden="true">→</span></button>
+                </form>
+                <p class="wallet-footnote"><span aria-hidden="true">🔒</span> Card details are entered only on Flutterwave's secure checkout page.</p>
+            </div>
+
+            <div data-funding-view="banktransfer" hidden>
+                <button type="button" class="wallet-fund-back" data-funding-back>← Back</button>
+                <p class="wallet-card-kicker">Bank transfer</p>
+                <h2>Your funding account</h2>
+                {{if and .VirtualAccount .VirtualAccount.Ready}}
+                <p class="wallet-fund-dialog-lead">No amount is needed here. Transfer any amount from your bank app to this account.</p>
+                <dl class="wallet-account-details wallet-fund-dialog-account">
+                    <div>
+                        <dt>Bank</dt>
+                        <dd>{{if .VirtualAccount.BankName}}{{.VirtualAccount.BankName}}{{else}}Flutterwave MFB{{end}}</dd>
+                    </div>
+                    <div>
+                        <dt>Account number</dt>
+                        <dd class="wallet-account-number-row">
+                            <span class="wallet-account-number" id="dialog-account-number">{{.VirtualAccount.AccountNumber}}</span>
+                            <button class="wallet-copy-button" type="button" data-copy-target="dialog-account-number" data-copy-status="dialog-copy-status" aria-label="Copy your bank transfer account number">Copy number</button>
+                            <span class="wallet-inline-status" id="dialog-copy-status" role="status" aria-live="polite"></span>
+                        </dd>
+                    </div>
+                    <div>
+                        <dt>Account name</dt>
+                        <dd>{{if .VirtualAccount.AccountName}}{{.VirtualAccount.AccountName}}{{else if .FullName}}AgroShield-{{.FullName}}{{else}}Your registered name{{end}}</dd>
+                    </div>
+                </dl>
+                <p class="wallet-footnote">Your wallet is credited only after Flutterwave confirms the transfer.</p>
+                {{else}}
+                <p class="wallet-fund-dialog-lead">Create your permanent funding account first. You can then receive any amount by bank transfer.</p>
+                <a class="wallet-button wallet-button-secondary" href="#funding-account-heading" data-funding-close>View funding account setup <span aria-hidden="true">→</span></a>
+                {{end}}
+            </div>
+        </div>
+    </dialog>
 
     <div class="wallet-receipt-overlay" id="receipt-overlay" hidden aria-hidden="true">
         <div class="wallet-receipt" role="dialog" aria-modal="true" aria-labelledby="receipt-title">

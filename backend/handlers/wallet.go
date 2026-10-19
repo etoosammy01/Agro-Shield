@@ -47,6 +47,7 @@ type WalletPageData struct {
 	BankCode      string
 	AccountName   string
 	AccountNumber string
+	FullName      string
 	Error         string
 	Success       string
 	IsAdmin       bool
@@ -139,7 +140,8 @@ func (h *WalletHandler) Page(w http.ResponseWriter, r *http.Request) {
 		Withdrawals: withdrawals, Transfers: transfers,
 		BankName: farmer.BankName, BankCode: farmer.BankCode,
 		AccountName: farmer.AccountName, AccountNumber: farmer.AccountNumber,
-		Error: r.URL.Query().Get("error"), Success: r.URL.Query().Get("success"),
+		FullName: strings.Join(strings.Fields(farmer.FullName), " "),
+		Error:    r.URL.Query().Get("error"), Success: r.URL.Query().Get("success"),
 		IsAdmin:        h.wallet.IsAdmin(farmer.ID),
 		VirtualAccount: virtualAccount,
 		HasEmail:       strings.TrimSpace(farmer.Email) != "",
@@ -446,8 +448,42 @@ func walletUserMessage(err error) string {
 	}
 }
 
+// LookupTransferRecipient resolves the phone number or Agro-Shield account
+// number on the transfer form before the sender submits it. The transfer handler
+// still resolves the identifier again, so this endpoint is for confirmation only
+// and cannot direct money itself.
+func (h *WalletHandler) LookupTransferRecipient(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	farmer, ok := middleware.FarmerFromContext(r)
+	if !ok || farmer == nil {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid form"})
+		return
+	}
+	recipient, err := h.wallet.ResolveTransferRecipient(r.Context(), farmer.ID, transferRecipientIdentifier(r))
+	if err != nil {
+		log.Printf("resolve transfer recipient for user %d: %v", farmer.ID, err)
+		status := http.StatusBadRequest
+		switch {
+		case errors.Is(err, services.ErrTransferRecipientNotFound):
+			status = http.StatusNotFound
+		case errors.Is(err, services.ErrTransferUnavailable):
+			status = http.StatusServiceUnavailable
+		}
+		writeJSON(w, status, map[string]string{"error": walletUserMessage(err)})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"name": recipient.FullName})
+}
+
 // Transfer reserves money from the sender's wallet for a recipient identified
-// by phone number.
+// by phone number or Agro-Shield account number.
 //
 // The money leaves the sender immediately but does not reach the recipient
 // until an admin approves it, so a mistyped or fraudulent transfer can be
@@ -469,7 +505,7 @@ func (h *WalletHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 
 	// Same ordering rule as withdrawals: everything that can be rejected
 	// cheaply is checked before the passcode is spent.
-	recipient, err := h.wallet.ResolveTransferRecipient(r.Context(), farmer.ID, r.FormValue("recipient_phone"))
+	recipient, err := h.wallet.ResolveTransferRecipient(r.Context(), farmer.ID, transferRecipientIdentifier(r))
 	if err != nil {
 		log.Printf("resolve transfer recipient for user %d: %v", farmer.ID, err)
 		h.redirectTransferError(w, r, err)
@@ -498,6 +534,15 @@ func (h *WalletHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 
 func (h *WalletHandler) redirectTransferError(w http.ResponseWriter, r *http.Request, err error) {
 	http.Redirect(w, r, "/wallet?error="+url.QueryEscape(walletUserMessage(err)), http.StatusSeeOther)
+}
+
+// transferRecipientIdentifier accepts the current field name and keeps the
+// previous phone-only name working for an already-open form during a deploy.
+func transferRecipientIdentifier(r *http.Request) string {
+	if identifier := strings.TrimSpace(r.FormValue("recipient")); identifier != "" {
+		return identifier
+	}
+	return strings.TrimSpace(r.FormValue("recipient_phone"))
 }
 
 // cancelErrorMessage names the two outcomes a user can act on - a request that
@@ -604,9 +649,11 @@ func (h *WalletHandler) SaveBankDetails(w http.ResponseWriter, r *http.Request) 
 	http.Redirect(w, r, "/wallet?success="+url.QueryEscape("Bank payout details saved."), http.StatusSeeOther)
 }
 
-// LookupAccount finds which banks an account number belongs to and the name
-// registered on it, so the payout form can fill in a verified name instead of
-// asking the user to type one.
+// LookupAccount confirms the name registered on an account. When the form sends
+// the selected bank_code it resolves directly at that bank, which supports every
+// provider in the Flutterwave directory. A request without a bank code sweeps a
+// bank shortlist instead, which the payout form uses to suggest a bank after the
+// user enters only an account number.
 //
 // This is a POST, not a GET: the account number is a sensitive identifier, and
 // a GET would put it in access logs, browser history and any Referer header
@@ -626,6 +673,32 @@ func (h *WalletHandler) LookupAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	accountNumber := r.FormValue("account_number")
+	bankCode := strings.TrimSpace(r.FormValue("bank_code"))
+
+	if bankCode != "" {
+		accountNumber = strings.TrimSpace(accountNumber)
+		if len(accountNumber) != 10 || strings.Trim(accountNumber, "0123456789") != "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Nigerian bank account numbers must contain 10 digits."})
+			return
+		}
+		if strings.Trim(bankCode, "0123456789") != "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Select your bank or payment provider again."})
+			return
+		}
+
+		accountName, err := h.wallet.ResolvePayoutAccount(r.Context(), accountNumber, bankCode)
+		if err != nil {
+			log.Printf("resolve payout account for user %d at bank %s: %v", farmer.ID, bankCode, err)
+			if errors.Is(err, services.ErrAccountNotResolved) {
+				writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "No account with this number exists at the selected bank."})
+				return
+			}
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "We couldn't confirm that account with your bank right now. Please try again."})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"account_name": accountName})
+		return
+	}
 
 	matches, err := h.wallet.LookupAccountBanks(r.Context(), accountNumber)
 	if err != nil {

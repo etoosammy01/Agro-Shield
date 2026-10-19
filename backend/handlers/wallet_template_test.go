@@ -69,6 +69,33 @@ func TestWalletPageRendersWithoutTransfers(t *testing.T) {
 	}
 }
 
+func TestWalletPageResolvesTransferRecipientAutomatically(t *testing.T) {
+	data := WalletPageData{
+		Wallet: &models.Wallet{ID: 1, FarmerID: 7, Balance: "5000.00", Currency: "NGN"},
+	}
+
+	recorder := httptest.NewRecorder()
+	if err := render.RenderTemplates(recorder, "wallet.html", data); err != nil {
+		t.Fatalf("render wallet.html: %v", err)
+	}
+	body := recorder.Body.String()
+
+	for _, want := range []string{
+		`id="transfer-recipient" name="recipient"`,
+		`id="transfer-recipient-name" placeholder="Completed after the account is found" readonly`,
+		`id="transfer-submit" disabled`,
+		"phone or Agro-Shield account number",
+		"We confirm the account name automatically",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the transfer form did not render %q", want)
+		}
+	}
+	if strings.Contains(body, `id="verify-transfer-recipient"`) {
+		t.Error("the transfer form still renders a separate verify-recipient action")
+	}
+}
+
 func TestWalletAdminPageRendersPendingTransfers(t *testing.T) {
 	data := WalletAdminPageData{
 		Transfers: []models.Transfer{{
@@ -677,6 +704,78 @@ func TestWalletPageRendersTheActiveFundingAccount(t *testing.T) {
 	} {
 		if strings.Contains(body, unwanted) {
 			t.Errorf("an active account rendered the setup form %q", unwanted)
+		}
+	}
+}
+
+func TestWalletPageFallsBackToTheProfileNameForTheFundingAccount(t *testing.T) {
+	data := WalletPageData{
+		Wallet:   &models.Wallet{ID: 1, FarmerID: 7, Balance: "1500.00", Currency: "NGN"},
+		FullName: "Adaeze Okonkwo",
+		VirtualAccount: &models.WalletVirtualAccount{
+			ID: 1, FarmerID: 7, TxRef: "AGRO-VA-7",
+			AccountNumber: "0123456789",
+			BankName:      "Flutterwave Bank",
+			Currency:      "NGN",
+			Status:        models.VirtualAccountActive,
+		},
+		HasEmail: true,
+	}
+
+	recorder := httptest.NewRecorder()
+	if err := render.RenderTemplates(recorder, "wallet.html", data); err != nil {
+		t.Fatalf("render wallet.html: %v", err)
+	}
+	body := recorder.Body.String()
+
+	if !strings.Contains(body, "AgroShield-Adaeze Okonkwo") {
+		t.Fatalf("the funding account did not fall back to the profile name: %s", body)
+	}
+	if strings.Contains(body, "Not returned by Flutterwave — use your registered name") {
+		t.Error("the funding account still rendered the empty-name placeholder")
+	}
+}
+
+func TestWalletPageFundsThroughADebitCardOrBankTransferDialog(t *testing.T) {
+	data := WalletPageData{
+		Wallet:   &models.Wallet{ID: 1, FarmerID: 7, Balance: "1500.00", Currency: "NGN"},
+		FullName: "James Inalegwu",
+		VirtualAccount: &models.WalletVirtualAccount{
+			ID: 1, FarmerID: 7, TxRef: "AGRO-VA-7",
+			AccountNumber: "0123456789", BankName: "Flutterwave MFB",
+			AccountName: "AgroShield-James Inalegwu", Currency: "NGN",
+			Status: models.VirtualAccountActive,
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+	if err := render.RenderTemplates(recorder, "wallet.html", data); err != nil {
+		t.Fatalf("render wallet.html: %v", err)
+	}
+	body := recorder.Body.String()
+
+	for _, want := range []string{
+		`data-open-funding`,
+		"Fund account",
+		`id="fund-account-dialog"`,
+		`data-funding-choice="card"`,
+		`data-funding-choice="banktransfer"`,
+		`action="/wallet/deposit"`,
+		"Continue to secure card checkout",
+		"No amount is needed here",
+		`id="dialog-account-number"`,
+		"AgroShield-James Inalegwu",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the funding dialog did not render %q", want)
+		}
+	}
+	if got := strings.Count(body, `id="deposit-amount"`); got != 1 {
+		t.Errorf("amount input rendered %d times, want only in the debit-card option", got)
+	}
+	for _, unwanted := range []string{"Top up your wallet", "wallet-deposit-card"} {
+		if strings.Contains(body, unwanted) {
+			t.Errorf("the removed top-up card still rendered %q", unwanted)
 		}
 	}
 }

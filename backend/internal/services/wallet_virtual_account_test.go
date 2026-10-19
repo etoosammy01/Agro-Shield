@@ -318,6 +318,9 @@ func TestSetupVirtualAccountUsesServerSideIdentityAndDeterministicReference(t *t
 	if provider.lastCreate.IdentityKind != "bvn" || provider.lastCreate.IdentityNumber != "22222222222" {
 		t.Errorf("identity = %q/%q, want the submitted BVN", provider.lastCreate.IdentityKind, provider.lastCreate.IdentityNumber)
 	}
+	if provider.lastCreate.Narration != "AgroShield-Adaeze Okonkwo" {
+		t.Errorf("narration = %q, want the branded account holder name", provider.lastCreate.Narration)
+	}
 	if store.account.IdentityKind != "bvn" {
 		t.Errorf("stored identity kind = %q, want bvn", store.account.IdentityKind)
 	}
@@ -331,6 +334,35 @@ func TestSetupVirtualAccountUsesServerSideIdentityAndDeterministicReference(t *t
 	// provider's single-account read endpoint.
 	if provider.lookupCalls != 0 {
 		t.Errorf("lookup calls = %d, want none for a first attempt", provider.lookupCalls)
+	}
+}
+
+func TestSetupVirtualAccountUsesTheNarrationWhenTheProviderOmitsTheName(t *testing.T) {
+	store := &fakeVirtualAccountStore{}
+	provider := &fakeVirtualAccountProvider{
+		lookup: func(string) (*VirtualAccountDetails, error) { return nil, ErrVirtualAccountNotFound },
+		create: func(req CreateVirtualAccountRequest) (*VirtualAccountDetails, error) {
+			return &VirtualAccountDetails{
+				OrderRef:      "URF_VA_7",
+				ProviderRef:   "FLW-VA-7",
+				AccountNumber: "0123456789",
+				BankName:      "Flutterwave MFB",
+				Currency:      "NGN",
+			}, nil
+		},
+	}
+	service := newVirtualAccountService(store, provider, nil)
+
+	account, err := service.SetupVirtualAccount(context.Background(), testVirtualFarmer(), VirtualAccountSetup{
+		IdentityKind:   "bvn",
+		IdentityNumber: "22222222222",
+		Consent:        true,
+	})
+	if err != nil {
+		t.Fatalf("SetupVirtualAccount() error = %v", err)
+	}
+	if account.AccountName != "AgroShield-Adaeze Okonkwo" {
+		t.Fatalf("AccountName = %q, want the narration used for bank resolution", account.AccountName)
 	}
 }
 

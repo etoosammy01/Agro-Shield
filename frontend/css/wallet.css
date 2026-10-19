@@ -120,6 +120,65 @@
     font-size: 0.72em;
 }
 
+.wallet-hero-fund-card {
+    display: flex;
+    width: min(100%, 360px);
+    align-items: center;
+    gap: 0.8rem;
+    margin-top: 1rem;
+    padding: 0.8rem 0.95rem;
+    border: 1px solid rgb(207 227 209 / 90%);
+    border-radius: 16px;
+    background: rgb(255 255 255 / 88%);
+    color: #1d432d;
+    box-shadow: 0 8px 22px rgb(41 82 51 / 8%);
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+    transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.wallet-hero-fund-card:hover,
+.wallet-hero-fund-card:focus-visible {
+    transform: translateY(-2px);
+    border-color: #9dcc9f;
+    box-shadow: 0 12px 28px rgb(41 82 51 / 13%);
+}
+
+.wallet-hero-fund-icon {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: 12px;
+    background: #e8f5e9;
+    color: #287348;
+    font-size: 1.35rem;
+    font-weight: 800;
+}
+
+.wallet-hero-fund-copy {
+    display: grid;
+    gap: 0.1rem;
+}
+
+.wallet-hero-fund-copy strong {
+    font-size: 0.94rem;
+}
+
+.wallet-hero-fund-copy small {
+    color: #6b786e;
+    font-size: 0.76rem;
+}
+
+.wallet-hero-fund-arrow {
+    margin-left: auto;
+    color: #2d7542;
+    font-size: 1.1rem;
+    font-weight: 800;
+}
+
 .wallet-hero-art {
     position: relative;
     z-index: 1;
@@ -267,12 +326,64 @@
     box-shadow: 0 18px 36px rgb(51 70 54 / 10%);
 }
 
-.wallet-deposit-card {
-    border-top: 3px solid #63a86c;
+.wallet-action-card:not(.wallet-withdraw-card) {
+    border-top: 3px solid #e785b0;
 }
 
-.wallet-action-card:not(.wallet-deposit-card):not(.wallet-withdraw-card) {
-    border-top: 3px solid #e785b0;
+/* The payout card is a short, task-focused form. Its card-level spacing is
+   tighter than the other action cards so the controls stay together instead
+   of leaving a large gap under the introduction. */
+.wallet-payout-card {
+    padding: 1.25rem;
+}
+
+.wallet-payout-card .wallet-card-icon {
+    width: 38px;
+    height: 38px;
+    margin-bottom: 0.7rem;
+    border-radius: 12px;
+    font-size: 1.2rem;
+}
+
+.wallet-payout-card .wallet-card-kicker {
+    margin-bottom: 0.2rem;
+    font-size: 0.64rem;
+}
+
+.wallet-action-card.wallet-payout-card h2 {
+    font-size: 1.15rem;
+}
+
+.wallet-action-card.wallet-payout-card > p:not(.wallet-card-kicker):not(.wallet-footnote) {
+    min-height: 0;
+    margin: 0.35rem 0 0.8rem;
+    font-size: 0.86rem;
+    line-height: 1.45;
+}
+
+.wallet-action-card.wallet-payout-card form {
+    gap: 0.45rem;
+}
+
+.wallet-payout-card .wallet-label {
+    margin-top: 0.15rem;
+    font-size: 0.78rem;
+}
+
+.wallet-action-card.wallet-payout-card input {
+    min-height: 43px;
+    padding: 0.58rem 0.72rem;
+    border-radius: 10px;
+    font-size: 0.9rem;
+}
+
+.wallet-payout-card .wallet-inline-status {
+    font-size: 0.75rem;
+}
+
+.wallet-payout-card .wallet-button {
+    min-height: 44px;
+    margin-top: 0.35rem;
 }
 
 .wallet-withdraw-card {
@@ -399,6 +510,13 @@
     box-shadow: 0 8px 18px rgb(30 66 43 / 14%);
 }
 
+.wallet-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.52;
+    transform: none;
+    box-shadow: none;
+}
+
 .wallet-button-primary {
     background: linear-gradient(100deg, #287348, #348753);
     color: #fff;
@@ -428,6 +546,10 @@
     font-size: 0.8rem;
 }
 
+.wallet-inline-status:empty {
+    display: none;
+}
+
 /* Confirmation and warning tones for the inline status lines. The default pink
    reads as an error, which is wrong for a name we successfully verified. */
 .wallet-inline-status[data-tone="ok"] {
@@ -438,48 +560,115 @@
     color: #9a6a13;
 }
 
-.wallet-bank-suggestions {
-    display: grid;
-    gap: 0.5rem;
-    margin: 0.6rem 0 1rem;
+.wallet-bank-picker {
+    position: relative;
 }
 
-.wallet-bank-suggestions-label {
+.wallet-bank-control {
+    position: relative;
+}
+
+.wallet-payout-card .wallet-bank-control input {
+    padding-right: 2rem;
+    cursor: text;
+}
+
+.wallet-bank-chevron {
+    position: absolute;
+    top: 50%;
+    right: 0.75rem;
+    color: #718077;
+    font-size: 1rem;
+    line-height: 1;
+    pointer-events: none;
+    transform: translateY(-58%);
+    transition: transform 140ms ease;
+}
+
+.wallet-bank-picker.is-open .wallet-bank-chevron {
+    transform: translateY(-58%) rotate(180deg);
+}
+
+.wallet-bank-menu {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 0.3rem);
+    right: 0;
+    left: 0;
+    overflow: hidden;
+    border: 1px solid #dce5dc;
+    border-radius: 11px;
+    background: #fff;
+    box-shadow: 0 14px 30px rgb(24 61 41 / 16%);
+}
+
+.wallet-bank-menu[hidden] {
+    display: none;
+}
+
+.wallet-bank-listbox {
+    max-height: 13.5rem;
     margin: 0;
-    color: #5c6660;
-    font-size: 0.8rem;
+    padding: 0.3rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    list-style: none;
 }
 
-.wallet-bank-suggestion {
+.wallet-bank-option {
     display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0.7rem 0.9rem;
-    border: 1px solid #dcebdc;
-    border-radius: 14px;
-    background: #f7fcf6;
-    color: #1f2a23;
-    font: inherit;
-    text-align: left;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.52rem 0.55rem;
+    border-radius: 8px;
+    color: #22372a;
     cursor: pointer;
 }
 
-.wallet-bank-suggestion:hover,
-.wallet-bank-suggestion:focus-visible {
-    border-color: #b6ddb4;
-    background: #effaed;
+.wallet-bank-option.is-active {
+    background: #f1f8f1;
 }
 
-.wallet-bank-suggestion-name {
-    font-weight: 600;
+.wallet-bank-option[aria-selected="true"] {
+    background: #eaf5eb;
+    color: #1d5c35;
 }
 
-.wallet-bank-suggestion-holder {
+.wallet-bank-option[aria-selected="true"] .wallet-bank-option-name::after {
+    margin-left: 0.4rem;
     color: #2f7a4a;
-    font-size: 0.82rem;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
+    content: "✓";
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
+.wallet-bank-option-name {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    font-size: 0.84rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wallet-bank-option-code {
+    flex: 0 0 auto;
+    padding: 0.12rem 0.35rem;
+    border-radius: 5px;
+    background: #f0f4f0;
+    color: #69776d;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+
+.wallet-bank-empty {
+    margin: 0;
+    padding: 0.8rem;
+    color: #7a847d;
+    font-size: 0.78rem;
+    line-height: 1.4;
 }
 
 /* A name the provider gave us is not editable, so it should not look like a
@@ -2269,6 +2458,156 @@
 .wallet-receipt-btn:focus-visible {
     outline: 3px solid rgb(99 168 108 / 28%);
     outline-offset: 2px;
+}
+
+/* ---------- Fund account dialog ---------- */
+
+.wallet-fund-dialog {
+    width: min(34rem, calc(100vw - 2rem));
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 24px;
+    background: #fff;
+    color: #1f3427;
+    box-shadow: 0 24px 70px rgb(13 34 22 / 30%);
+}
+
+.wallet-fund-dialog::backdrop {
+    background: rgb(15 30 22 / 58%);
+    backdrop-filter: blur(5px);
+}
+
+.wallet-fund-dialog-shell {
+    position: relative;
+    padding: 1.55rem;
+}
+
+.wallet-fund-dialog h2 {
+    margin: 0;
+    color: #183d29;
+    font-size: 1.45rem;
+    letter-spacing: -0.025em;
+}
+
+.wallet-fund-dialog-lead {
+    margin: 0.55rem 0 1rem;
+    color: #637067;
+    font-size: 0.9rem;
+    line-height: 1.55;
+}
+
+.wallet-fund-dialog-close {
+    position: absolute;
+    top: 0.9rem;
+    right: 0.9rem;
+    display: grid;
+    width: 36px;
+    height: 36px;
+    place-items: center;
+    border: 1px solid #e2e9e2;
+    border-radius: 50%;
+    background: #fff;
+    color: #526259;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.9rem;
+}
+
+.wallet-fund-methods {
+    display: grid;
+    gap: 0.7rem;
+    margin-top: 1.1rem;
+}
+
+.wallet-fund-method {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.85rem;
+    width: 100%;
+    padding: 0.95rem;
+    border: 1px solid #dfe9df;
+    border-radius: 16px;
+    background: #fbfdfb;
+    color: #21422e;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+    transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.wallet-fund-method:hover,
+.wallet-fund-method:focus-visible {
+    transform: translateY(-2px);
+    border-color: #9ecda2;
+    background: #f2faf2;
+}
+
+.wallet-fund-method-icon {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    place-items: center;
+    border-radius: 13px;
+    background: #e8f5e9;
+    color: #287348;
+    font-size: 1.1rem;
+    font-weight: 800;
+}
+
+.wallet-fund-method strong,
+.wallet-fund-method small {
+    display: block;
+}
+
+.wallet-fund-method small {
+    margin-top: 0.18rem;
+    color: #6c786f;
+    font-size: 0.78rem;
+    font-weight: 400;
+    line-height: 1.4;
+}
+
+.wallet-fund-back {
+    margin: 0 0 0.9rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #2d7542;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 800;
+}
+
+.wallet-fund-form {
+    display: grid;
+    gap: 0.7rem;
+    margin-top: 1rem;
+}
+
+.wallet-fund-form .wallet-label {
+    margin-top: 0;
+}
+
+.wallet-fund-form .wallet-input-wrap {
+    min-height: 52px;
+}
+
+.wallet-fund-form .wallet-input-wrap input {
+    width: 100%;
+    min-height: 48px;
+    border: 0;
+    background: transparent;
+    color: #1f3427;
+    font: inherit;
+    outline: 0;
+}
+
+.wallet-fund-dialog-account {
+    margin-bottom: 0.9rem;
 }
 
 .wallet-receipt-overlay {
