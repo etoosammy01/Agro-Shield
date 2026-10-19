@@ -152,7 +152,9 @@ func NewContainer(
 	// Flutterwave API.
 	// ========================================================
 
-	walletService := services.NewWalletService(walletRepo, farmerRepo, flutterwaveClient, bankLookupRepo, walletAdminIDs, commissionBasisPoints, notificationService, staleDepositAfter)
+	walletService := services.NewWalletService(walletRepo, farmerRepo, bankLookupRepo, flutterwaveClient, walletAdminIDs, commissionBasisPoints, notificationService)
+	walletService.SetStaleDepositAfter(staleDepositAfter)
+	
 	paymentService := services.NewPaymentService(paymentRepo, orderRepo, farmerRepo, flutterwaveClient, walletService)
 
 	feedbackService := services.NewFeedbackService(

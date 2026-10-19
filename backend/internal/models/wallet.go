@@ -81,6 +81,18 @@ const (
 	VirtualAccountFailed  = "failed"
 )
 
+// Expired is deliberately not a synonym for failed. Failed means the payment
+// provider answered and the payment did not succeed; expired means the
+// reconciliation pass asked and the provider had no transaction for the
+// reference at all. Only that second answer may close an attempt nobody paid.
+// const (
+// 	// DepositPending    = "pending"
+// 	DepositSuccessful = "successful"
+// 	DepositFailed     = "failed"
+// 	DepositExpired    = "expired"
+// )
+
+
 // WalletVirtualAccount is the farmer's permanent NGN funding account.
 //
 // The BVN or NIN used to open it is deliberately absent: it is sent to

@@ -20,11 +20,101 @@ import (
 	"backend/internal/repository"
 )
 
+// walletStore is the slice of the wallet repository this service uses. It is an
+// interface rather than the concrete repository so the money paths can be
+// tested against an in-memory store, including the failures that are hard to
+// provoke against PostgreSQL.
+type walletStore interface {
+	GetWallet(ctx context.Context, farmerID int) (*models.Wallet, error)
+	EnsureWallet(ctx context.Context, farmerID int) (*models.Wallet, error)
+	ListTransactions(ctx context.Context, farmerID int) ([]models.WalletTransaction, error)
+
+	DepositProvider(ctx context.Context, reference string) (string, error)
+	CreateDeposit(ctx context.Context, farmerID int, provider, reference, amount string) error
+	CompleteDeposit(ctx context.Context, reference, transactionID, amount, currency string) (bool, error)
+	FailDeposit(ctx context.Context, reference string) error
+	ListPendingDepositsOlderThan(ctx context.Context, cutoff time.Time) ([]models.PendingDeposit, error)
+	ExpireDeposit(ctx context.Context, reference string) error
+	ListDeposits(ctx context.Context, farmerID int) ([]models.WalletDeposit, error)
+	StalePendingDeposits(ctx context.Context, olderThan time.Duration, limit int) ([]models.WalletDeposit, error)
+
+	CreateWithdrawal(ctx context.Context, farmerID int, reference, amount string) error
+	ListFarmerWithdrawals(ctx context.Context, farmerID int) ([]models.Withdrawal, error)
+	ListWithdrawals(ctx context.Context, pendingOnly bool) ([]models.Withdrawal, error)
+	BeginWithdrawal(ctx context.Context, withdrawalID int64, adminID int) (*models.Withdrawal, error)
+	GetWithdrawal(ctx context.Context, withdrawalID int64) (*models.Withdrawal, error)
+	GetWithdrawalByReference(ctx context.Context, reference string) (*models.Withdrawal, error)
+	RecordWithdrawalVerification(ctx context.Context, reference, status, resolvedName, detail string) error
+	SetTransferID(ctx context.Context, reference, transferID string) error
+	RevertWithdrawalToPending(ctx context.Context, reference string) error
+	RejectWithdrawal(ctx context.Context, withdrawalID int64, adminID int) error
+	CancelWithdrawal(ctx context.Context, withdrawalID int64, farmerID int) error
+	ExpireStaleWithdrawals(ctx context.Context, cutoff time.Time) ([]models.Withdrawal, error)
+	ClaimWithdrawalReminder(ctx context.Context, withdrawalID int64, cutoff time.Time) (bool, error)
+	CompleteTransfer(ctx context.Context, reference, transferID, status string, amount int64, currency string) (bool, error)
+
+	PayForOrder(ctx context.Context, buyerID, cropID int, quantity float64, commissionBasisPoints int64) (int64, error)
+	PlatformRevenueTotal(ctx context.Context) (string, int, error)
+
+	CreateTransfer(ctx context.Context, senderID, recipientID int, reference, amount, note string) error
+	ListFarmerTransfers(ctx context.Context, farmerID int) ([]models.Transfer, error)
+	ListPendingTransfers(ctx context.Context) ([]models.Transfer, error)
+	ApproveTransfer(ctx context.Context, transferID int64, adminID int) (*models.Transfer, error)
+	RejectTransfer(ctx context.Context, transferID int64, adminID int) (*models.Transfer, error)
+	CancelTransfer(ctx context.Context, transferID int64, senderID int) error
+	ExpireStaleTransfers(ctx context.Context, cutoff time.Time) ([]models.Transfer, error)
+	ClaimTransferReminder(ctx context.Context, transferID int64, cutoff time.Time) (bool, error)
+
+	ListAdminIDs(ctx context.Context) ([]int, error)
+	ListAdminAccounts(ctx context.Context) ([]models.AdminAccount, error)
+	SetAdmin(ctx context.Context, farmerID int, admin bool) (bool, error)
+}
+
+// farmerStore is the slice of the farmer repository the wallet needs: payout
+// details, and the account a phone number names.
+type farmerStore interface {
+	GetByID(id int) (*models.Farmer, error)
+	GetByPhone(phone string) (*models.Farmer, error)
+	UpdateBankDetails(id int, bankName, bankCode, accountName, accountNumber string) error
+}
+
+// bankLookupStore caches which banks an account number belongs to, so a number
+// is swept at the provider at most once.
+type bankLookupStore interface {
+	HasAny(ctx context.Context, accountNumber string) (bool, error)
+	Find(ctx context.Context, accountNumber string) ([]repository.BankLookup, error)
+	FindOne(ctx context.Context, accountNumber, bankCode string) (*repository.BankLookup, error)
+	SaveMatches(ctx context.Context, accountNumber string, matches []repository.BankLookup) error
+	SaveMiss(ctx context.Context, accountNumber string) error
+}
+
+// accountResolver is the account-name half of the Flutterwave client, held as a
+// narrow interface so the bank fan-out can be tested without HTTP.
+type accountResolver interface {
+	ResolveAccount(accountNumber, bankCode string) (*ResolvedAccount, error)
+}
+
+// bankDirectory is the bank-list half of the same client, for checking a stored
+// bank name against its code.
+type bankDirectory interface {
+	ListBanks(country string) ([]Bank, error)
+}
+
+// notifier is the notification store as the wallet service sees it. Keeping it
+// this narrow lets a test record what was said without a database.
+type notifier interface {
+	CreateNotification(userID int, title, message, kind string) error
+}
+
 type WalletService struct {
 	repo    walletStore
 	farmers farmerStore
 	lookups bankLookupStore
 	flutter *FlutterwaveClient
+
+	// notify delivers the messages that follow money movement. It may be nil: a
+	// wallet still has to move money when nobody can be told about it.
+	notify notifier
 
 	adminIDs map[int]struct{}
 
@@ -66,7 +156,7 @@ type WalletService struct {
 	staleDepositAfter time.Duration
 }
 
-func NewWalletService(repo walletStore, farmers farmerStore, flutter *FlutterwaveClient, lookups *repository.BankLookupRepository, adminIDs []int, commissionBasisPoints int64, notify notifier, staleDepositAfter time.Duration) *WalletService {
+func NewWalletService(repo walletStore, farmers farmerStore, lookups bankLookupStore, flutter *FlutterwaveClient, adminIDs []int, commissionBasisPoints int64, notify notifier) *WalletService {
 	configured := make(map[int]struct{}, len(adminIDs))
 	for _, id := range adminIDs {
 		if id > 0 {
@@ -82,6 +172,7 @@ func NewWalletService(repo walletStore, farmers farmerStore, flutter *Flutterwav
 		farmers:               farmers,
 		lookups:               lookups,
 		flutter:               flutter,
+		notify:                notify,
 		resolver:              flutter,
 		directory:             flutter,
 		virtualAccounts:       flutter,
@@ -90,6 +181,16 @@ func NewWalletService(repo walletStore, farmers farmerStore, flutter *Flutterwav
 		commissionBasisPoints: commissionBasisPoints,
 		staleDepositAfter:     staleDepositAfter,
 		notify:                notify,
+		staleDepositAfter:     24 * time.Hour,
+	}
+}
+
+// SetStaleDepositAfter sets how long an unsettled funding attempt may wait
+// before the admin report lists it. A zero or negative age keeps the 24-hour
+// default, because a zero threshold would report every pending deposit.
+func (s *WalletService) SetStaleDepositAfter(age time.Duration) {
+	if age > 0 {
+		s.staleDepositAfter = age
 	}
 }
 
@@ -494,6 +595,185 @@ func (s *WalletService) IsAdmin(farmerID int) bool {
 
 	_, ok := s.adminIDs[farmerID]
 	return ok
+}
+
+// AdminIDs returns the current admin set as a sorted copy, so a caller cannot
+// mutate the set the service guards with its own lock.
+func (s *WalletService) AdminIDs() []int {
+	s.adminMu.RLock()
+	defer s.adminMu.RUnlock()
+	ids := make([]int, 0, len(s.adminIDs))
+	for id := range s.adminIDs {
+		ids = append(ids, id)
+	}
+	sort.Ints(ids)
+	return ids
+}
+
+// RefreshAdminIDs merges the accounts flagged in the database into the admin
+// set. Configured IDs are always kept: they are the recovery path when the
+// table is empty or unreadable.
+func (s *WalletService) RefreshAdminIDs(ctx context.Context) error {
+	flagged, err := s.repo.ListAdminIDs(ctx)
+	if err != nil {
+		return err
+	}
+	s.adminMu.Lock()
+	defer s.adminMu.Unlock()
+	next := make(map[int]struct{}, len(s.configuredAdminIDs)+len(flagged))
+	for id := range s.configuredAdminIDs {
+		next[id] = struct{}{}
+	}
+	for _, id := range flagged {
+		if id > 0 {
+			next[id] = struct{}{}
+		}
+	}
+	s.adminIDs = next
+	return nil
+}
+
+// isConfiguredAdmin reports whether the role comes from the environment rather
+// than the database, which is what decides whether the page may revoke it.
+func (s *WalletService) isConfiguredAdmin(farmerID int) bool {
+	s.adminMu.RLock()
+	defer s.adminMu.RUnlock()
+	_, ok := s.configuredAdminIDs[farmerID]
+	return ok
+}
+
+// AdminAccounts lists the accounts allowed to review wallet requests: the ones
+// flagged in the database plus any configured in the environment that have no
+// row of their own. Configured grants are marked so the page does not offer a
+// removal that would not stick.
+func (s *WalletService) AdminAccounts(ctx context.Context) ([]models.AdminAccount, error) {
+	flagged, err := s.repo.ListAdminAccounts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	accounts := make([]models.AdminAccount, len(flagged))
+	index := make(map[int]int, len(flagged))
+	for i, account := range flagged {
+		accounts[i] = account
+		index[account.FarmerID] = i
+	}
+
+	s.adminMu.RLock()
+	configured := make([]int, 0, len(s.configuredAdminIDs))
+	for id := range s.configuredAdminIDs {
+		configured = append(configured, id)
+	}
+	s.adminMu.RUnlock()
+	sort.Ints(configured)
+
+	for _, id := range configured {
+		if i, ok := index[id]; ok {
+			// Already listed from the database: mark why it cannot be removed.
+			accounts[i].FromConfig = true
+			continue
+		}
+		farmer, err := s.farmers.GetByID(id)
+		if err != nil {
+			return nil, err
+		}
+		if farmer == nil {
+			continue
+		}
+		accounts = append(accounts, models.AdminAccount{
+			FarmerID:   farmer.ID,
+			FullName:   farmer.FullName,
+			Phone:      farmer.Phone,
+			FromConfig: true,
+		})
+	}
+	return accounts, nil
+}
+
+// SetAdmin grants or revokes the admin role. Only an admin may change it, and
+// two grants are protected: an actor cannot remove themselves (which could lock
+// the last admin out), and a configured grant cannot be revoked here because
+// the environment would restore it on the next start.
+func (s *WalletService) SetAdmin(ctx context.Context, actorID, targetID int, admin bool) error {
+	if !s.IsAdmin(actorID) {
+		return ErrNotAdmin
+	}
+	if targetID <= 0 {
+		return ErrAdminNotFound
+	}
+	if !admin && targetID == actorID {
+		return ErrAdminSelfRemoval
+	}
+	if !admin && s.isConfiguredAdmin(targetID) {
+		return ErrAdminFromConfig
+	}
+	found, err := s.repo.SetAdmin(ctx, targetID, admin)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return ErrAdminNotFound
+	}
+	// Apply the change to the cached set now, before the redirect lands, so the
+	// page that follows already reflects it.
+	if err := s.RefreshAdminIDs(ctx); err != nil {
+		log.Printf("refresh wallet admins after change: %v", err)
+	}
+	return nil
+}
+
+// SetAdminByPhone is the page's other entry point: an operator knows the
+// account's phone number, not its internal id.
+func (s *WalletService) SetAdminByPhone(ctx context.Context, actorID int, phone string, admin bool) error {
+	if !s.IsAdmin(actorID) {
+		return ErrNotAdmin
+	}
+	phone = strings.TrimSpace(phone)
+	if phone == "" {
+		return ErrAdminPhoneRequired
+	}
+	farmer, err := s.farmers.GetByPhone(phone)
+	if err != nil {
+		return err
+	}
+	if farmer == nil {
+		return ErrAdminNotFound
+	}
+	return s.SetAdmin(ctx, actorID, farmer.ID, admin)
+}
+
+// notifyUser sends one message to one account. Best-effort by design: the money
+// has already moved, so a failed send is logged rather than returned.
+func (s *WalletService) notifyUser(farmerID int, title, message, kind string) {
+	if s.notify == nil || farmerID <= 0 {
+		return
+	}
+	if err := s.notify.CreateNotification(farmerID, title, message, kind); err != nil {
+		log.Printf("notify user %d (%s): %v", farmerID, kind, err)
+	}
+}
+
+// notifyAdminsExcept sends one message to every admin but exceptID. The
+// exception keeps the requester from being told their own request is waiting
+// for them: the self-approval rule means it is not.
+func (s *WalletService) notifyAdminsExcept(exceptID int, title, message, kind string) {
+	for _, id := range s.adminIDsExcept(exceptID) {
+		s.notifyUser(id, title, message, kind)
+	}
+}
+
+// adminIDsExcept copies the admin set without exceptID, so the notification
+// fan-out never holds the admin lock while it talks to the store.
+func (s *WalletService) adminIDsExcept(exceptID int) []int {
+	s.adminMu.RLock()
+	defer s.adminMu.RUnlock()
+	ids := make([]int, 0, len(s.adminIDs))
+	for id := range s.adminIDs {
+		if id != exceptID {
+			ids = append(ids, id)
+		}
+	}
+	sort.Ints(ids)
+	return ids
 }
 
 func (s *WalletService) Wallet(ctx context.Context, farmerID int) (*models.Wallet, []models.WalletTransaction, error) {

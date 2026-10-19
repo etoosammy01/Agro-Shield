@@ -74,10 +74,10 @@ type WalletAdminPageData struct {
 	Withdrawals       []models.Withdrawal
 	Transfers         []models.Transfer
 	PendingDeposits   []models.PendingDeposit
-	Admins            []models.AdminAccount
-	AgedRequests      int
 	StalePending      []models.WalletDeposit
 	StaleAfterHours   int
+	Admins            []models.AdminAccount
+	AgedRequests      int
 	RevenueTotal      string
 	RevenueCount      int
 	CommissionEnabled bool
@@ -723,11 +723,12 @@ func (h *WalletHandler) AdminPage(w http.ResponseWriter, r *http.Request) {
 	for _, withdrawal := range withdrawals {
 		if (withdrawal.Status == models.WithdrawalPending || withdrawal.Status == models.WithdrawalProcessing) &&
 			withdrawal.CreatedAt.Before(agedCutoff) {
-			agedRequests++
+		agedRequests++
 		}
 	}
 	for _, transfer := range transfers {
 		if transfer.Status == models.TransferPending && transfer.CreatedAt.Before(agedCutoff) {
+		if transfer.CreatedAt.Before(agedCutoff) {
 			agedRequests++
 		}
 	}
@@ -936,29 +937,23 @@ func (h *WalletHandler) ReconcileWithdrawal(w http.ResponseWriter, r *http.Reque
 	})
 }
 
-// ReturnWithdrawalToQueue puts a payout that never reached Flutterwave back in
-// the approval queue, so it can be rejected and the reserved funds released.
-func (h *WalletHandler) ReturnWithdrawalToQueue(w http.ResponseWriter, r *http.Request) {
-	h.runAdminWalletAction(w, r, adminWalletAction{
-		idField:      "withdrawal_id",
-		redirectPath: adminWalletPath,
-		failure:      "Could not return the request to the queue. It has a saved Flutterwave transfer, so a payout may be on its way - check the provider before doing anything else. Funds remain reserved.",
-		success:      "Request returned to the queue. Reject it to release the reserved funds.",
-		run: func(ctx context.Context, id int64, adminID int) error {
-			return h.wallet.ReturnWithdrawalToQueue(ctx, id, adminID)
-		},
-	})
-}
+
 
 // RecordTransferID takes the Flutterwave transfer id an admin found in the
 // provider's dashboard and stores it against a payout that never recorded its
 // own, so that payout can then be reconciled.
+// RecordTransferID stores the Flutterwave transfer id an admin found for a
+// payout whose own id was never saved. The id is what settlement matches on, so
+// without it neither the webhook nor reconcile can pay or refund the row.
+
 func (h *WalletHandler) RecordTransferID(w http.ResponseWriter, r *http.Request) {
 	h.runAdminWalletAction(w, r, adminWalletAction{
 		idField:      "withdrawal_id",
 		redirectPath: adminWalletPath,
 		failure:      "Could not record the Flutterwave transfer id. Check the number against the provider's dashboard and try again; funds remain reserved.",
 		success:      "Flutterwave transfer recorded. Check the provider status to settle or refund this payout.",
+		failure:      "Could not record the transfer id. Check it against Flutterwave and confirm the payout is still processing; no funds were moved.",
+		success:      "Transfer id recorded. Check the provider status to settle or refund the payout.",
 		runForm: func(ctx context.Context, id int64, adminID int, form url.Values) error {
 			return h.wallet.RecordProviderTransferID(ctx, id, adminID, form.Get("provider_transfer_id"))
 		},
