@@ -185,7 +185,7 @@ func testVirtualFarmer() *models.Farmer {
 }
 
 func newVirtualAccountService(store *fakeVirtualAccountStore, provider *fakeVirtualAccountProvider, notifier *fakeNotifier) *WalletService {
-	service := NewWalletService(store, nil, nil, nil, nil, 0, notifier, 0)
+	service := NewWalletService(store, nil, nil, nil, nil, 0, notifier)
 	service.virtualAccounts = provider
 	return service
 }

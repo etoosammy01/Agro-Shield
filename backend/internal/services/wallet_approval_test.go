@@ -847,7 +847,7 @@ func (f fakeAdminStore) ListAdminIDs(context.Context) ([]int, error) {
 // which is what a deployment that still sets WALLET_ADMIN_USER_IDS relies on.
 func TestRefreshAdminIDsAddsFlaggedAccountsAndKeepsConfiguredOnes(t *testing.T) {
 	store := fakeAdminStore{flagged: []int{14}}
-	service := NewWalletService(store, nil, nil, nil, []int{2}, 0, nil, 0)
+	service := NewWalletService(store, nil, nil, nil, []int{2}, 0, nil)
 
 	if !service.IsAdmin(2) {
 		t.Fatal("the configured admin was dropped at construction")
@@ -880,7 +880,7 @@ func TestRefreshAdminIDsAddsFlaggedAccountsAndKeepsConfiguredOnes(t *testing.T) 
 }
 
 func TestRefreshAdminIDsReportsAReadFailureWithoutChangingTheSet(t *testing.T) {
-	service := NewWalletService(fakeAdminStore{err: errors.New("connection reset")}, nil, nil, nil, []int{2}, 0, nil, 0)
+	service := NewWalletService(fakeAdminStore{err: errors.New("connection reset")}, nil, nil, nil, []int{2}, 0, nil)
 
 	if err := service.RefreshAdminIDs(context.Background()); err == nil {
 		t.Fatal("RefreshAdminIDs() hid a database failure")
@@ -923,7 +923,7 @@ func (f fakeAdminFarmers) GetByID(id int) (*models.Farmer, error) {
 
 func TestSetAdminRefusesAnyoneWhoIsNotAnAdmin(t *testing.T) {
 	store := &fakeAdminChangeStore{setFound: true}
-	service := NewWalletService(store, nil, nil, nil, nil, 0, nil, 0)
+	service := NewWalletService(store, nil, nil, nil, nil, 0, nil)
 
 	if err := service.SetAdmin(context.Background(), 5, 9, true); !errors.Is(err, ErrNotAdmin) {
 		t.Errorf("SetAdmin() error = %v, want %v", err, ErrNotAdmin)
@@ -933,7 +933,7 @@ func TestSetAdminRefusesAnyoneWhoIsNotAnAdmin(t *testing.T) {
 func TestSetAdminRefusesSelfRemovalAndConfiguredAdmins(t *testing.T) {
 	// Actor and target are flagged in the database, not configured.
 	store := &fakeAdminChangeStore{ids: []int{5}, setFound: true}
-	service := NewWalletService(store, nil, nil, nil, nil, 0, nil, 0)
+	service := NewWalletService(store, nil, nil, nil, nil, 0, nil)
 	if err := service.RefreshAdminIDs(context.Background()); err != nil {
 		t.Fatalf("RefreshAdminIDs() error = %v", err)
 	}
@@ -942,7 +942,7 @@ func TestSetAdminRefusesSelfRemovalAndConfiguredAdmins(t *testing.T) {
 	}
 
 	// A role granted by the environment cannot be revoked from the page.
-	configured := NewWalletService(&fakeAdminChangeStore{setFound: true}, nil, nil, nil, []int{2, 3}, 0, nil, 0)
+	configured := NewWalletService(&fakeAdminChangeStore{setFound: true}, nil, nil, nil, []int{2, 3}, 0, nil)
 	if err := configured.SetAdmin(context.Background(), 2, 3, false); !errors.Is(err, ErrAdminFromConfig) {
 		t.Errorf("removing a configured admin: error = %v, want %v", err, ErrAdminFromConfig)
 	}
@@ -953,7 +953,7 @@ func TestSetAdminByPhoneNarrowsToTheAccount(t *testing.T) {
 		"08012345678": {ID: 9, FullName: "Ada Obi", Phone: "08012345678"},
 	}}
 	store := &fakeAdminChangeStore{ids: []int{5}, setFound: true}
-	service := NewWalletService(store, farmers, nil, nil, nil, 0, nil, 0)
+	service := NewWalletService(store, farmers, nil, nil, nil, 0, nil)
 	if err := service.RefreshAdminIDs(context.Background()); err != nil {
 		t.Fatalf("RefreshAdminIDs() error = %v", err)
 	}
@@ -978,7 +978,7 @@ func TestAdminAccountsListsFlaggedAndConfiguredAdmins(t *testing.T) {
 	farmers := fakeAdminFarmers{byID: map[int]*models.Farmer{
 		2: {ID: 2, FullName: "Ada Obi", Phone: "08012345678"},
 	}}
-	service := NewWalletService(store, farmers, nil, nil, []int{2}, 0, nil, 0)
+	service := NewWalletService(store, farmers, nil, nil, []int{2}, 0, nil)
 
 	accounts, err := service.AdminAccounts(context.Background())
 	if err != nil {
