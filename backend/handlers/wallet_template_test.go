@@ -84,9 +84,13 @@ func TestWalletPageResolvesTransferRecipientAutomatically(t *testing.T) {
 	for _, want := range []string{
 		`id="transfer-recipient" name="recipient"`,
 		`id="transfer-recipient-name" placeholder="Completed after the account is found" readonly`,
-		`id="transfer-submit" disabled`,
+		`id="transfer-start" disabled`,
+		`data-transfer-step="confirm" hidden`,
+		`id="transfer-submit"`,
+		`id="transfer-code" name="code"`,
 		"phone or Agro-Shield wallet number",
-		"We confirm the account name automatically",
+		"Confirm and send for approval",
+		"sent a 6-digit code to the phone number registered on your account",
 		`id="wallet-number"`,
 		"8000000007",
 		`data-copy-target="wallet-number"`,
@@ -97,6 +101,39 @@ func TestWalletPageResolvesTransferRecipientAutomatically(t *testing.T) {
 	}
 	if strings.Contains(body, `id="verify-transfer-recipient"`) {
 		t.Error("the transfer form still renders a separate verify-recipient action")
+	}
+}
+
+func TestWalletPageConfirmsWithdrawalWithOTPBeforeSubmitting(t *testing.T) {
+	data := WalletPageData{
+		Wallet:        &models.Wallet{ID: 1, FarmerID: 7, Balance: "5000.00", Currency: "NGN"},
+		BankName:      "Access Bank",
+		AccountName:   "James Inalegwu",
+		AccountNumber: "0106787237",
+	}
+
+	recorder := httptest.NewRecorder()
+	if err := render.RenderTemplates(recorder, "wallet.html", data); err != nil {
+		t.Fatalf("render wallet.html: %v", err)
+	}
+	body := recorder.Body.String()
+
+	for _, want := range []string{
+		`id="withdrawal-form"`,
+		`id="withdrawal-amount" name="amount"`,
+		`id="withdrawal-start"`,
+		`data-withdrawal-step="confirm" hidden`,
+		`id="withdrawal-code" name="code"`,
+		`id="withdrawal-submit"`,
+		"Confirm and request approval",
+		"sent a 6-digit code to the phone number registered on your account",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the withdrawal form did not render %q", want)
+		}
+	}
+	if strings.Contains(body, ">Send code</button>") {
+		t.Error("the withdrawal form still asks for the passcode before the confirmation step")
 	}
 }
 

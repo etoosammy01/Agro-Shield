@@ -21,18 +21,86 @@ if (connectionStatus) {
   });
 }
 
+// Withdrawal: choose the amount first, then confirm it with a passcode. The
+// code is requested when the confirmation step opens so the sender does not
+// have to press a separate "send code" button first.
+(() => {
+  const form = document.getElementById("withdrawal-form");
+  const amount = document.getElementById("withdrawal-amount");
+  const startButton = document.getElementById("withdrawal-start");
+  const submitButton = document.getElementById("withdrawal-submit");
+  const backButton = document.getElementById("withdrawal-back");
+  const code = document.getElementById("withdrawal-code");
+  const detailsStep = form && form.querySelector('[data-withdrawal-step="details"]');
+  const confirmStep = form && form.querySelector('[data-withdrawal-step="confirm"]');
+  const summaryAmount = form && form.querySelector("[data-withdrawal-summary-amount]");
+  if (!form || !amount || !startButton || !submitButton || !backButton || !code ||
+      !detailsStep || !confirmStep || !summaryAmount) return;
+
+  const formatAmount = () => {
+    const value = Number(amount.value);
+    if (!Number.isFinite(value)) return amount.value;
+    return value.toLocaleString("en-NG", { maximumFractionDigits: 0 });
+  };
+
+  startButton.addEventListener("click", () => {
+    if (!amount.reportValidity()) return;
+
+    summaryAmount.textContent = formatAmount();
+    detailsStep.hidden = true;
+    confirmStep.hidden = false;
+    code.required = true;
+
+    const resendButton = confirmStep.querySelector('[data-otp-purpose="withdrawal"]');
+    if (resendButton && confirmStep.dataset.otpSent !== "true") {
+      confirmStep.dataset.otpSent = "true";
+      resendButton.click();
+    }
+    code.focus();
+  });
+
+  backButton.addEventListener("click", () => {
+    confirmStep.hidden = true;
+    detailsStep.hidden = false;
+    code.required = false;
+    code.value = "";
+    amount.focus();
+  });
+
+  form.addEventListener("submit", (event) => {
+    if (confirmStep.hidden) {
+      event.preventDefault();
+      amount.reportValidity();
+      amount.focus();
+    }
+  });
+})();
+
 // Wallet-to-wallet transfer: the recipient is identified by phone number,
 // Agro-Shield wallet number, or saved bank account number. A successful lookup fills the read-only account
 // name; the server resolves the identifier again when the transfer is submitted,
 // so this confirmation never becomes the authority for where money goes.
 (() => {
+  const form = document.getElementById("transfer-form");
   const recipient = document.getElementById("transfer-recipient");
+  const startButton = document.getElementById("transfer-start");
   const submitButton = document.getElementById("transfer-submit");
+  const backButton = document.getElementById("transfer-back");
   const status = document.getElementById("transfer-recipient-status");
   const name = document.getElementById("transfer-recipient-name");
-  if (!recipient || !submitButton || !status || !name) return;
+  const amount = document.getElementById("transfer-amount");
+  const note = document.getElementById("transfer-note");
+  const code = document.getElementById("transfer-code");
+  const detailsStep = form && form.querySelector('[data-transfer-step="details"]');
+  const confirmStep = form && form.querySelector('[data-transfer-step="confirm"]');
+  const summaryName = form && form.querySelector("[data-transfer-summary-name]");
+  const summaryAmount = form && form.querySelector("[data-transfer-summary-amount]");
+  const summaryNote = form && form.querySelector("[data-transfer-summary-note]");
+  const summaryNoteRow = form && form.querySelector("[data-transfer-summary-note-row]");
+  if (!form || !recipient || !startButton || !submitButton || !backButton ||
+      !status || !name || !amount || !note || !code || !detailsStep || !confirmStep ||
+      !summaryName || !summaryAmount || !summaryNote || !summaryNoteRow) return;
 
-  const form = recipient.closest("form");
   let resolved = false;
   let sequence = 0;
   let lookupTimer = null;
@@ -46,7 +114,7 @@ if (connectionStatus) {
     sequence += 1;
     window.clearTimeout(lookupTimer);
     resolved = false;
-    submitButton.disabled = true;
+    startButton.disabled = true;
     name.value = "";
     name.classList.remove("wallet-input-verified");
     setStatus(message, tone);
@@ -91,7 +159,7 @@ if (connectionStatus) {
       resolved = true;
       name.value = recipientName;
       name.classList.add("wallet-input-verified");
-      submitButton.disabled = false;
+      startButton.disabled = false;
       setStatus("Account name confirmed.", "ok");
     } catch (error) {
       if (current !== sequence) return;
@@ -111,14 +179,56 @@ if (connectionStatus) {
     lookupTimer = window.setTimeout(resolveRecipient, 450);
   });
 
-  if (form) {
-    form.addEventListener("submit", (event) => {
-      if (resolved) return;
-      event.preventDefault();
+  const formatAmount = () => {
+    const value = Number(amount.value);
+    if (!Number.isFinite(value)) return amount.value;
+    return value.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  startButton.addEventListener("click", () => {
+    if (!resolved) {
       setStatus("Wait for the Agro-Shield account name to be confirmed before sending.", "warn");
       recipient.focus();
-    });
-  }
+      return;
+    }
+    if (!recipient.reportValidity() || !amount.reportValidity() || !note.reportValidity()) return;
+
+    summaryName.textContent = name.value;
+    summaryAmount.textContent = formatAmount();
+    const noteText = note.value.trim();
+    summaryNote.textContent = noteText;
+    summaryNoteRow.hidden = noteText === "";
+
+    detailsStep.hidden = true;
+    confirmStep.hidden = false;
+    code.required = true;
+
+    // Send the passcode as soon as the confirmation step opens, rather than
+    // making the sender request it with a separate button first. The resend
+    // button remains available if the message does not arrive.
+    const resendButton = confirmStep.querySelector('[data-otp-purpose="transfer"]');
+    if (resendButton && confirmStep.dataset.otpSent !== "true") {
+      confirmStep.dataset.otpSent = "true";
+      resendButton.click();
+    }
+    code.focus();
+  });
+
+  backButton.addEventListener("click", () => {
+    confirmStep.hidden = true;
+    detailsStep.hidden = false;
+    code.required = false;
+    code.value = "";
+    recipient.focus();
+  });
+
+  form.addEventListener("submit", (event) => {
+    if (confirmStep.hidden) {
+      event.preventDefault();
+      setStatus("Confirm the account name and press Send transfer first.", "warn");
+      recipient.focus();
+    }
+  });
 })();
 
 // Payout details form.

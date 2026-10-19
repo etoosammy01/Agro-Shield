@@ -473,6 +473,50 @@
     gap: 0.65rem;
 }
 
+.wallet-transfer-step {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.wallet-transfer-step[hidden] {
+    display: none;
+}
+
+.wallet-transfer-confirm .wallet-form-heading {
+    margin: 0;
+}
+
+.wallet-transfer-summary {
+    display: grid;
+    gap: 0.55rem;
+    margin: 0;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid #e7eee7;
+    border-radius: 12px;
+    background: #f8fbf8;
+}
+
+.wallet-transfer-summary div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.wallet-transfer-summary dt {
+    color: #6a766d;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.wallet-transfer-summary dd {
+    margin: 0;
+    color: #183d29;
+    font-weight: 800;
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
 .wallet-label {
     margin-top: 0.25rem;
     color: #34483b;
