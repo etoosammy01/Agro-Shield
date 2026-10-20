@@ -278,9 +278,7 @@ func main() {
 	// ============================================================
 
 	emailSender := services.NewBrevoEmailSender(
-		cfg.BrevoSMTPHost,
-		cfg.BrevoSMTPLogin,
-		cfg.BrevoSMTPKey,
+		cfg.BrevoAPIKey,
 		cfg.BrevoFromEmail,
 		cfg.BrevoFromName,
 	)

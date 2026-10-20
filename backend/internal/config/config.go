@@ -14,12 +14,10 @@ import (
 // Config holds all application settings in one place.
 type Config struct {
 	// Welcome email — Brevo SMTP
-	BrevoSMTPHost  string
-	BrevoSMTPLogin string
-	BrevoSMTPKey   string
+	// Welcome email — Brevo API
+	BrevoAPIKey    string
 	BrevoFromEmail string
 	BrevoFromName  string
-
 	// Application
 	Port   string
 	AppEnv string
@@ -100,9 +98,8 @@ func Load() (Config, error) {
 
 	cfg := Config{
 		// Welcome email — Brevo SMTP
-		BrevoSMTPHost:  strings.TrimSpace(os.Getenv("BREVO_SMTP_HOST")),
-		BrevoSMTPLogin: strings.TrimSpace(os.Getenv("BREVO_SMTP_LOGIN")),
-		BrevoSMTPKey:   strings.TrimSpace(os.Getenv("BREVO_SMTP_KEY")),
+		// Welcome email — Brevo API
+		BrevoAPIKey:    strings.TrimSpace(os.Getenv("BREVO_API_KEY")),
 		BrevoFromEmail: strings.TrimSpace(os.Getenv("BREVO_FROM_EMAIL")),
 		BrevoFromName:  strings.TrimSpace(os.Getenv("BREVO_FROM_NAME")),
 

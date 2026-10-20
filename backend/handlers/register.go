@@ -203,6 +203,12 @@ func (h *Register) submitRegistration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Println("User registered successfully as", page.Role)
+	if err := h.emailSender.SendWelcome(
+    	page.Email,
+    	page.FirstName,
+	); err != nil {
+    	log.Printf("welcome email failed: %v", err)
+	}
 
 	// Auto-login: the new account lands straight on the mandatory
 	// Complete Your Profile step instead of a separate /login visit.
