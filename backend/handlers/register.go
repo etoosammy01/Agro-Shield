@@ -64,6 +64,7 @@ func renderRegisterPage(w http.ResponseWriter, status int, page RegisterPageData
 	}
 	if err := render.RenderTemplates(w, "register.html", page); err != nil {
 		log.Println("render error", err)
+
 		// Once a non-200 status has been written we can't send a second
 		// error response, so only do it for the normal case.
 		if status == http.StatusOK {
@@ -102,12 +103,14 @@ func validateRegistration(page *RegisterPageData, password, confirm string) {
 	if page.Country == "" {
 		page.FieldErrors["country"] = "Enter your country."
 	}
+
 	switch {
 	case password == "":
 		page.FieldErrors["password"] = "Create a password."
 	case len(password) < 8:
 		page.FieldErrors["password"] = "Password must be at least 8 characters."
 	}
+
 	if confirm != password {
 		page.FieldErrors["confirm"] = "Passwords don't match."
 	}
@@ -147,6 +150,7 @@ func (h *Register) submitRegistration(w http.ResponseWriter, r *http.Request) {
 	page.State = strings.TrimSpace(r.FormValue("state"))
 	page.LGA = strings.TrimSpace(r.FormValue("lga"))
 	page.Country = strings.TrimSpace(r.FormValue("country"))
+
 	if r.FormValue("role") == "buyer" {
 		page.Role = "buyer"
 	}
@@ -193,8 +197,7 @@ func (h *Register) submitRegistration(w http.ResponseWriter, r *http.Request) {
 			renderRegisterPage(w, http.StatusUnprocessableEntity, page)
 
 		default:
-			// Unexpected failure: log the real cause for developers, but
-			// never show internal error text to the user.
+			// Log the actual error for developers, but don't expose it to users.
 			log.Printf("registration failed: %v", err)
 			page.Error = "Something went wrong on our side. Please try again in a moment."
 			renderRegisterPage(w, http.StatusInternalServerError, page)
@@ -202,12 +205,19 @@ func (h *Register) submitRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Send the welcome email once after successful registration.
 	log.Println("User registered successfully as", page.Role)
-	if err := h.emailSender.SendWelcome(
-    	page.Email,
-    	page.FirstName,
+	log.Printf("Attempting welcome email to %s", page.Email)
+
+	if h.emailSender == nil {
+		log.Println("welcome email failed: emailSender is nil")
+	} else if err := h.emailSender.SendWelcome(
+		page.Email,
+		page.FirstName,
 	); err != nil {
-    	log.Printf("welcome email failed: %v", err)
+		log.Printf("welcome email failed: %v", err)
+	} else {
+		log.Printf("Brevo accepted welcome email request for %s", page.Email)
 	}
 
 	// Auto-login: the new account lands straight on the mandatory
