@@ -64,13 +64,13 @@ type Config struct {
 
 	// OTP delivery — SMS
 	//
-	// SMSProvider selects the transport: "log" writes one-time codes to the
-	// server log (the default, so local development needs no vendor account),
-	// and "termii" sends them over the Termii SMS API.
-	SMSProvider    string
-	TermiiAPIKey   string
-	TermiiSenderID string
-	TermiiBaseURL  string
+	// SMSProvider selects "log" for local development or "otpdev" for SMS
+	// delivery and verification through OTP.dev.
+	SMSProvider      string
+	OTPDevAPIKey     string
+	OTPDevSender     string
+	OTPDevTemplateID string
+	OTPDevBaseURL    string
 }
 
 // LoadDatabaseURL reads only the database URL.
@@ -128,10 +128,11 @@ func Load() (Config, error) {
 		CommissionPercent:       strings.TrimSpace(os.Getenv("COMMISSION_PERCENT")),
 
 		// SMS / OTP
-		SMSProvider:    strings.TrimSpace(os.Getenv("SMS_PROVIDER")),
-		TermiiAPIKey:   strings.TrimSpace(os.Getenv("TERMII_API_KEY")),
-		TermiiSenderID: strings.TrimSpace(os.Getenv("TERMII_SENDER_ID")),
-		TermiiBaseURL:  strings.TrimSpace(os.Getenv("TERMII_BASE_URL")),
+		SMSProvider:      strings.TrimSpace(os.Getenv("SMS_PROVIDER")),
+		OTPDevAPIKey:     strings.TrimSpace(os.Getenv("OTP_DEV_API_KEY")),
+		OTPDevSender:     strings.TrimSpace(os.Getenv("OTP_DEV_SENDER")),
+		OTPDevTemplateID: strings.TrimSpace(os.Getenv("OTP_DEV_TEMPLATE_ID")),
+		OTPDevBaseURL:    strings.TrimSpace(os.Getenv("OTP_DEV_BASE_URL")),
 	}
 
 	rawTrustProxy := strings.TrimSpace(os.Getenv("TRUST_PROXY_HEADERS"))
@@ -185,13 +186,12 @@ func Load() (Config, error) {
 		cfg.AppEnv = "development"
 	}
 
-	// One-time codes go to the server log unless a real SMS provider is selected.
+	// Local development needs no SMS account.
 	if cfg.SMSProvider == "" {
 		cfg.SMSProvider = "log"
 	}
-
-	if cfg.TermiiBaseURL == "" {
-		cfg.TermiiBaseURL = "https://api.ng.termii.com"
+	if cfg.OTPDevBaseURL == "" {
+		cfg.OTPDevBaseURL = "https://api.otp.dev"
 	}
 
 	// Wallet reporting threshold.
@@ -243,18 +243,24 @@ func Load() (Config, error) {
 	// Validate SMS provider configuration.
 	switch cfg.SMSProvider {
 	case "log":
-		// Always available — no credentials required.
-	case "termii":
-		if cfg.TermiiAPIKey == "" {
-			return Config{}, fmt.Errorf("TERMII_API_KEY must not be empty when SMS_PROVIDER=termii")
+		// No provider credentials are needed for local development.
+	case "otpdev":
+		if cfg.OTPDevAPIKey == "" {
+			return Config{}, fmt.Errorf("OTP_DEV_API_KEY must not be empty when SMS_PROVIDER=otpdev")
 		}
-
-		if cfg.TermiiSenderID == "" {
-			return Config{}, fmt.Errorf("TERMII_SENDER_ID must not be empty when SMS_PROVIDER=termii")
+		if cfg.OTPDevSender == "" {
+			return Config{}, fmt.Errorf("OTP_DEV_SENDER must not be empty when SMS_PROVIDER=otpdev")
+		}
+		if cfg.OTPDevTemplateID == "" {
+			return Config{}, fmt.Errorf("OTP_DEV_TEMPLATE_ID must not be empty when SMS_PROVIDER=otpdev")
+		}
+		endpoint, err := url.Parse(cfg.OTPDevBaseURL)
+		if err != nil || endpoint.Scheme != "https" || endpoint.Hostname() == "" || endpoint.User != nil || endpoint.RawQuery != "" || endpoint.Fragment != "" {
+			return Config{}, fmt.Errorf("OTP_DEV_BASE_URL must be an absolute HTTPS URL without credentials, a query or a fragment")
 		}
 	default:
 		return Config{}, fmt.Errorf(
-			"SMS_PROVIDER must be \"log\" or \"termii\", got %q",
+			"SMS_PROVIDER must be \"log\" or \"otpdev\", got %q",
 			cfg.SMSProvider,
 		)
 	}

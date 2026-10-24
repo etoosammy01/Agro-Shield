@@ -71,26 +71,12 @@ type otpStore interface {
 // Passcodes are generated with crypto/rand, stored only as bcrypt hashes, and
 // are single-use with a short expiry.
 type OTPService struct {
-	repo otpStore
-	sms  SMSSender
+	repo     otpStore
+	provider OTPProvider
 }
 
-func NewOTPService(repo *repository.OTPRepository, sms SMSSender) *OTPService {
-	return &OTPService{repo: repo, sms: sms}
-}
-
-// otpPurposeLabel is the human-readable name used in the SMS body.
-func otpPurposeLabel(purpose string) string {
-	switch purpose {
-	case models.OTPPurposeWithdrawal:
-		return "withdrawal"
-	case models.OTPPurposeTransfer:
-		return "transfer"
-	case models.OTPPurposePasswordReset:
-		return "password reset"
-	default:
-		return "verification"
-	}
+func NewOTPService(repo *repository.OTPRepository, provider OTPProvider) *OTPService {
+	return &OTPService{repo: repo, provider: provider}
 }
 
 // generateOTPCode returns a uniformly random otpCodeLength-digit code.
@@ -168,11 +154,7 @@ func (s *OTPService) Issue(ctx context.Context, farmerID int, phone, purpose str
 		return fmt.Errorf("store one-time passcode: %w", err)
 	}
 
-	message := fmt.Sprintf(
-		"Your Agro-Shield %s code is %s. It expires in %d minutes. Never share this code with anyone.",
-		otpPurposeLabel(purpose), code, int(otpTTL.Minutes()),
-	)
-	if err := s.sms.Send(recipient, message); err != nil {
+	if err := s.provider.Send(ctx, recipient, code, purpose); err != nil {
 		return fmt.Errorf("send one-time passcode: %w", err)
 	}
 	return nil
@@ -211,7 +193,16 @@ func (s *OTPService) Verify(ctx context.Context, farmerID int, purpose, code str
 
 	// bcrypt's comparison is constant-time, so a wrong code leaks nothing about
 	// how close it was.
-	if err := bcrypt.CompareHashAndPassword([]byte(active.CodeHash), []byte(code)); err != nil {
+	verificationErr := bcrypt.CompareHashAndPassword([]byte(active.CodeHash), []byte(code))
+	if verificationErr == nil {
+		// Use the phone stored with this challenge, never a number supplied by
+		// the verification request. An outage must not bypass provider checks.
+		verificationErr = s.provider.Verify(ctx, active.Phone, code)
+		if verificationErr != nil && !errors.Is(verificationErr, ErrOTPInvalid) {
+			return fmt.Errorf("verify one-time passcode with provider: %w", verificationErr)
+		}
+	}
+	if verificationErr != nil {
 		// Snapshot the count before recording the failure: the repository may
 		// hand back a struct it later mutates, and this must not depend on that.
 		attempts := active.Attempts
@@ -228,6 +219,9 @@ func (s *OTPService) Verify(ctx context.Context, farmerID int, purpose, code str
 	}
 
 	if err := s.repo.Consume(ctx, active.ID); err != nil {
+		if errors.Is(err, repository.ErrNoActiveOTP) {
+			return ErrOTPUnavailable
+		}
 		return fmt.Errorf("consume one-time passcode: %w", err)
 	}
 	return nil

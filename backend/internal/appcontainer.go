@@ -79,7 +79,7 @@ func NewContainer(
 	walletRepo *repository.WalletRepository,
 	bankLookupRepo *repository.BankLookupRepository,
 	otpRepo *repository.OTPRepository,
-	smsSender services.SMSSender,
+	otpProvider services.OTPProvider,
 	flutterwaveClient *services.FlutterwaveClient,
 	feedbackRepo *repository.FeedbackRepository,
 	walletAdminIDs []int,
@@ -157,7 +157,7 @@ func NewContainer(
 	// One-time passcodes guard password resets and wallet payouts. The
 	// transport is chosen by config, so local development can run with the
 	// log-only sender and no SMS account.
-	otpService := services.NewOTPService(otpRepo, smsSender)
+	otpService := services.NewOTPService(otpRepo, otpProvider)
 
 	feedbackService := services.NewFeedbackService(
 		feedbackRepo,

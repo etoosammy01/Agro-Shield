@@ -217,20 +217,16 @@ func main() {
 	}
 
 	// ============================================================
-	// CREATE SMS SENDER          ← added
+	// CREATE OTP PROVIDER
 	//
-	// Delivers one-time passcodes. SMS_PROVIDER=log (the default)
-	// prints codes to the server log so development needs no SMS
-	// account; SMS_PROVIDER=termii sends real messages and requires
-	// TERMII_API_KEY and TERMII_SENDER_ID.
+	// SMS_PROVIDER=log writes codes to the development log.
+	// SMS_PROVIDER=otpdev sends and verifies codes through OTP.dev.
 	// ============================================================
 
-	smsSender := services.NewSMSSender(
-		cfg.SMSProvider,
-		cfg.TermiiAPIKey,
-		cfg.TermiiSenderID,
-		cfg.TermiiBaseURL,
-	)
+	var otpProvider services.OTPProvider = services.LogOTPProvider{}
+	if cfg.SMSProvider == "otpdev" {
+		otpProvider = services.NewOTPDevProvider(cfg.OTPDevAPIKey, cfg.OTPDevSender, cfg.OTPDevTemplateID, cfg.OTPDevBaseURL)
+	}
 	if cfg.SMSProvider == "log" && cfg.AppEnv != "development" {
 		log.Printf("WARNING: SMS_PROVIDER=log in %s — one-time passcodes are being written to this log instead of being sent, and anyone with log access can read them", cfg.AppEnv)
 	}
@@ -265,7 +261,7 @@ func main() {
 		walletRepo,
 		bankLookupRepo,
 		otpRepo,
-		smsSender,
+		otpProvider,
 		flutterwaveClient,
 		feedbackRepo,
 		walletAdminIDs,

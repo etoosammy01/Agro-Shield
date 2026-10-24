@@ -78,15 +78,25 @@ func (r *OTPRepository) IncrementAttempts(ctx context.Context, id int64) error {
 	return err
 }
 
-// Consume marks a code used. The consumed_at IS NULL guard makes this
-// idempotent-safe: a code can only ever be spent once, even if two requests
-// race.
+// Consume atomically spends an unexpired code. A concurrent verifier must
+// observe failure if another request already consumed it.
 func (r *OTPRepository) Consume(ctx context.Context, id int64) error {
-	_, err := r.db.ExecContext(ctx, `
-		UPDATE otp_codes SET consumed_at = $1 WHERE id = $2 AND consumed_at IS NULL`,
+	result, err := r.db.ExecContext(ctx, `
+		UPDATE otp_codes SET consumed_at = $1
+		WHERE id = $2 AND consumed_at IS NULL AND expires_at > $1`,
 		time.Now(), id,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count != 1 {
+		return ErrNoActiveOTP
+	}
+	return nil
 }
 
 // CountIssuedSince powers the issuance rate limit.
