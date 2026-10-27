@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,236 +13,191 @@ import (
 	"time"
 )
 
+// OTPDevProvider sends and verifies Agro-Shield's generated codes through OTP.dev.
+// Local verification retains the user/purpose binding, expiry, and single-use rules.
 type OTPDevProvider struct {
-	apiKey     string
-	sender     string
-	templateID string
-	baseURL    string
-	client     *http.Client
+	apiKey, sender, templateID, baseURL string
+	client                              *http.Client
 }
 
-func NewOTPDevProvider(
-	apiKey, sender, templateID, baseURL string,
-) *OTPDevProvider {
+var _ OTPProvider = (*OTPDevProvider)(nil)
+
+func NewOTPDevProvider(apiKey, sender, templateID, baseURL string) (*OTPDevProvider, error) {
+	apiKey = strings.TrimSpace(apiKey)
+	sender = strings.TrimSpace(sender)
+	templateID = strings.TrimSpace(templateID)
 	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if apiKey == "" || sender == "" || templateID == "" {
+		return nil, errors.New("OTP.dev API key, sender, and template ID are required")
+	}
 	if baseURL == "" {
-		baseURL = "https://api.otp.dev"
+		baseURL = "https://api.otp.dev/v1"
 	}
-
+	u, err := url.Parse(baseURL)
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+		return nil, errors.New("OTP.dev base URL must be an absolute HTTP(S) URL without credentials, query, or fragment")
+	}
+	baseURL = strings.TrimSuffix(baseURL, "/v1") + "/v1"
 	return &OTPDevProvider{
-		apiKey:     strings.TrimSpace(apiKey),
-		sender:     strings.TrimSpace(sender),
-		templateID: strings.TrimSpace(templateID),
-		baseURL:    baseURL,
+		apiKey: apiKey, sender: sender, templateID: templateID, baseURL: baseURL,
 		client: &http.Client{
-			Timeout: 15 * time.Second,
+			Timeout: 10 * time.Second,
+			// Do not forward the API key or resend a code to a redirect target.
+			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 		},
-	}
+	}, nil
 }
 
-// normalizeOTPPhone removes formatting and converts a Nigerian local
-// number beginning with 0 to its international 234 format.
-func normalizeOTPPhone(phone string) string {
-	var digits strings.Builder
-
-	for _, r := range phone {
-		if r >= '0' && r <= '9' {
-			digits.WriteRune(r)
-		}
+func (d *OTPDevProvider) Send(ctx context.Context, phone, code, purpose string) error {
+	if d == nil || d.client == nil {
+		return errors.New("OTP.dev delivery is not configured")
 	}
-
-	result := digits.String()
-	if strings.HasPrefix(result, "0") {
-		result = "234" + result[1:]
+	normalized := NormalizeNigerianPhone(phone)
+	if normalized == "" {
+		return errors.New("a valid Nigerian phone number is required for OTP.dev delivery")
 	}
-
-	return result
-}
-
-func validOTPCode(code string) bool {
-	if len(code) < 4 || len(code) > 8 {
-		return false
-	}
-
-	for _, r := range code {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-
-	return true
-}
-
-func (p *OTPDevProvider) request(
-	ctx context.Context,
-	method string,
-	endpoint string,
-	payload []byte,
-) ([]byte, error) {
-	if p == nil {
-		return nil, fmt.Errorf("OTP.dev provider is nil")
-	}
-	if p.apiKey == "" {
-		return nil, fmt.Errorf("OTP.dev API key is not configured")
-	}
-
-	var body io.Reader
-	if len(payload) > 0 {
-		body = bytes.NewReader(payload)
-	}
-
-	req, err := http.NewRequestWithContext(
-		ctx,
-		method,
-		endpoint,
-		body,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("create OTP.dev request: %w", err)
-	}
-
-	req.Header.Set("X-OTP-Key", p.apiKey)
-	req.Header.Set("Accept", "application/json")
-
-	if len(payload) > 0 {
-		req.Header.Set("Content-Type", "application/json")
-	}
-
-	client := p.client
-	if client == nil {
-		client = &http.Client{Timeout: 15 * time.Second}
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("contact OTP.dev: %w", err)
-	}
-	defer resp.Body.Close()
-
-	responseBody, readErr := io.ReadAll(
-		io.LimitReader(resp.Body, 4096),
-	)
-	if readErr != nil {
-		return nil, fmt.Errorf("read OTP.dev response: %w", readErr)
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf(
-			"OTP.dev request failed (HTTP %d): %s",
-			resp.StatusCode,
-			strings.TrimSpace(string(responseBody)),
-		)
-	}
-
-	return responseBody, nil
-}
-
-// Send delivers the application-generated OTP through OTP.dev.
-func (p *OTPDevProvider) Send(
-	ctx context.Context,
-	phone, code, purpose string,
-) error {
-	_ = purpose // The configured OTP.dev template handles message content.
-
-	if p == nil {
-		return fmt.Errorf("OTP.dev provider is nil")
-	}
-	if p.apiKey == "" || p.sender == "" || p.templateID == "" {
-		return fmt.Errorf("OTP.dev configuration is incomplete")
-	}
-	if !validOTPCode(code) {
-		return fmt.Errorf("OTP code must contain 4 to 8 digits")
-	}
-
-	phone = normalizeOTPPhone(phone)
+	phone = otpDevPhone(normalized)
 	if phone == "" {
-		return fmt.Errorf("recipient phone number is invalid")
+		return errors.New("could not convert the phone number to international format")
+	}
+	if !isWellFormedOTPCode(code) {
+		return errors.New("OTP.dev delivery requires a six-digit code")
 	}
 
-	payload := struct {
+	// Supplying our own code keeps the SMS identical to the hash stored by
+	// OTPService. Verified against OTP.dev: it returns 201 for this payload.
+	payload, err := json.Marshal(map[string]any{"data": map[string]string{
+		"channel": "sms", "sender": d.sender, "phone": phone,
+		"template": d.templateID, "code": code,
+	}})
+	if err != nil {
+		return fmt.Errorf("encode OTP.dev request: %w", err)
+	}
+	responseBody, err := d.request(ctx, http.MethodPost, d.baseURL+"/verifications", payload)
+	if err != nil {
+		return err
+	}
+
+	// OTP.dev wraps the confirmation in a "data" object.
+	var result struct {
 		Data struct {
-			Channel  string `json:"channel"`
-			Sender   string `json:"sender"`
-			Phone    string `json:"phone"`
-			Template string `json:"template"`
-			Code     string `json:"code"`
+			MessageID string `json:"message_id"`
+			Phone     string `json:"phone"`
 		} `json:"data"`
-	}{}
-
-	payload.Data.Channel = "sms"
-	payload.Data.Sender = p.sender
-	payload.Data.Phone = phone
-	payload.Data.Template = p.templateID
-	payload.Data.Code = code
-
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("prepare OTP.dev request: %w", err)
 	}
-
-	endpoint := p.baseURL + "/v1/verifications"
-	_, err = p.request(ctx, http.MethodPost, endpoint, body)
-	if err != nil {
-		return fmt.Errorf("send OTP: %w", err)
+	if err := json.Unmarshal(responseBody, &result); err != nil ||
+		strings.TrimSpace(result.Data.MessageID) == "" ||
+		otpDevDigits(result.Data.Phone) != phone {
+		return errors.New("OTP.dev returned an invalid delivery confirmation")
 	}
-
 	return nil
 }
 
-// Verify checks the code against OTP.dev's verification records.
-func (p *OTPDevProvider) Verify(
-	ctx context.Context,
-	phone, code string,
-) error {
-	if p == nil {
-		return fmt.Errorf("OTP.dev provider is nil")
+// Verify checks the code against OTP.dev in addition to OTPService's local checks.
+func (d *OTPDevProvider) Verify(ctx context.Context, phone, code string) error {
+	if !isWellFormedOTPCode(code) {
+		return ErrOTPInvalid
 	}
-	if !validOTPCode(code) {
-		return fmt.Errorf("OTP code must contain 4 to 8 digits")
-	}
-
-	phone = normalizeOTPPhone(phone)
+	phone = otpDevPhone(NormalizeNigerianPhone(phone))
 	if phone == "" {
-		return fmt.Errorf("recipient phone number is invalid")
+		return ErrOTPUnusablePhone
 	}
-
-	endpoint, err := url.Parse(
-		p.baseURL + "/v1/verifications",
-	)
+	if d == nil || d.client == nil {
+		return errors.New("OTP.dev delivery is not configured")
+	}
+	endpoint, err := url.Parse(d.baseURL + "/verifications")
 	if err != nil {
-		return fmt.Errorf("prepare OTP verification URL: %w", err)
+		return errors.New("could not create OTP.dev verification URL")
 	}
-
 	query := endpoint.Query()
-	query.Set("code", code)
 	query.Set("phone", phone)
+	query.Set("code", code)
 	endpoint.RawQuery = query.Encode()
-
-	responseBody, err := p.request(
-		ctx,
-		http.MethodGet,
-		endpoint.String(),
-		nil,
-	)
+	responseBody, err := d.request(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
-		return fmt.Errorf("verify OTP: %w", err)
+		return err
 	}
-
 	var result struct {
 		Data []struct {
 			Phone string `json:"phone"`
 		} `json:"data"`
 	}
-
 	if err := json.Unmarshal(responseBody, &result); err != nil {
-		return fmt.Errorf("decode OTP.dev verification response: %w", err)
+		return errors.New("OTP.dev returned an invalid verification response")
 	}
-
 	for _, item := range result.Data {
-		if normalizeOTPPhone(item.Phone) == phone {
+		if otpDevDigits(item.Phone) == phone {
 			return nil
 		}
 	}
+	return ErrOTPInvalid
+}
 
-	return fmt.Errorf("invalid OTP code")
+func (d *OTPDevProvider) request(ctx context.Context, method, endpoint string, payload []byte) ([]byte, error) {
+	if d == nil || d.client == nil {
+		return nil, errors.New("OTP.dev delivery is not configured")
+	}
+	request, err := http.NewRequestWithContext(ctx, method, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return nil, errors.New("could not create OTP.dev request")
+	}
+	request.Header.Set("X-OTP-Key", d.apiKey)
+	request.Header.Set("Accept", "application/json")
+	if len(payload) > 0 {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	response, err := d.client.Do(request)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, errors.New("OTP.dev request failed")
+	}
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(response.Body, 64<<10))
+	if err != nil {
+		return nil, errors.New("could not read OTP.dev response")
+	}
+
+	// Provider errors can echo the request, including the code and phone, so
+	// only the numeric error code is surfaced (e.g. 1136 not authorized,
+	// 1512 invalid template, 1620 missing sender).
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		var apiErr struct {
+			Errors []struct {
+				Code any `json:"code"`
+			} `json:"errors"`
+		}
+		_ = json.Unmarshal(body, &apiErr)
+		if len(apiErr.Errors) > 0 {
+			return nil, fmt.Errorf("OTP.dev rejected request (HTTP %d, code %v)", response.StatusCode, apiErr.Errors[0].Code)
+		}
+		return nil, fmt.Errorf("OTP.dev rejected request (HTTP %d)", response.StatusCode)
+	}
+	return body, nil
+}
+
+// otpDevPhone converts any common way of writing a Nigerian mobile number to
+// the digits-only international form OTP.dev expects (e.g. 2349060904492).
+// It returns "" for anything that is not a valid Nigerian mobile number.
+func otpDevPhone(input string) string {
+	d := otpDevDigits(input)
+	d = strings.TrimPrefix(d, "00") // international dialing prefix
+	d = strings.TrimPrefix(d, "234")
+	d = strings.TrimPrefix(d, "0") // local trunk zero, also after +234
+	// Nigerian mobile numbers are 10 digits starting with 7, 8 or 9.
+	if len(d) != 10 || d[0] < '7' || d[0] > '9' {
+		return ""
+	}
+	return "234" + d
+}
+
+func otpDevDigits(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r >= '0' && r <= '9' {
+			return r
+		}
+		return -1
+	}, s)
 }

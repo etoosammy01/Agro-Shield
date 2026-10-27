@@ -11,6 +11,14 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// OTP.dev delivery settings are built into the application. Only the API key
+// is supplied by the environment.
+const (
+	otpDevSender     = "AgroShield"
+	otpDevTemplateID = "" // Set to the template ID from the OTP.dev account.
+	otpDevBaseURL    = "https://api.otp.dev"
+)
+
 // Config holds all application settings in one place.
 type Config struct {
 	// Welcome email — Brevo SMTP
@@ -129,10 +137,14 @@ func Load() (Config, error) {
 
 		// SMS / OTP
 		SMSProvider:      strings.TrimSpace(os.Getenv("SMS_PROVIDER")),
-		OTPDevAPIKey:     strings.TrimSpace(os.Getenv("OTP_DEV_API_KEY")),
-		OTPDevSender:     strings.TrimSpace(os.Getenv("OTP_DEV_SENDER")),
-		OTPDevTemplateID: strings.TrimSpace(os.Getenv("OTP_DEV_TEMPLATE_ID")),
-		OTPDevBaseURL:    strings.TrimSpace(os.Getenv("OTP_DEV_BASE_URL")),
+		OTPDevAPIKey:     strings.TrimSpace(os.Getenv("OTPDEV_API_KEY")),
+		OTPDevSender:     otpDevSender,
+		OTPDevTemplateID: otpDevTemplateID,
+		OTPDevBaseURL:    otpDevBaseURL,
+	}
+	// Accept the previous API key name for existing deployments.
+	if cfg.OTPDevAPIKey == "" {
+		cfg.OTPDevAPIKey = strings.TrimSpace(os.Getenv("OTP_DEV_API_KEY"))
 	}
 
 	rawTrustProxy := strings.TrimSpace(os.Getenv("TRUST_PROXY_HEADERS"))
@@ -186,12 +198,12 @@ func Load() (Config, error) {
 		cfg.AppEnv = "development"
 	}
 
-	// Local development needs no SMS account.
+	// An API key enables OTP.dev automatically; development without a key uses logs.
 	if cfg.SMSProvider == "" {
 		cfg.SMSProvider = "log"
-	}
-	if cfg.OTPDevBaseURL == "" {
-		cfg.OTPDevBaseURL = "https://api.otp.dev"
+		if cfg.OTPDevAPIKey != "" {
+			cfg.SMSProvider = "otpdev"
+		}
 	}
 
 	// Wallet reporting threshold.
@@ -246,17 +258,13 @@ func Load() (Config, error) {
 		// No provider credentials are needed for local development.
 	case "otpdev":
 		if cfg.OTPDevAPIKey == "" {
-			return Config{}, fmt.Errorf("OTP_DEV_API_KEY must not be empty when SMS_PROVIDER=otpdev")
+			return Config{}, fmt.Errorf("OTPDEV_API_KEY must not be empty when SMS_PROVIDER=otpdev")
 		}
 		if cfg.OTPDevSender == "" {
-			return Config{}, fmt.Errorf("OTP_DEV_SENDER must not be empty when SMS_PROVIDER=otpdev")
+			return Config{}, fmt.Errorf("OTP.dev sender must be set in backend/internal/config/config.go")
 		}
 		if cfg.OTPDevTemplateID == "" {
-			return Config{}, fmt.Errorf("OTP_DEV_TEMPLATE_ID must not be empty when SMS_PROVIDER=otpdev")
-		}
-		endpoint, err := url.Parse(cfg.OTPDevBaseURL)
-		if err != nil || endpoint.Scheme != "https" || endpoint.Hostname() == "" || endpoint.User != nil || endpoint.RawQuery != "" || endpoint.Fragment != "" {
-			return Config{}, fmt.Errorf("OTP_DEV_BASE_URL must be an absolute HTTPS URL without credentials, a query or a fragment")
+			return Config{}, fmt.Errorf("OTP.dev template ID must be set in backend/internal/config/config.go")
 		}
 	default:
 		return Config{}, fmt.Errorf(

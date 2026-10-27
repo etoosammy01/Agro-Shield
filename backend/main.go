@@ -225,7 +225,10 @@ func main() {
 
 	var otpProvider services.OTPProvider = services.LogOTPProvider{}
 	if cfg.SMSProvider == "otpdev" {
-		otpProvider = services.NewOTPDevProvider(cfg.OTPDevAPIKey, cfg.OTPDevSender, cfg.OTPDevTemplateID, cfg.OTPDevBaseURL)
+		otpProvider, err = services.NewOTPDevProvider(cfg.OTPDevAPIKey, cfg.OTPDevSender, cfg.OTPDevTemplateID, cfg.OTPDevBaseURL)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 	if cfg.SMSProvider == "log" && cfg.AppEnv != "development" {
 		log.Printf("WARNING: SMS_PROVIDER=log in %s — one-time passcodes are being written to this log instead of being sent, and anyone with log access can read them", cfg.AppEnv)

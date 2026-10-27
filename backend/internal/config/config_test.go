@@ -9,8 +9,39 @@ func setValidTestEnvironment(t *testing.T) {
 	t.Setenv("GROQ_API_KEY", "test-key")
 	t.Setenv("PAYMENT_REDIRECT_URL", "https://example.test/payment/callback")
 	t.Setenv("SMS_PROVIDER", "log")
+	t.Setenv("OTPDEV_API_KEY", "")
+	t.Setenv("OTP_DEV_API_KEY", "")
 	t.Setenv("TRUST_PROXY_HEADERS", "")
 	t.Setenv("TRUSTED_PROXY_CIDRS", "")
+}
+
+func TestLoadRecognizesOTPAPIKeyNames(t *testing.T) {
+	for _, name := range []string{"OTPDEV_API_KEY", "OTP_DEV_API_KEY"} {
+		t.Run(name, func(t *testing.T) {
+			setValidTestEnvironment(t)
+			// Log mode lets us check API key loading independently of account settings.
+			t.Setenv(name, " test-otp-key ")
+			cfg, err := Load()
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if cfg.OTPDevAPIKey != "test-otp-key" {
+				t.Fatal("OTP API key was not loaded from " + name)
+			}
+		})
+	}
+}
+
+func TestLoadDefaultsToLogWithoutOTPAPIKey(t *testing.T) {
+	setValidTestEnvironment(t)
+	t.Setenv("SMS_PROVIDER", "")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.SMSProvider != "log" {
+		t.Fatalf("SMSProvider = %q, want log", cfg.SMSProvider)
+	}
 }
 
 func TestLoadRejectsForwardedHeadersWithoutTrustedProxyNetworks(t *testing.T) {
