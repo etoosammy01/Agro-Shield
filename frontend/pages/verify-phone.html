@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/static/assets/favicon_io/favicon-32x32.png">
+    <title>Verify Your Phone | Agro-Shield</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/register.css">
+    <link rel="stylesheet" href="/static/css/register-extra.css">
+    <link rel="stylesheet" href="/static/css/complete-profile.css">
+</head>
+<body>
+<main class="auth-container complete-profile-container">
+    <section class="auth-right complete-profile-panel">
+        <div class="auth-form-wrapper">
+            <img class="auth-brand" src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield">
+            <p class="onboarding-step">Complete registration · Step 2 of 2</p>
+            <h2>Verify your phone number</h2>
+            <p class="complete-profile-subtitle">Verify the phone number you registered with. After verification, you'll log in to continue.</p>
+            {{if .Error}}<p class="message" role="alert">{{.Error}}</p>{{end}}
+            {{if .Success}}<p class="onboarding-status" role="status">{{.Success}}</p>{{end}}
+            <form action="/verify-phone" method="POST">
+                <input type="hidden" name="action" value="send_code">
+                <div class="form-group">
+                    <label for="registered-phone">Registered phone number</label>
+                    <input id="registered-phone" type="tel" value="{{.Phone}}" readonly>
+                </div>
+                <button type="submit" class="secondary-button">{{if .CodeSent}}Resend code{{else}}Send code{{end}}</button>
+            </form>
+            <form action="/verify-phone" method="POST" class="phone-code-form">
+                <input type="hidden" name="action" value="verify_code">
+                <div class="form-group">
+                    <label for="verification-code">Verification code</label>
+                    <input id="verification-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code"
+                           maxlength="6" minlength="6" pattern="[0-9]{6}" placeholder="6-digit code" required>
+                </div>
+                <button type="submit">Verify and proceed to login</button>
+            </form>
+            <a class="onboarding-exit" href="/logout">Log out</a>
+        </div>
+    </section>
+</main>
+<script src="/static/js/verify-phone.js"></script>
+</body>
+</html>

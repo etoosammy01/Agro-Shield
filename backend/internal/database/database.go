@@ -998,6 +998,9 @@ CREATE INDEX IF NOT EXISTS idx_otp_codes_created_at ON otp_codes(created_at);
 `); err != nil {
 		return fmt.Errorf("otp migration: %w", err)
 	}
+	if err := RunOnboardingMigration(db); err != nil {
+		return err
+	}
 
 	// -------------------------------------------------------------------------
 	// 14. BANK ACCOUNT LOOKUPS
@@ -1042,5 +1045,27 @@ CREATE INDEX IF NOT EXISTS idx_deliveries_crop_status ON deliveries(crop_id, sta
 	}
 
 	log.Println("✅ Agro-Shield fresh PostgreSQL schema created successfully")
+	return nil
+}
+
+// RunOnboardingMigration upgrades existing accounts without treating old
+// uploaded pictures or phone numbers as completed verification steps.
+func RunOnboardingMigration(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("onboarding migration: %w", err)
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`ALTER TABLE farmers
+		ADD COLUMN IF NOT EXISTS selfie_captured_at TIMESTAMP,
+		ADD COLUMN IF NOT EXISTS phone_verified_at TIMESTAMP;
+		ALTER TABLE otp_codes DROP CONSTRAINT IF EXISTS otp_codes_purpose_check;
+		ALTER TABLE otp_codes ADD CONSTRAINT otp_codes_purpose_check
+		CHECK (purpose IN ('withdrawal','transfer','password_reset','phone_verification'));`); err != nil {
+		return fmt.Errorf("onboarding migration: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("onboarding migration: %w", err)
+	}
 	return nil
 }

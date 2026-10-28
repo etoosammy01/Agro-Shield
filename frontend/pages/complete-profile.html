@@ -1,132 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-      <link rel="apple-touch-icon" sizes="180x180" href="static/assets/favicon_io/apple-touch-icon.png">
-      <link rel="icon" type="image/png" sizes="32x32" href="static/assets/favicon_io/favicon-32x32.png">
-      <link rel="icon" type="image/png" sizes="16x16" href="static/assets/favicon_io/favicon-16x16.png">
-      <link rel="manifest" href="static/assets/favicon_io/site.webmanifest">
-
-
-      <title>Complete Your Profile | Agro-Shield</title>
-
-      <link rel="stylesheet" href="/static/css/style.css">
-      <link rel="stylesheet" href="/static/css/register.css">
-      <link rel="stylesheet" href="/static/css/register-extra.css">
-      <link rel="stylesheet" href="/static/css/complete-profile.css">
-
-      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/static/assets/favicon_io/favicon-32x32.png">
+    <title>Take a Selfie | Agro-Shield</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/register.css">
+    <link rel="stylesheet" href="/static/css/register-extra.css">
+    <link rel="stylesheet" href="/static/css/complete-profile.css">
 </head>
-
 <body>
-
-      <main class="auth-container complete-profile-container">
-
-            <section class="auth-right complete-profile-panel">
-
-                  <div class="auth-form-wrapper">
-
-                        <img class="auth-brand" src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield">
-
-                        <form id="complete-profile-form" action="/complete-profile" method="POST"
-                              enctype="multipart/form-data">
-
-                              <h2>Complete your profile</h2>
-
-                              <p class="complete-profile-subtitle">
-                                    {{if .IsBuyer}}
-                                    A photo is required so farmers know who they're dealing with.
-                                    {{else}}
-                                    A photo is required so buyers know who they're dealing with.
-                                    {{end}}
-                              </p>
-
-                              {{if .Error}}
-                              <p class="message">{{.Error}}</p>
-                              {{end}}
-
-
-                              <!-- PROFILE PICTURE -->
-                              <div class="photo-upload-block">
-
-                                    <div class="photo-preview" id="photo-preview">
-                                          <i class="fa-solid fa-camera"></i>
-                                    </div>
-
-                                    <label class="photo-upload-button" for="profile-picture">
-                                          Upload photo
-                                    </label>
-
-                                    <input id="profile-picture" name="profile_picture" type="file" accept="image/*"
-                                          required>
-
-                                    <p class="photo-required-hint">Required to continue</p>
-
-                              </div>
-
-
-                              {{if not .IsBuyer}}
-
-                              <!-- PAYOUT DETAILS (farmers only, optional) -->
-                              <div class="payout-section">
-
-                                    <div class="payout-heading">
-                                          <i class="fa-solid fa-building-columns"></i>
-                                          <span>Payout details</span>
-                                          <span class="optional-badge">Optional</span>
-                                    </div>
-
-                                    <p class="payout-hint">
-                                          Used for approved wallet withdrawals. You can add or update these details
-                                          later from your wallet.
-                                    </p>
-
-                                    <div class="form-group">
-                                          <label for="bank-name">Bank name</label>
-                                          <input type="text" name="bank-name" id="bank-name">
-                                    </div>
-
-                                    <div class="form-group">
-                                          <label for="bank-code">Flutterwave bank code</label>
-                                          <input type="text" name="bank-code" id="bank-code">
-                                    </div>
-
-                                    <div class="form-group">
-                                          <label for="account-name">Account name</label>
-                                          <input type="text" name="account-name" id="account-name"
-                                                placeholder="Name on the account">
-                                    </div>
-
-                                    <div class="form-group">
-                                          <label for="account-number">Account number</label>
-                                          <input type="text" name="account-number" id="account-number"
-                                                placeholder="10-digit NUBAN number" inputmode="numeric" maxlength="10"
-                                                pattern="[0-9]{10}">
-                                    </div>
-
-                              </div>
-
-                              {{end}}
-
-
-                              <button type="submit" id="continue-button" disabled>
-                                    Continue
-                              </button>
-
-                        </form>
-
-                  </div>
-
-            </section>
-
-      </main>
-
-
-      <script src="/static/js/complete-profile.js"></script>
-
+<main class="auth-container complete-profile-container">
+    <section class="auth-right complete-profile-panel">
+        <div class="auth-form-wrapper">
+            <img class="auth-brand" src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield">
+            <form id="complete-profile-form" action="/complete-profile" method="POST" enctype="multipart/form-data">
+                <p class="onboarding-step">Complete registration · Step 1 of 2</p>
+                <h2>Take a selfie</h2>
+                <p class="complete-profile-subtitle">Allow camera access and take a clear photo of your face. This will be your profile picture.</p>
+                {{if .Error}}<p class="message" role="alert">{{.Error}}</p>{{end}}
+                <div class="selfie-camera">
+                    <video id="selfie-video" autoplay muted playsinline aria-label="Live camera preview"></video>
+                    <img id="selfie-preview" alt="Your captured selfie" hidden>
+                </div>
+                <p id="camera-status" class="onboarding-status" role="status" aria-live="polite">Opening your camera…</p>
+                <div class="selfie-actions">
+                    <button type="button" id="capture-button" class="secondary-button" disabled>Take selfie</button>
+                    <button type="button" id="retake-button" class="secondary-button" hidden>Retake</button>
+                    <button type="button" id="camera-retry-button" class="secondary-button" hidden>Retry camera</button>
+                </div>
+                <button type="submit" id="continue-button" disabled>Continue to phone verification</button>
+                <noscript><p class="message">Enable JavaScript to take a selfie with your camera.</p></noscript>
+            </form>
+            <a class="onboarding-exit" href="/logout">Log out</a>
+        </div>
+    </section>
+</main>
+<script src="/static/js/complete-profile.js"></script>
 </body>
-
 </html>

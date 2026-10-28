@@ -15,7 +15,7 @@ import (
 // is supplied by the environment.
 const (
 	otpDevSender     = "AgroShield"
-	otpDevTemplateID = "" // Set to the template ID from the OTP.dev account.
+	otpDevTemplateID = "a724614a-3a7c-4625-930e-2a8b45141474" // Set to the template ID from the OTP.dev account.
 	otpDevBaseURL    = "https://api.otp.dev"
 )
 

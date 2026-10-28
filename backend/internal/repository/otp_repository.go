@@ -99,6 +99,45 @@ func (r *OTPRepository) Consume(ctx context.Context, id int64) error {
 	return nil
 }
 
+// ConsumeAndVerifyPhone spends the exact challenge and marks the matching
+// account number verified atomically. Lock the account before the challenge,
+// matching UpdateProfile's lock order, so changing a phone cannot race success.
+func (r *OTPRepository) ConsumeAndVerifyPhone(ctx context.Context, id int64, farmerID int, phone string) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var accountID int
+	if err := tx.QueryRowContext(ctx, `SELECT id FROM farmers
+		WHERE id = $1 AND phone = $2 AND selfie_captured_at IS NOT NULL AND deleted_at IS NULL
+		FOR UPDATE`, farmerID, phone).Scan(&accountID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNoActiveOTP
+		}
+		return err
+	}
+	result, err := tx.ExecContext(ctx, `UPDATE otp_codes SET consumed_at = $1
+		WHERE id = $2 AND farmer_id = $3 AND phone = $4 AND purpose = $5
+		AND consumed_at IS NULL AND expires_at > $1 AND attempts < 5`,
+		time.Now(), id, farmerID, phone, models.OTPPurposePhoneVerification)
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count != 1 {
+		return ErrNoActiveOTP
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE farmers SET phone_verified_at = CURRENT_TIMESTAMP,
+		updated_at = CURRENT_TIMESTAMP WHERE id = $1`, farmerID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // CountIssuedSince powers the issuance rate limit.
 func (r *OTPRepository) CountIssuedSince(ctx context.Context, farmerID int, purpose string, since time.Time) (int, error) {
 	var count int

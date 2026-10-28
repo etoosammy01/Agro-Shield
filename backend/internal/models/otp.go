@@ -9,9 +9,10 @@ import (
 // otp_codes.purpose CHECK constraint, so they must stay in sync with
 // database.go.
 const (
-	OTPPurposeWithdrawal    = "withdrawal"
-	OTPPurposeTransfer      = "transfer"
-	OTPPurposePasswordReset = "password_reset"
+	OTPPurposeWithdrawal        = "withdrawal"
+	OTPPurposeTransfer          = "transfer"
+	OTPPurposePasswordReset     = "password_reset"
+	OTPPurposePhoneVerification = "phone_verification"
 )
 
 // OTPCode is one issued one-time passcode. The code itself is only ever held
@@ -31,7 +32,7 @@ type OTPCode struct {
 // ValidOTPPurpose reports whether purpose is one this application issues.
 func ValidOTPPurpose(purpose string) bool {
 	switch purpose {
-	case OTPPurposeWithdrawal, OTPPurposeTransfer, OTPPurposePasswordReset:
+	case OTPPurposeWithdrawal, OTPPurposeTransfer, OTPPurposePasswordReset, OTPPurposePhoneVerification:
 		return true
 	default:
 		return false

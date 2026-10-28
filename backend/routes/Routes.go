@@ -137,6 +137,9 @@ func RegisterRoutes(
 	completeProfileHandler := handlers.NewCompleteProfileHandler(
 		container.Auth,
 	)
+	verifyPhoneHandler := handlers.NewVerifyPhoneHandler(container.OTP)
+	http.HandleFunc("/verify-phone", middleware.OnlyPath("/verify-phone",
+		middleware.RequireAuth(container.FarmerRepo, verifyPhoneHandler.Handler)))
 
 	http.HandleFunc(
 		"/complete-profile",
@@ -1094,6 +1097,7 @@ Disallow: /dashboard
 Disallow: /profile
 Disallow: /profile/edit
 Disallow: /complete-profile
+Disallow: /verify-phone
 Disallow: /storage
 Disallow: /marketplace
 Disallow: /market-insights

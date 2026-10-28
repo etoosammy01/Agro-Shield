@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"database/sql"
+	"time"
+)
 
 type Farmer struct {
 	ID                  int
@@ -14,6 +17,8 @@ type Farmer struct {
 	PhotoURL            string // passport photograph
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
+	SelfieCapturedAt    sql.NullTime
+	PhoneVerifiedAt     sql.NullTime
 
 	BankName      string
 	BankCode      string

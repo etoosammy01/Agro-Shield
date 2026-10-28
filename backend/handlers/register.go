@@ -90,6 +90,8 @@ func validateRegistration(page *RegisterPageData, password, confirm string) {
 	}
 	if page.Phone == "" {
 		page.FieldErrors["phone"] = "Enter your phone number."
+	} else if services.NormalizeNigerianPhone(page.Phone) == "" {
+		page.FieldErrors["phone"] = "Enter a valid Nigerian phone number that can receive SMS."
 	}
 	if page.Community == "" {
 		page.FieldErrors["community"] = "Enter your community or village."
@@ -165,9 +167,7 @@ func (h *Register) submitRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Profile photo and bank details are collected on the mandatory
-	// Complete Your Profile step immediately after this, not here —
-	// so they're intentionally passed empty.
+	// The selfie is captured next. Payout details can be added from the wallet.
 	farmer, err := h.service.Register(
 		page.FirstName,
 		page.LastName,
@@ -220,8 +220,8 @@ func (h *Register) submitRegistration(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Brevo accepted welcome email request for %s", page.Email)
 	}
 
-	// Auto-login: the new account lands straight on the mandatory
-	// Complete Your Profile step instead of a separate /login visit.
+	// A temporary session allows onboarding, but cannot access protected pages
+	// until selfie capture and phone verification are both complete.
 	sessionID := middleware.CreateSession(farmer.ID)
 	middleware.SetSessionCookie(w, sessionID)
 

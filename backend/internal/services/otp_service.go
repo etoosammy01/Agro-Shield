@@ -63,6 +63,7 @@ type otpStore interface {
 	LatestActive(ctx context.Context, farmerID int, purpose string) (*models.OTPCode, error)
 	IncrementAttempts(ctx context.Context, id int64) error
 	Consume(ctx context.Context, id int64) error
+	ConsumeAndVerifyPhone(ctx context.Context, id int64, farmerID int, phone string) error
 	CountIssuedSince(ctx context.Context, farmerID int, purpose string, since time.Time) (int, error)
 }
 
@@ -163,6 +164,19 @@ func (s *OTPService) Issue(ctx context.Context, farmerID int, phone, purpose str
 // Verify checks a submitted code and, on success, consumes it so it cannot be
 // replayed. Every failure is counted against the code.
 func (s *OTPService) Verify(ctx context.Context, farmerID int, purpose, code string) error {
+	return s.verify(ctx, farmerID, purpose, code, "")
+}
+
+// VerifyPhone also persists phone ownership; ordinary OTP verification does
+// not grant onboarding access. phone must come from the authenticated account.
+func (s *OTPService) VerifyPhone(ctx context.Context, farmerID int, phone, code string) error {
+	if NormalizeNigerianPhone(phone) == "" {
+		return ErrOTPUnusablePhone
+	}
+	return s.verify(ctx, farmerID, models.OTPPurposePhoneVerification, code, phone)
+}
+
+func (s *OTPService) verify(ctx context.Context, farmerID int, purpose, code, phone string) error {
 	if farmerID <= 0 {
 		return errors.New("invalid account for one-time passcode")
 	}
@@ -180,6 +194,9 @@ func (s *OTPService) Verify(ctx context.Context, farmerID int, purpose, code str
 	}
 	if err != nil {
 		return fmt.Errorf("load one-time passcode: %w", err)
+	}
+	if phone != "" && active.Phone != phone {
+		return ErrOTPUnavailable
 	}
 
 	// A code that has already burned through its attempts must not be usable
@@ -218,7 +235,12 @@ func (s *OTPService) Verify(ctx context.Context, farmerID int, purpose, code str
 		return ErrOTPInvalid
 	}
 
-	if err := s.repo.Consume(ctx, active.ID); err != nil {
+	if phone != "" {
+		err = s.repo.ConsumeAndVerifyPhone(ctx, active.ID, farmerID, active.Phone)
+	} else {
+		err = s.repo.Consume(ctx, active.ID)
+	}
+	if err != nil {
 		if errors.Is(err, repository.ErrNoActiveOTP) {
 			return ErrOTPUnavailable
 		}

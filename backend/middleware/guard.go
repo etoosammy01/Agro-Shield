@@ -24,6 +24,8 @@ func bodyLimitForPath(path string) int64 {
 		return 12 << 20
 	case path == "/register":
 		return 1 << 20
+	case path == "/verify-phone":
+		return 16 << 10
 	case path == "/orders/pay":
 		return 1 << 20
 	case path == "/wallet/virtual-account":
@@ -63,6 +65,7 @@ type rateRule struct {
 var rateRules = []rateRule{
 	{path: "/login", methods: postOnly(), limiter: NewRateLimiter(20, 30)},
 	{path: "/register", methods: postOnly(), limiter: NewRateLimiter(10, 20)},
+	{path: "/verify-phone", methods: postOnly(), limiter: NewRateLimiter(5, 10)},
 	{path: "/forgot-password", methods: postOnly(), limiter: NewRateLimiter(10, 20)},
 	{path: "/learning/chat", methods: postOnly(), limiter: NewRateLimiter(20, 30)},
 	{path: "/ai-assistant", methods: postOnly(), limiter: NewRateLimiter(6, 10)},

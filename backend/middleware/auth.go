@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"backend/internal/models"
-	"backend/internal/repository"
 	"backend/internal/services"
 )
 
@@ -145,19 +144,15 @@ func FarmerFromContext(r *http.Request) (*models.Farmer, bool) {
 	return farmer, ok
 }
 
-// completeProfilePath is exempted from the profile-completion gate below,
-// so a farmer who hasn't uploaded a real photo yet can actually reach the
-// page that lets them do so, instead of being redirected back to itself.
-const completeProfilePath = "/complete-profile"
+type farmerReader interface {
+	GetByID(int) (*models.Farmer, error)
+}
 
 // RequireAuth protects a handler. It checks for a valid session cookie,
 // loads the logged-in farmer, and attaches it to the request context.
-// If there's no valid session, it redirects to /login. If the session is
-// valid but the farmer hasn't completed their mandatory profile photo yet,
-// it redirects to /complete-profile instead of the requested page — this
-// closes the gap where a farmer could otherwise type a URL like /dashboard
-// directly and skip the mandatory step entirely.
-func RequireAuth(repo *repository.FarmerRepository, next http.HandlerFunc) http.HandlerFunc {
+// Incomplete accounts can only reach onboarding pages; those handlers enforce
+// the order of the steps. Ordinary protected pages require both steps.
+func RequireAuth(repo farmerReader, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sessionID, ok := SessionIDFromRequest(r)
 		if !ok {
@@ -179,8 +174,8 @@ func RequireAuth(repo *repository.FarmerRepository, next http.HandlerFunc) http.
 			return
 		}
 
-		if r.URL.Path != completeProfilePath && !services.HasCompletedProfile(farmer) {
-			http.Redirect(w, r, completeProfilePath, http.StatusSeeOther)
+		if r.URL.Path != "/complete-profile" && r.URL.Path != "/verify-phone" && !services.HasCompletedProfile(farmer) {
+			http.Redirect(w, r, services.OnboardingPath(farmer), http.StatusSeeOther)
 			return
 		}
 

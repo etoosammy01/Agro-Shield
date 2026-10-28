@@ -11,11 +11,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// DefaultPhotoURL is the placeholder photo assigned at registration, before
-// the account completes the mandatory Complete Your Profile step. It
-// matches the same fallback the original database migration already used
-// to backfill legacy rows, so this stays consistent with the existing
-// schema convention rather than introducing a new one.
+// DefaultPhotoURL is the placeholder assigned before a selfie is captured.
 const DefaultPhotoURL = "/static/assets/images/un.jpeg"
 
 // Sentinel errors that handlers can match with errors.Is to show the right
@@ -47,10 +43,8 @@ func NewAuthService(repo *repository.FarmerRepository) *AuthService {
 // Register creates a new farmer or buyer account. role should be "farmer" or
 // "buyer" — anything else defaults to "farmer".
 //
-// A profile photo, and for farmers, bank details, are NOT required here —
-// they're collected on the mandatory Complete Your Profile step that
-// follows registration. If no photo is supplied, the account is created
-// with DefaultPhotoURL until a real one is uploaded.
+// Selfie capture and phone verification follow registration. Bank details
+// can be added later from the wallet.
 //
 // Returns ErrPhoneTaken if the phone number is already registered, and
 // ErrPasswordTooShort if the password is too short.
@@ -61,6 +55,9 @@ func (s *AuthService) Register(firstName, lastName, phone, email, password, comm
 	}
 	if phone == "" {
 		return nil, errors.New("phone is required")
+	}
+	if NormalizeNigerianPhone(phone) == "" {
+		return nil, ErrOTPUnusablePhone
 	}
 	if password == "" {
 		return nil, errors.New("password is required")
@@ -119,13 +116,28 @@ func (s *AuthService) Register(firstName, lastName, phone, email, password, comm
 	return farmer, nil
 }
 
-// HasCompletedProfile reports whether this account has uploaded a real
-// profile photo yet, as opposed to still carrying DefaultPhotoURL from
-// registration. Used to decide whether to show the Complete Your Profile
-// step, and can also be used to gate produce listings or negotiations on a
-// completed profile if that's wanted later.
+// HasCompletedProfile requires both persisted onboarding steps. An existing
+// uploaded profile picture alone does not prove a selfie was captured.
 func HasCompletedProfile(farmer *models.Farmer) bool {
-	return farmer != nil && strings.TrimSpace(farmer.PhotoURL) != "" && farmer.PhotoURL != DefaultPhotoURL
+	return farmer != nil && farmer.SelfieCapturedAt.Valid && farmer.PhoneVerifiedAt.Valid
+}
+
+// OnboardingPath returns the next required step, or the dashboard when done.
+func OnboardingPath(farmer *models.Farmer) string {
+	if farmer == nil || !farmer.SelfieCapturedAt.Valid {
+		return "/complete-profile"
+	}
+	if !farmer.PhoneVerifiedAt.Valid {
+		return "/verify-phone"
+	}
+	return "/dashboard"
+}
+
+func (s *AuthService) UpdateSelfie(id int, photoURL string) error {
+	if strings.TrimSpace(photoURL) == "" {
+		return errors.New("a selfie is required")
+	}
+	return s.repo.UpdateSelfie(id, photoURL)
 }
 
 // Login verifies a phone number + password against the stored hash and
@@ -177,6 +189,9 @@ func (s *AuthService) UpdateProfile(id int, fullName, phone, email, community, l
 	}
 	if phone == "" {
 		return errors.New("phone is required")
+	}
+	if NormalizeNigerianPhone(phone) == "" {
+		return ErrOTPUnusablePhone
 	}
 	if community == "" || lga == "" || state == "" || country == "" {
 		return errors.New("community, LGA, state, and country are required")
