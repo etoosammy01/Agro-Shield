@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"backend/internal/models"
+	"backend/internal/otp"
 	"backend/internal/repository"
 
 	"golang.org/x/crypto/bcrypt"
@@ -57,7 +58,7 @@ func (s *AuthService) Register(firstName, lastName, phone, email, password, comm
 		return nil, errors.New("phone is required")
 	}
 	if NormalizeNigerianPhone(phone) == "" {
-		return nil, ErrOTPUnusablePhone
+		return nil, otp.ErrUnusablePhone
 	}
 	if password == "" {
 		return nil, errors.New("password is required")
@@ -191,7 +192,7 @@ func (s *AuthService) UpdateProfile(id int, fullName, phone, email, community, l
 		return errors.New("phone is required")
 	}
 	if NormalizeNigerianPhone(phone) == "" {
-		return ErrOTPUnusablePhone
+		return otp.ErrUnusablePhone
 	}
 	if community == "" || lga == "" || state == "" || country == "" {
 		return errors.New("community, LGA, state, and country are required")

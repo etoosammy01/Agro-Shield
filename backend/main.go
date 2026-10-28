@@ -13,6 +13,7 @@ import (
 	app "backend/internal"
 	"backend/internal/config"
 	"backend/internal/database"
+	"backend/internal/otp"
 	"backend/internal/repository"
 	"backend/internal/services"
 	learningproviders "backend/internal/services/learning"
@@ -220,19 +221,11 @@ func main() {
 	// CREATE OTP PROVIDER
 	//
 	// SMS_PROVIDER=log writes codes to the development log.
-	// SMS_PROVIDER=otpdev sends and verifies codes through OTP.dev.
+	// Plug in a custom OTP provider here when starting the provider afresh.
 	// ============================================================
 
-	var otpProvider services.OTPProvider = services.LogOTPProvider{}
-	if cfg.SMSProvider == "otpdev" {
-		otpProvider, err = services.NewOTPDevProvider(cfg.OTPDevAPIKey, cfg.OTPDevSender, cfg.OTPDevTemplateID, cfg.OTPDevBaseURL)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-	if cfg.SMSProvider == "log" && cfg.AppEnv != "development" {
-		log.Printf("WARNING: SMS_PROVIDER=log in %s — one-time passcodes are being written to this log instead of being sent, and anyone with log access can read them", cfg.AppEnv)
-	}
+	var otpProvider otp.Provider = otp.LogProvider{}
+	log.Printf("OTP SMS transport=%s", cfg.SMSProvider)
 
 	// ============================================================
 	// 5. CREATE APPLICATION CONTAINER
@@ -276,13 +269,15 @@ func main() {
 	// 6. REGISTER ROUTES
 	// ============================================================
 
-	emailSender := services.NewBrevoEmailSender(
-		cfg.BrevoAPIKey,
-		cfg.BrevoFromEmail,
-		cfg.BrevoFromName,
-	)
+	var emailSender services.EmailSender
+	if cfg.BrevoAPIKey != "" && cfg.BrevoFromEmail != "" {
+		emailSender = services.NewBrevoEmailSender(cfg.BrevoAPIKey, cfg.BrevoFromEmail, cfg.BrevoFromName)
+	} else {
+		log.Print("welcome_email disabled: configure BREVO_API_KEY and BREVO_FROM_EMAIL")
+	}
+	welcomeEmail := services.NewWelcomeEmailService(emailSender)
 
-	routes.RegisterRoutes(container, emailSender)
+	routes.RegisterRoutes(container, welcomeEmail)
 	// Health checks are deliberately outside the application router so they
 	// remain cheap and are not affected by page-level middleware decisions.
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -347,6 +342,9 @@ func main() {
 		if err := server.Shutdown(shutdownCtx); err != nil {
 			log.Printf("graceful shutdown failed: %v", err)
 			_ = server.Close()
+		}
+		if err := welcomeEmail.Close(shutdownCtx); err != nil {
+			log.Printf("welcome_email shutdown: %v", err)
 		}
 	}()
 

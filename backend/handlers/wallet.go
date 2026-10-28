@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"backend/internal/models"
+	"backend/internal/otp"
 	"backend/internal/services"
 	"backend/middleware"
 	"backend/render"
@@ -19,11 +20,11 @@ import (
 
 type WalletHandler struct {
 	wallet       *services.WalletService
-	otp          *services.OTPService
+	otp          *otp.Service
 	notification *services.NotificationService
 }
 
-func NewWalletHandler(wallet *services.WalletService, otp *services.OTPService, notification *services.NotificationService) *WalletHandler {
+func NewWalletHandler(wallet *services.WalletService, otp *otp.Service, notification *services.NotificationService) *WalletHandler {
 	return &WalletHandler{wallet: wallet, otp: otp, notification: notification}
 }
 
@@ -373,7 +374,7 @@ func (h *WalletHandler) SendOTP(w http.ResponseWriter, r *http.Request) {
 	if err := h.otp.Issue(r.Context(), farmer.ID, farmer.Phone, purpose); err != nil {
 		log.Printf("issue %s code for user %d: %v", purpose, farmer.ID, err)
 		status := http.StatusBadGateway
-		if errors.Is(err, services.ErrOTPRateLimited) {
+		if errors.Is(err, otp.ErrRateLimited) {
 			status = http.StatusTooManyRequests
 		}
 		writeJSON(w, status, map[string]string{"error": otpUserMessage(err)})

@@ -2,6 +2,7 @@ package services
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,7 +13,7 @@ import (
 )
 
 type EmailSender interface {
-	SendWelcome(to, name string) error
+	SendWelcome(ctx context.Context, to, name string) error
 }
 
 type BrevoEmailSender struct {
@@ -31,16 +32,21 @@ func NewBrevoEmailSender(
 		fromName:  strings.TrimSpace(fromName),
 		client: &http.Client{
 			Timeout: 15 * time.Second,
+			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 		},
 	}
 }
 
-func (s *BrevoEmailSender) SendWelcome(to, name string) error {
+func (s *BrevoEmailSender) SendWelcome(ctx context.Context, to, name string) error {
 	to = strings.TrimSpace(to)
 	name = strings.TrimSpace(name)
 
-	if s.apiKey == "" || s.fromEmail == "" {
+	if s == nil || s.apiKey == "" || s.fromEmail == "" {
 		return fmt.Errorf("Brevo API email configuration is incomplete")
+	}
+	from, err := mail.ParseAddress(s.fromEmail)
+	if err != nil || from.Address != s.fromEmail {
+		return fmt.Errorf("Brevo sender email is invalid")
 	}
 
 	parsed, err := mail.ParseAddress(to)
@@ -95,7 +101,8 @@ func (s *BrevoEmailSender) SendWelcome(to, name string) error {
 		return fmt.Errorf("prepare welcome email: %w", err)
 	}
 
-	req, err := http.NewRequest(
+	req, err := http.NewRequestWithContext(
+		ctx,
 		http.MethodPost,
 		"https://api.brevo.com/v3/smtp/email",
 		bytes.NewReader(body),
@@ -115,18 +122,18 @@ func (s *BrevoEmailSender) SendWelcome(to, name string) error {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("send welcome email through Brevo: %w", err)
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return fmt.Errorf("Brevo welcome email request failed")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		responseBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return fmt.Errorf(
-			"Brevo rejected welcome email (HTTP %d): %s",
-			resp.StatusCode,
-			strings.TrimSpace(string(responseBody)),
-		)
+		// Provider bodies may contain recipient data. Log only the status.
+		return fmt.Errorf("Brevo rejected welcome email (HTTP %d)", resp.StatusCode)
 	}
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
 
 	return nil
 }

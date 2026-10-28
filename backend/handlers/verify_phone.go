@@ -55,6 +55,9 @@ func (h *VerifyPhone) Handler(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("sent") == "1" {
 			page.CodeSent = true
 			page.Success = "We've sent a verification code to your phone. It expires in 5 minutes."
+			if transport, ok := h.otp.(interface{ DevelopmentDelivery() bool }); ok && transport.DevelopmentDelivery() {
+				page.Success = "Development mode: no SMS was sent. Your verification code is in the server log and expires in 5 minutes."
+			}
 		}
 		h.renderPage(w, http.StatusOK, page)
 		return
@@ -78,7 +81,7 @@ func (h *VerifyPhone) Handler(w http.ResponseWriter, r *http.Request) {
 		if err := h.otp.VerifyPhone(r.Context(), farmer.ID, farmer.Phone, r.FormValue("code")); err != nil {
 			log.Printf("verify phone for user %d: %v", farmer.ID, err)
 			page.CodeSent = true
-			page.Error = resetCodeMessage(err)
+			page.Error = otpVerificationMessage(err)
 			h.renderPage(w, http.StatusBadRequest, page)
 			return
 		}

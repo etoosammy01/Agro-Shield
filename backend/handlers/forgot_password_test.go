@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"backend/internal/services"
+	"backend/internal/otp"
 )
 
 // A wrong or expired code must be described as such. The old mapping reused
@@ -14,15 +14,15 @@ func TestResetCodeMessageDescribesVerificationFailure(t *testing.T) {
 		err  error
 		want string
 	}{
-		{services.ErrOTPInvalid, "That verification code is not correct. Check it and try again."},
-		{services.ErrOTPUnavailable, "That verification code has expired or was already used. Request a new one."},
-		{services.ErrOTPTooManyAttempts, "Too many incorrect attempts. Request a new verification code."},
-		{services.ErrOTPRateLimited, "You have requested too many codes. Please wait a few minutes and try again."},
+		{otp.ErrInvalid, "That verification code is not correct. Check it and try again."},
+		{otp.ErrUnavailable, "That verification code has expired or was already used. Request a new one."},
+		{otp.ErrTooManyAttempts, "Too many incorrect attempts. Request a new verification code."},
+		{otp.ErrRateLimited, "You have requested too many codes. Please wait a few minutes and try again."},
 		{errors.New("SQLSTATE 08006 connection failure"), "We couldn't verify that code right now. Please try again in a moment."},
 	}
 	for _, tc := range cases {
-		if got := resetCodeMessage(tc.err); got != tc.want {
-			t.Errorf("resetCodeMessage(%v) = %q, want %q", tc.err, got, tc.want)
+		if got := otpVerificationMessage(tc.err); got != tc.want {
+			t.Errorf("otpVerificationMessage(%v) = %q, want %q", tc.err, got, tc.want)
 		}
 	}
 }

@@ -3,6 +3,7 @@ package app
 import (
 	"time"
 
+	"backend/internal/otp"
 	"backend/internal/repository"
 	"backend/internal/services"
 )
@@ -37,7 +38,7 @@ type Container struct {
 	Chat         *services.ChatService
 	Payment      *services.PaymentService // ← added
 	Wallet       *services.WalletService
-	OTP          *services.OTPService // ← added
+	OTP          *otp.Service // ← added
 	Feedback     *services.FeedbackService
 	MarketEvents *repository.MarketEventRepository
 
@@ -79,7 +80,7 @@ func NewContainer(
 	walletRepo *repository.WalletRepository,
 	bankLookupRepo *repository.BankLookupRepository,
 	otpRepo *repository.OTPRepository,
-	otpProvider services.OTPProvider,
+	otpProvider otp.Provider,
 	flutterwaveClient *services.FlutterwaveClient,
 	feedbackRepo *repository.FeedbackRepository,
 	walletAdminIDs []int,
@@ -157,7 +158,7 @@ func NewContainer(
 	// One-time passcodes guard password resets and wallet payouts. The
 	// transport is chosen by config, so local development can run with the
 	// log-only sender and no SMS account.
-	otpService := services.NewOTPService(otpRepo, otpProvider)
+	otpService := otp.NewService(otpRepo, otpProvider)
 
 	feedbackService := services.NewFeedbackService(
 		feedbackRepo,

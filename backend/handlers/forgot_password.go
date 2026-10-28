@@ -1,22 +1,22 @@
 package handlers
 
 import (
-	"errors"
 	"log"
 	"net/http"
 	"strings"
 
 	"backend/internal/models"
+	"backend/internal/otp"
 	"backend/internal/services"
 	"backend/render"
 )
 
 type ForgotPassword struct {
 	auth *services.AuthService
-	otp  *services.OTPService
+	otp  *otp.Service
 }
 
-func NewForgotPasswordHandler(auth *services.AuthService, otp *services.OTPService) *ForgotPassword {
+func NewForgotPasswordHandler(auth *services.AuthService, otp *otp.Service) *ForgotPassword {
 	return &ForgotPassword{auth: auth, otp: otp}
 }
 
@@ -124,7 +124,7 @@ func (h *ForgotPassword) resetPassword(w http.ResponseWriter, r *http.Request, p
 
 	if err := h.otp.Verify(r.Context(), farmer.ID, models.OTPPurposePasswordReset, code); err != nil {
 		log.Printf("verify password reset code for user %d: %v", farmer.ID, err)
-		h.renderPage(w, phone, ForgotPasswordPageData{Error: resetCodeMessage(err), CodeSent: true})
+		h.renderPage(w, phone, ForgotPasswordPageData{Error: otpVerificationMessage(err), CodeSent: true})
 		return
 	}
 
@@ -135,36 +135,6 @@ func (h *ForgotPassword) resetPassword(w http.ResponseWriter, r *http.Request, p
 	}
 
 	h.renderPage(w, phone, ForgotPasswordPageData{Success: "Password updated — you can now log in."})
-}
-
-// otpUserMessage turns an OTP error into something safe to show. Only the
-// errors a user can act on are surfaced; anything else would leak internals.
-func otpUserMessage(err error) string {
-	switch {
-	case errors.Is(err, services.ErrOTPRateLimited),
-		errors.Is(err, services.ErrOTPUnusablePhone):
-		return err.Error()
-	default:
-		return "We couldn't send a verification code right now. Please try again in a moment."
-	}
-}
-
-// resetCodeMessage explains a failed password-reset check. These errors only
-// occur after the account lookup, so they reveal nothing about registration;
-// saying "we couldn't send a code" here would be both wrong and unhelpful.
-func resetCodeMessage(err error) string {
-	switch {
-	case errors.Is(err, services.ErrOTPInvalid):
-		return "That verification code is not correct. Check it and try again."
-	case errors.Is(err, services.ErrOTPUnavailable):
-		return "That verification code has expired or was already used. Request a new one."
-	case errors.Is(err, services.ErrOTPTooManyAttempts):
-		return "Too many incorrect attempts. Request a new verification code."
-	case errors.Is(err, services.ErrOTPRateLimited):
-		return "You have requested too many codes. Please wait a few minutes and try again."
-	default:
-		return "We couldn't verify that code right now. Please try again in a moment."
-	}
 }
 
 func (h *ForgotPassword) renderPage(w http.ResponseWriter, phone string, data ForgotPasswordPageData) {

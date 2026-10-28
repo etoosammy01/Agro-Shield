@@ -15,7 +15,7 @@ import (
 
 func RegisterRoutes(
 	container *app.Container,
-	emailSender services.EmailSender,
+	welcomeEmail services.WelcomeEmailNotifier,
 ) {
 	// USSD gateways post menu selections to this provider-neutral endpoint.
 	ussdHandler := ussd.NewHandler(container.FarmerRepo, container.Crop, services.NewWeatherService(), container.Order, container.Notification)
@@ -88,7 +88,7 @@ func RegisterRoutes(
 
 	registerHandler := handlers.NewRegisterHandler(
 		container.Auth,
-		emailSender,
+		welcomeEmail,
 	)
 
 	http.HandleFunc(

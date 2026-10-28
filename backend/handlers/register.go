@@ -205,25 +205,13 @@ func (h *Register) submitRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Send the welcome email once after successful registration.
 	log.Println("User registered successfully as", page.Role)
-	log.Printf("Attempting welcome email to %s", page.Email)
-
-	if h.emailSender == nil {
-		log.Println("welcome email failed: emailSender is nil")
-	} else if err := h.emailSender.SendWelcome(
-		page.Email,
-		page.FirstName,
-	); err != nil {
-		log.Printf("welcome email failed: %v", err)
-	} else {
-		log.Printf("Brevo accepted welcome email request for %s", page.Email)
-	}
 
 	// A temporary session allows onboarding, but cannot access protected pages
 	// until selfie capture and phone verification are both complete.
 	sessionID := middleware.CreateSession(farmer.ID)
 	middleware.SetSessionCookie(w, sessionID)
+	h.notifyWelcomeEmail(farmer.ID, page.Email, page.FirstName)
 
 	http.Redirect(w, r, "/complete-profile", http.StatusSeeOther)
 }

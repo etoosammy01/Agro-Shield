@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"backend/internal/models"
-	"backend/internal/services"
+	"backend/internal/otp"
 	"backend/middleware"
 )
 
@@ -94,10 +94,10 @@ func TestPhoneVerificationSuccessRequiresLoginAgain(t *testing.T) {
 
 func TestPhoneVerificationErrorsKeepUserOnStep(t *testing.T) {
 	f := &models.Farmer{ID: 13, Phone: "08012345678", SelfieCapturedAt: sql.NullTime{Time: time.Now(), Valid: true}}
-	for _, err := range []error{services.ErrOTPInvalid, services.ErrOTPUnavailable, services.ErrOTPTooManyAttempts, errors.New("provider unavailable")} {
+	for _, err := range []error{otp.ErrInvalid, otp.ErrUnavailable, otp.ErrTooManyAttempts, errors.New("provider unavailable")} {
 		o := &onboardingOTP{err: err}
 		w, _ := onboardingRequest(t, f, NewVerifyPhoneHandler(o).Handler, "POST", "/verify-phone", url.Values{"action": {"verify_code"}, "code": {"123456"}})
-		if w.Code != http.StatusBadRequest || w.Header().Get("Location") != "" || !strings.Contains(html.UnescapeString(w.Body.String()), resetCodeMessage(err)) {
+		if w.Code != http.StatusBadRequest || w.Header().Get("Location") != "" || !strings.Contains(html.UnescapeString(w.Body.String()), otpVerificationMessage(err)) {
 			t.Fatalf("verification failure not displayed: %d %s", w.Code, w.Body.String())
 		}
 		if len(w.Result().Cookies()) != 0 {
