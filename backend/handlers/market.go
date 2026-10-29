@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"backend/internal/models"
@@ -18,13 +17,13 @@ import (
 
 type Marketplace struct {
 	crop         *services.CropService
-	wallet       *services.WalletService
+	checkout     *Checkout
 	events       *repository.MarketEventRepository
 	notification *services.NotificationService
 }
 
-func NewMarketplaceHandler(crop *services.CropService, wallet *services.WalletService, events *repository.MarketEventRepository, notification *services.NotificationService) *Marketplace {
-	return &Marketplace{crop: crop, wallet: wallet, events: events, notification: notification}
+func NewMarketplaceHandler(crop *services.CropService, checkout *Checkout, events *repository.MarketEventRepository, notification *services.NotificationService) *Marketplace {
+	return &Marketplace{crop: crop, checkout: checkout, events: events, notification: notification}
 }
 
 type MarketplacePageData struct {
@@ -75,24 +74,21 @@ func (h *Marketplace) MarketplaceHandler(w http.ResponseWriter, r *http.Request)
 			h.render(w, farmer.IsBuyer(), farmer.ID, "", "Only buyer accounts can place orders", "")
 			return
 		}
-		cropID, _ := strconv.Atoi(r.FormValue("crop_id"))
-		quantity, _ := strconv.ParseFloat(r.FormValue("quantity"), 64)
-		checkoutToken := strings.TrimSpace(r.FormValue("checkout_token"))
-		if checkoutToken == "" {
-			h.render(w, farmer.IsBuyer(), farmer.ID, "", "This page is out of date. Refresh the marketplace and try again. No order was placed.", "")
-			return
-		}
-		orderID, alreadyPlaced, err := h.wallet.PayForOrder(r.Context(), farmer.ID, cropID, quantity, checkoutToken)
+		result, err := h.checkout.Pay(w, r, farmer)
 		if err != nil {
-			h.render(w, farmer.IsBuyer(), farmer.ID, "", userError(err, "We couldn't complete that purchase. No order was placed; check the quantity and your wallet balance, then try again."), "")
+			h.render(w, farmer.IsBuyer(), farmer.ID, "", err.Error(), "")
 			return
 		}
-		if alreadyPlaced {
+		if result == nil {
+			return // The payment confirmation page is awaiting a code.
+		}
+		if result.AlreadyPlaced {
 			// The page was submitted twice with one checkout token. The buyer was
 			// charged once, so say that rather than implying a second order.
 			h.render(w, farmer.IsBuyer(), farmer.ID, "This order was already placed. Your wallet was charged only once.", "", "")
 			return
 		}
+		cropID, quantity, orderID := result.CropID, result.Quantity, result.OrderID
 		h.record("checkout_completed", &cropID, farmer.ID, r, fmt.Sprintf(`{"quantity":%g}`, quantity))
 		if h.notification != nil {
 			_ = h.notification.CreateNotification(farmer.ID, "Order placed",

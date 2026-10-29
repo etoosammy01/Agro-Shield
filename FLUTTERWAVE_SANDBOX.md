@@ -64,7 +64,7 @@ Set the webhook secret hash to exactly the value in `FLUTTERWAVE_SECRET_HASH`. T
 
 ## 7. Marketplace payment status
 
-The `/orders/pay` endpoint now accepts only an `order_id`, identifies the buyer from the authenticated session, loads the amount and buyer details from PostgreSQL, and rejects orders that do not belong to the buyer or are not pending external payment. It marks eligible orders as paid only after verification.
+The `/orders/pay` endpoint accepts an `order_id` and a six-digit payment `code` requested through `POST /wallet/otp/send` with `purpose=payment`. It identifies the buyer from the authenticated session, loads the amount and buyer details from PostgreSQL, and rejects orders that do not belong to the buyer or are not pending external payment. Agro-Shield verifies the SMS code locally before checkout starts; Flutterwave transaction verification determines when an eligible order is paid. See [OTP.dev setup](docs/otp-dev.md).
 
 **Current limitation:** the existing marketplace's regular order form still uses the internal Agro-Shield wallet-payment flow. It does not yet create `pending_payment` orders or redirect to Flutterwave checkout. Therefore, wallet deposit/withdrawal sandbox testing is the immediately testable flow. Do not assume marketplace external checkout is end-to-end until its order-creation UI is explicitly connected to this endpoint.
 

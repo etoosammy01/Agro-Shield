@@ -49,6 +49,15 @@ func (r *OTPRepository) Issue(ctx context.Context, farmerID int, phone, purpose,
 	return tx.Commit()
 }
 
+// Invalidate burns an undelivered challenge by its exact hash. A concurrent
+// resend has a different bcrypt hash and must remain usable.
+func (r *OTPRepository) Invalidate(ctx context.Context, farmerID int, purpose, codeHash string) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE otp_codes SET consumed_at = $1
+		WHERE farmer_id = $2 AND purpose = $3 AND code_hash = $4 AND consumed_at IS NULL`,
+		time.Now(), farmerID, purpose, codeHash)
+	return err
+}
+
 // LatestActive returns the newest code that is neither used nor expired.
 func (r *OTPRepository) LatestActive(ctx context.Context, farmerID int, purpose string) (*models.OTPCode, error) {
 	var code models.OTPCode

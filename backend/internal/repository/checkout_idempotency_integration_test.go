@@ -43,6 +43,12 @@ func TestPayForOrderIsIdempotentPerCheckoutToken(t *testing.T) {
 	repo := NewWalletRepository(db)
 	ctx := context.Background()
 	token := uniqueRef("CHECKOUT")
+	if _, _, err := repo.PayForOrder(ctx, buyer.ID, crop.ID, 1, uniqueRef("PRICE-CHANGE"), 0, 2000); err == nil {
+		t.Fatal("checkout charged a different price from the confirmed amount")
+	}
+	if balance := walletBalanceOf(t, db, buyer.ID); balance != "5000.00" {
+		t.Fatalf("rejected price change debited the buyer: %s", balance)
+	}
 
 	firstID, firstReused, err := repo.PayForOrder(ctx, buyer.ID, crop.ID, 1, token, 0)
 	if err != nil {
@@ -71,6 +77,12 @@ func TestPayForOrderIsIdempotentPerCheckoutToken(t *testing.T) {
 	}
 	if orders != 1 {
 		t.Fatalf("orders for token = %d, want 1", orders)
+	}
+	if receiptID, err := repo.OrderForCheckoutToken(ctx, buyer.ID, token); err != nil || receiptID != firstID {
+		t.Fatalf("completed checkout receipt = %d, error = %v", receiptID, err)
+	}
+	if receiptID, err := repo.OrderForCheckoutToken(ctx, seller.ID, token); err != nil || receiptID != 0 {
+		t.Fatalf("another user could read the buyer's receipt: id = %d, error = %v", receiptID, err)
 	}
 }
 

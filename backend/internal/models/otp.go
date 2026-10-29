@@ -13,6 +13,7 @@ const (
 	OTPPurposeTransfer          = "transfer"
 	OTPPurposePasswordReset     = "password_reset"
 	OTPPurposePhoneVerification = "phone_verification"
+	OTPPurposePayment           = "payment"
 )
 
 // OTPCode is one issued one-time passcode. The code itself is only ever held
@@ -32,7 +33,7 @@ type OTPCode struct {
 // ValidOTPPurpose reports whether purpose is one this application issues.
 func ValidOTPPurpose(purpose string) bool {
 	switch purpose {
-	case OTPPurposeWithdrawal, OTPPurposeTransfer, OTPPurposePasswordReset, OTPPurposePhoneVerification:
+	case OTPPurposeWithdrawal, OTPPurposeTransfer, OTPPurposePasswordReset, OTPPurposePhoneVerification, OTPPurposePayment:
 		return true
 	default:
 		return false

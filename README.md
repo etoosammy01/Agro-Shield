@@ -790,6 +790,7 @@ Depending on the enabled features, Agro-Shield may require environment variables
 | `FLUTTERWAVE_SECRET_HASH` | Webhook verification           |
 | `PAYMENT_REDIRECT_URL`    | Flutterwave checkout callback  |
 | `WALLET_ADMIN_USER_IDS`   | Comma-separated user IDs allowed to review wallet withdrawals |
+| `OTPDEV_API_KEY`         | OTP.dev API authentication; enables SMS automatically |
 | `GEMINI_API_KEY`          | AI services                    |
 | `APP_URL`                 | Application/base URL           |
 | `TRUST_PROXY_HEADERS`     | Set `true` only behind a trusted reverse proxy |
@@ -802,6 +803,8 @@ Depending on the enabled features, Agro-Shield may require environment variables
 Forwarded client-IP and protocol headers are ignored by default. If the application runs behind a reverse proxy, set `TRUST_PROXY_HEADERS=true` **and** list the proxy networks in `TRUSTED_PROXY_CIDRS`; startup fails if either side is configured without the other. The immediate network peer must match one of those CIDRs before `X-Forwarded-For` or `X-Forwarded-Proto` is honored. The in-memory rate limiter tracks each proxy/client IP separately but is per process; deployments with multiple application instances need a shared or edge limiter.
 
 Wallets use NGN in the first release. Wallet balances are created for new accounts and backfilled for existing accounts. Configure `WALLET_ADMIN_USER_IDS` with trusted account IDs (find IDs in the `farmers` table); leaving it empty disables in-app withdrawal approval. Configure the Flutterwave webhook at `/webhooks/flutterwave` for payment and transfer events, and ensure the Flutterwave account has transfers enabled. A transfer request that times out after being sent stays reserved and must be reconciled against its unique reference in Flutterwave before retrying or refunding.
+
+Phone verification, order payments, transfers, withdrawals, and password resets use OTP.dev when `OTPDEV_API_KEY` is configured. The sender, template ID, and API URL are built in. Production requires real SMS delivery. See [OTP.dev setup](docs/otp-dev.md) for the verification flow and development behavior.
 
 ---
 

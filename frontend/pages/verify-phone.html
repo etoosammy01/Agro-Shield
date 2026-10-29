@@ -20,7 +20,7 @@
             <p class="complete-profile-subtitle">Verify the phone number you registered with. After verification, you'll log in to continue.</p>
             {{if .Error}}<p class="message" role="alert">{{.Error}}</p>{{end}}
             {{if .Success}}<p class="onboarding-status" role="status">{{.Success}}</p>{{end}}
-            <form action="/verify-phone" method="POST">
+            <form action="/verify-phone" method="POST" data-verification-form>
                 <input type="hidden" name="action" value="send_code">
                 <div class="form-group">
                     <label for="registered-phone">Registered phone number</label>
@@ -28,7 +28,7 @@
                 </div>
                 <button type="submit" class="secondary-button">{{if .CodeSent}}Resend code{{else}}Send code{{end}}</button>
             </form>
-            <form action="/verify-phone" method="POST" class="phone-code-form">
+            <form action="/verify-phone" method="POST" class="phone-code-form" data-verification-form>
                 <input type="hidden" name="action" value="verify_code">
                 <div class="form-group">
                     <label for="verification-code">Verification code</label>

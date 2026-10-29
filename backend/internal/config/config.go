@@ -11,11 +11,10 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// OTP.dev delivery settings are built into the application. Only the API key
-// is supplied by the environment.
+// OTP.dev settings are built in. Only the API key is read from the environment.
 const (
-	otpDevSender     = "AgroShield"
-	otpDevTemplateID = "a724614a-3a7c-4625-930e-2a8b45141474" // Set to the template ID from the OTP.dev account.
+	otpDevSender     = "OTP Dev"
+	otpDevTemplateID = "a724614a-3a7c-4625-930e-2a8b45141474" // Approved Agro-Shield template used by Agrilinks.
 	otpDevBaseURL    = "https://api.otp.dev"
 )
 
@@ -72,8 +71,8 @@ type Config struct {
 
 	// OTP delivery — SMS
 	//
-	// SMSProvider selects "log" for local development or "otpdev" for SMS
-	// delivery and verification through OTP.dev.
+	// SMSProvider is selected automatically from the API key: "otpdev" for
+	// SMS delivery, or "log" for development when no key is configured.
 	SMSProvider      string
 	OTPDevAPIKey     string
 	OTPDevSender     string
@@ -136,7 +135,6 @@ func Load() (Config, error) {
 		CommissionPercent:       strings.TrimSpace(os.Getenv("COMMISSION_PERCENT")),
 
 		// SMS / OTP
-		SMSProvider:      strings.TrimSpace(os.Getenv("SMS_PROVIDER")),
 		OTPDevAPIKey:     strings.TrimSpace(os.Getenv("OTPDEV_API_KEY")),
 		OTPDevSender:     otpDevSender,
 		OTPDevTemplateID: otpDevTemplateID,
@@ -199,11 +197,9 @@ func Load() (Config, error) {
 	}
 
 	// An API key enables OTP.dev automatically; development without a key uses logs.
-	if cfg.SMSProvider == "" {
-		cfg.SMSProvider = "log"
-		if cfg.OTPDevAPIKey != "" {
-			cfg.SMSProvider = "otpdev"
-		}
+	cfg.SMSProvider = "log"
+	if cfg.OTPDevAPIKey != "" {
+		cfg.SMSProvider = "otpdev"
 	}
 
 	// Wallet reporting threshold.
@@ -252,25 +248,8 @@ func Load() (Config, error) {
 		)
 	}
 
-	// Validate SMS provider configuration.
-	switch cfg.SMSProvider {
-	case "log":
-		// No provider credentials are needed for local development.
-	case "otpdev":
-		if cfg.OTPDevAPIKey == "" {
-			return Config{}, fmt.Errorf("OTPDEV_API_KEY must not be empty when SMS_PROVIDER=otpdev")
-		}
-		if cfg.OTPDevSender == "" {
-			return Config{}, fmt.Errorf("OTP.dev sender must be set in backend/internal/config/config.go")
-		}
-		if cfg.OTPDevTemplateID == "" {
-			return Config{}, fmt.Errorf("OTP.dev template ID must be set in backend/internal/config/config.go")
-		}
-	default:
-		return Config{}, fmt.Errorf(
-			"SMS_PROVIDER must be \"log\" or \"otpdev\", got %q",
-			cfg.SMSProvider,
-		)
+	if cfg.SMSProvider == "log" && strings.EqualFold(cfg.AppEnv, "production") {
+		return Config{}, fmt.Errorf("OTPDEV_API_KEY must not be empty in production; the log provider is for development")
 	}
 
 	return cfg, nil

@@ -32,6 +32,16 @@ func (s *mockStore) Issue(_ context.Context, farmerID int, phone, purpose, hash 
 	return nil
 }
 
+func (s *mockStore) Invalidate(ctx context.Context, farmerID int, purpose, hash string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if s.active != nil && s.active.FarmerID == farmerID && s.active.Purpose == purpose && s.active.CodeHash == hash {
+		s.active.ConsumedAt = sql.NullTime{Time: time.Now(), Valid: true}
+	}
+	return nil
+}
+
 func (s *mockStore) LatestActive(_ context.Context, farmerID int, purpose string) (*models.OTPCode, error) {
 	if s.active == nil || s.active.FarmerID != farmerID || s.active.Purpose != purpose || s.active.ConsumedAt.Valid || !s.active.ExpiresAt.After(time.Now()) {
 		return nil, repository.ErrNoActiveOTP
@@ -73,7 +83,6 @@ type mockProvider struct {
 	lastCode    string
 	lastPurpose string
 	sendErr     error
-	verifyErr   error
 }
 
 func (p *mockProvider) Send(_ context.Context, phone, code, purpose string) error {
@@ -81,10 +90,6 @@ func (p *mockProvider) Send(_ context.Context, phone, code, purpose string) erro
 	p.lastCode = code
 	p.lastPurpose = purpose
 	return p.sendErr
-}
-
-func (p *mockProvider) Verify(_ context.Context, _, _ string) error {
-	return p.verifyErr
 }
 
 func TestOTPServiceIssueAndVerify(t *testing.T) {
@@ -108,7 +113,11 @@ func TestOTPServiceIssueAndVerify(t *testing.T) {
 	}
 
 	// Verify with wrong code
-	if err := svc.Verify(ctx, 1, models.OTPPurposeWithdrawal, "000000"); !errors.Is(err, ErrInvalid) {
+	wrongCode := "000000"
+	if provider.lastCode == wrongCode {
+		wrongCode = "000001"
+	}
+	if err := svc.Verify(ctx, 1, models.OTPPurposeWithdrawal, wrongCode); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("expected ErrInvalid, got: %v", err)
 	}
 
@@ -140,5 +149,73 @@ func TestVerifyPhone(t *testing.T) {
 
 	if !store.verified {
 		t.Fatal("expected phone to be marked verified")
+	}
+}
+
+func TestPaymentCodesAreLimitedToTheirAccountAndPurpose(t *testing.T) {
+	store, provider := &mockStore{}, &mockProvider{}
+	service := NewService(store, provider)
+	ctx := context.Background()
+	if err := service.Issue(ctx, 10, "08012345678", models.OTPPurposePayment); err != nil {
+		t.Fatal(err)
+	}
+	for _, purpose := range []string{models.OTPPurposePhoneVerification, models.OTPPurposeWithdrawal, models.OTPPurposeTransfer, models.OTPPurposePasswordReset} {
+		if err := service.Verify(ctx, 10, purpose, provider.lastCode); !errors.Is(err, ErrUnavailable) {
+			t.Fatalf("payment code approved purpose %s: %v", purpose, err)
+		}
+	}
+	if err := service.Verify(ctx, 11, models.OTPPurposePayment, provider.lastCode); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("payment code approved another account: %v", err)
+	}
+	store.active.ExpiresAt = time.Now().Add(-time.Minute)
+	if err := service.Verify(ctx, 10, models.OTPPurposePayment, provider.lastCode); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("expired payment code was accepted: %v", err)
+	}
+}
+
+type otpSendFunc func(context.Context, string, string, string) error
+
+func (send otpSendFunc) Send(ctx context.Context, phone, code, purpose string) error {
+	return send(ctx, phone, code, purpose)
+}
+
+func TestFailedDeliveryCleanupSurvivesRequestCancellation(t *testing.T) {
+	store := &mockStore{}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	service := NewService(store, otpSendFunc(func(ctx context.Context, _, _, _ string) error {
+		cancel()
+		return ctx.Err()
+	}))
+	if err := service.Issue(ctx, 10, "08012345678", models.OTPPurposePayment); !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled delivery = %v", err)
+	}
+	if store.active == nil || !store.active.ConsumedAt.Valid {
+		t.Fatal("canceled delivery left an undelivered challenge active")
+	}
+}
+
+func TestFailedDeliveryDoesNotInvalidateNewerResend(t *testing.T) {
+	store := &mockStore{}
+	newCode := "123456"
+	newHash, err := bcrypt.GenerateFromPassword([]byte(newCode), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := NewService(store, otpSendFunc(func(ctx context.Context, phone, code, purpose string) error {
+		if err := store.Issue(ctx, 10, "08012345678", purpose, string(newHash), time.Now().Add(time.Minute)); err != nil {
+			return err
+		}
+		return errors.New("earlier delivery failed")
+	}))
+	ctx := context.Background()
+	if err := service.Issue(ctx, 10, "08012345678", models.OTPPurposePayment); err == nil {
+		t.Fatal("failed delivery reported success")
+	}
+	if store.active.ConsumedAt.Valid || store.active.CodeHash != string(newHash) {
+		t.Fatal("older delivery failure invalidated the newer resend")
+	}
+	if err := service.Verify(ctx, 10, models.OTPPurposePayment, newCode); err != nil {
+		t.Fatalf("newer resend could not be verified: %v", err)
 	}
 }

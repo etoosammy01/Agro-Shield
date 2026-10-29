@@ -11,6 +11,7 @@ import (
 // Typically satisfied by *repository.OTPRepository.
 type Store interface {
 	Issue(ctx context.Context, farmerID int, phone, purpose, codeHash string, expiresAt time.Time) error
+	Invalidate(ctx context.Context, farmerID int, purpose, codeHash string) error
 	LatestActive(ctx context.Context, farmerID int, purpose string) (*models.OTPCode, error)
 	IncrementAttempts(ctx context.Context, id int64) error
 	Consume(ctx context.Context, id int64) error

@@ -2,11 +2,8 @@ package dto
 
 // InitiatePaymentRequest is the body the frontend sends to POST /orders/pay.
 type InitiatePaymentRequest struct {
-	OrderID       int64  `json:"order_id"`
-	Amount        string `json:"amount"`   // e.g. "5000.00" - keep as string, never float, for money
-	Currency      string `json:"currency"` // e.g. "NGN"
-	CustomerEmail string `json:"customer_email"`
-	CustomerName  string `json:"customer_name"`
+	OrderID int64  `json:"order_id"`
+	Code    string `json:"code"`
 }
 
 // InitiatePaymentResponse is what we hand back to the frontend: a link to

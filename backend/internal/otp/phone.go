@@ -15,27 +15,15 @@ func NormalizePhone(phone string) string {
 			digits.WriteRune(r)
 		}
 	}
-	value := digits.String()
-
-	switch {
-	case value == "":
-		return ""
-	case strings.HasPrefix(value, "234"):
-		if len(value) == 13 {
-			return value
-		}
-		return ""
-	case strings.HasPrefix(value, "0"):
-		if len(value) == 11 {
-			return "234" + value[1:]
-		}
-		return ""
-	default:
-		if len(value) == 10 {
-			return "234" + value
-		}
+	value := strings.TrimPrefix(digits.String(), "00")
+	value = strings.TrimPrefix(value, "234")
+	value = strings.TrimPrefix(value, "0")
+	// Match Agrilinks' accepted international and trunk formats. Nigerian
+	// mobile subscriber numbers have ten digits starting with 7, 8, or 9.
+	if len(value) != 10 || value[0] < '7' || value[0] > '9' {
 		return ""
 	}
+	return "234" + value
 }
 
 // VerifyPhone consumes the OTP challenge and atomically marks phone verification in persistence.

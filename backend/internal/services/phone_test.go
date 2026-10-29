@@ -13,6 +13,8 @@ func TestNormalizeNigerianPhone(t *testing.T) {
 		{name: "plus prefix", in: "+2348012345678", want: "2348012345678"},
 		{name: "spaces and dashes", in: "0801 234-5678", want: "2348012345678"},
 		{name: "bare subscriber number", in: "8012345678", want: "2348012345678"},
+		{name: "international dialing prefix", in: "002348012345678", want: "2348012345678"},
+		{name: "international with trunk zero", in: "+2340801 2345678", want: "2348012345678"},
 		{name: "empty", in: "", want: ""},
 		{name: "whitespace only", in: "   ", want: ""},
 		{name: "letters only", in: "not-a-number", want: ""},
@@ -20,6 +22,8 @@ func TestNormalizeNigerianPhone(t *testing.T) {
 		{name: "too long trunk", in: "080123456789", want: ""},
 		{name: "trunk with 234 prefix", in: "0234801234567", want: ""},
 		{name: "foreign number", in: "+1 555 0100", want: ""},
+		{name: "foreign full number", in: "+14155550123", want: ""},
+		{name: "invalid mobile prefix", in: "01234567890", want: ""},
 	}
 
 	for _, test := range tests {

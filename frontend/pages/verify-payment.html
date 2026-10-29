@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/static/assets/favicon_io/favicon-32x32.png">
+    <title>Confirm Payment | Agro-Shield</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/register.css">
+    <link rel="stylesheet" href="/static/css/register-extra.css">
+    <link rel="stylesheet" href="/static/css/complete-profile.css">
+</head>
+<body>
+<main class="auth-container complete-profile-container">
+    <section class="auth-right complete-profile-panel">
+        <div class="auth-form-wrapper">
+            <img class="auth-brand" src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield">
+            <h2>Confirm your payment</h2>
+            <p class="complete-profile-subtitle">Pay ₦{{money .Total}} from your wallet for {{.Quantity}} {{.Crop.Unit}} of {{.Crop.Name}}.</p>
+            <p class="complete-profile-subtitle">Enter the code sent to {{.Phone}} to approve this purchase.</p>
+            {{if .Error}}<p class="message" role="alert">{{.Error}}</p>{{end}}
+            {{if .Success}}<p class="onboarding-status" role="status">{{.Success}}</p>{{end}}
+            <form action="{{.ActionURL}}" method="POST" data-verification-form>
+                <input type="hidden" name="action" value="send_payment_code">
+                <input type="hidden" name="crop_id" value="{{.Crop.ID}}">
+                <input type="hidden" name="quantity" value="{{.Quantity}}">
+                <input type="hidden" name="unit_price" value="{{.Crop.PricePerUnit}}">
+                <input type="hidden" name="checkout_token" value="{{.CheckoutToken}}">
+                <button type="submit" class="secondary-button">Resend code</button>
+            </form>
+            <form action="{{.ActionURL}}" method="POST" class="phone-code-form" data-verification-form>
+                <input type="hidden" name="action" value="verify_payment">
+                <input type="hidden" name="crop_id" value="{{.Crop.ID}}">
+                <input type="hidden" name="quantity" value="{{.Quantity}}">
+                <input type="hidden" name="unit_price" value="{{.Crop.PricePerUnit}}">
+                <input type="hidden" name="checkout_token" value="{{.CheckoutToken}}">
+                <div class="form-group">
+                    <label for="verification-code">Verification code</label>
+                    <input id="verification-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code"
+                           maxlength="6" minlength="6" pattern="[0-9]{6}" placeholder="6-digit code" required>
+                </div>
+                <button type="submit">Confirm payment of ₦{{money .Total}}</button>
+            </form>
+            <a class="onboarding-exit" href="/marketplace">Back to marketplace</a>
+        </div>
+    </section>
+</main>
+<script src="/static/js/verify-phone.js"></script>
+</body>
+</html>

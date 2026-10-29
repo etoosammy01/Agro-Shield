@@ -220,11 +220,14 @@ func main() {
 	// ============================================================
 	// CREATE OTP PROVIDER
 	//
-	// SMS_PROVIDER=log writes codes to the development log.
-	// Plug in a custom OTP provider here when starting the provider afresh.
+	// An OTP.dev API key automatically enables SMS delivery and verification.
+	// Development without a key writes codes to the log.
 	// ============================================================
 
-	var otpProvider otp.Provider = otp.LogProvider{}
+	otpProvider, err := newOTPProvider(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
 	log.Printf("OTP SMS transport=%s", cfg.SMSProvider)
 
 	// ============================================================
@@ -353,4 +356,20 @@ func main() {
 		log.Fatal(err)
 	}
 	<-shutdownComplete
+}
+
+func newOTPProvider(cfg config.Config) (otp.Provider, error) {
+	switch cfg.SMSProvider {
+	case "log":
+		return otp.LogProvider{}, nil
+	case "otpdev":
+		return otp.NewOTPDevProvider(otp.OTPDevConfig{
+			APIKey:     cfg.OTPDevAPIKey,
+			Sender:     cfg.OTPDevSender,
+			TemplateID: cfg.OTPDevTemplateID,
+			BaseURL:    cfg.OTPDevBaseURL,
+		})
+	default:
+		return nil, errors.New("unsupported OTP SMS provider")
+	}
 }

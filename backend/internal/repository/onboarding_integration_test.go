@@ -126,6 +126,35 @@ func TestPhoneVerificationAtomicConsumptionAndPhoneChange(t *testing.T) {
 	}
 }
 
+func TestInvalidatingFailedDeliveryPreservesNewerOTPAndIssuanceAudit(t *testing.T) {
+	db := testDB(t)
+	farmer := createTestUser(t, db)
+	store := NewOTPRepository(db)
+	ctx := context.Background()
+	purpose := models.OTPPurposeTransfer
+	for _, hash := range []string{"older-delivery-hash", "newer-resend-hash"} {
+		if err := store.Issue(ctx, farmer.ID, farmer.Phone, purpose, hash, time.Now().Add(time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := store.Invalidate(ctx, farmer.ID, purpose, "older-delivery-hash"); err != nil {
+		t.Fatal(err)
+	}
+	active, err := store.LatestActive(ctx, farmer.ID, purpose)
+	if err != nil || active.CodeHash != "newer-resend-hash" {
+		t.Fatalf("older delivery failure invalidated the newer challenge: %v", err)
+	}
+	if err := store.Invalidate(ctx, farmer.ID, purpose, "newer-resend-hash"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.LatestActive(ctx, farmer.ID, purpose); !errors.Is(err, ErrNoActiveOTP) {
+		t.Fatalf("failed delivery challenge remained active: %v", err)
+	}
+	if count, err := store.CountIssuedSince(ctx, farmer.ID, purpose, time.Now().Add(-time.Minute)); err != nil || count != 2 {
+		t.Fatalf("failed delivery erased the issuance audit: count = %d, error = %v", count, err)
+	}
+}
+
 func TestPhoneVerificationRejectsExpiredExhaustedAndMismatchedChallenges(t *testing.T) {
 	db := testDB(t)
 	f := createTestUser(t, db)

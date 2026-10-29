@@ -264,7 +264,8 @@ func RegisterRoutes(
 	// MARKETPLACE
 	// ========================================================
 
-	marketplaceHandler := handlers.NewMarketplaceHandler(container.Crop, container.Wallet, container.MarketEvents, container.Notification)
+	checkoutHandler := handlers.NewCheckoutHandler(container.Crop, container.Wallet, container.OTP)
+	marketplaceHandler := handlers.NewMarketplaceHandler(container.Crop, checkoutHandler, container.MarketEvents, container.Notification)
 
 	http.HandleFunc(
 		"/marketplace",
@@ -749,7 +750,7 @@ func RegisterRoutes(
 	// ORDERS
 	// ========================================================
 
-	orderHandler := handlers.NewOrderHandler(container.Order, container.Wallet)
+	orderHandler := handlers.NewOrderHandler(container.Order, checkoutHandler)
 
 	// Order list (buyer purchases / farmer sales)
 	// GET /orders
@@ -919,6 +920,7 @@ func RegisterRoutes(
 
 	paymentHandler := handlers.NewPaymentHandler(
 		container.Payment,
+		container.OTP,
 	)
 	walletHandler := handlers.NewWalletHandler(container.Wallet, container.OTP, container.Notification)
 

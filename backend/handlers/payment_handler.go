@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -19,17 +20,26 @@ import (
 // ============================================================
 
 type PaymentHandler struct {
-	payment *services.PaymentService
+	payment paymentProcessor
+	otp     paymentOTP
 }
 
-func NewPaymentHandler(payment *services.PaymentService) *PaymentHandler {
-	return &PaymentHandler{payment: payment}
+type paymentProcessor interface {
+	Preflight(context.Context, services.InitiatePaymentInput) error
+	Initiate(context.Context, services.InitiatePaymentInput) (*services.InitiatePaymentResult, error)
+	ConfirmCallback(context.Context, string, string) (string, error)
+	ProcessWebhook(context.Context, []byte, string) (bool, error)
+}
+
+func NewPaymentHandler(payment paymentProcessor, otp paymentOTP) *PaymentHandler {
+	return &PaymentHandler{payment: payment, otp: otp}
 }
 
 // --- POST /orders/pay ----------------------------------------------------
 
 type initiatePaymentRequest struct {
-	OrderID int64 `json:"order_id"`
+	OrderID int64  `json:"order_id"`
+	Code    string `json:"code"`
 }
 
 func (h *PaymentHandler) InitiatePayment(w http.ResponseWriter, r *http.Request) {
@@ -37,21 +47,32 @@ func (h *PaymentHandler) InitiatePayment(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	var req initiatePaymentRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-
 	farmer, ok := middleware.FarmerFromContext(r)
 	if !ok || farmer == nil || !farmer.IsBuyer() {
 		http.Error(w, "Only authenticated buyers can pay for orders", http.StatusForbidden)
 		return
 	}
-	result, err := h.payment.Initiate(r.Context(), services.InitiatePaymentInput{
+	var req initiatePaymentRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.OrderID <= 0 {
+		http.Error(w, "valid order_id and verification code are required", http.StatusBadRequest)
+		return
+	}
+	input := services.InitiatePaymentInput{
 		OrderID: req.OrderID,
 		BuyerID: farmer.ID,
-	})
+	}
+	if err := h.payment.Preflight(r.Context(), input); err != nil {
+		log.Printf("preflight order payment for user %d: %v", farmer.ID, err)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": userError(err, "We couldn't check this order. Please try again.")})
+		return
+	}
+	if err := h.otp.Verify(r.Context(), farmer.ID, models.OTPPurposePayment, req.Code); err != nil {
+		log.Printf("verify order payment code for user %d: %v", farmer.ID, err)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": otpVerificationMessage(err)})
+		return
+	}
+	result, err := h.payment.Initiate(r.Context(), input)
 	if err != nil {
 		log.Printf("initiate payment: %v", err)
 		http.Error(w, "Payment service is temporarily unavailable. No payment status was confirmed; check your payment status before retrying.", http.StatusBadGateway)

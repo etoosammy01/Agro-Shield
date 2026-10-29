@@ -20,11 +20,11 @@ import (
 
 type WalletHandler struct {
 	wallet       *services.WalletService
-	otp          *otp.Service
+	otp          paymentOTP
 	notification *services.NotificationService
 }
 
-func NewWalletHandler(wallet *services.WalletService, otp *otp.Service, notification *services.NotificationService) *WalletHandler {
+func NewWalletHandler(wallet *services.WalletService, otp paymentOTP, notification *services.NotificationService) *WalletHandler {
 	return &WalletHandler{wallet: wallet, otp: otp, notification: notification}
 }
 
@@ -366,8 +366,12 @@ func (h *WalletHandler) SendOTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	purpose := strings.TrimSpace(r.FormValue("purpose"))
-	if purpose != models.OTPPurposeWithdrawal && purpose != models.OTPPurposeTransfer {
+	if purpose != models.OTPPurposeWithdrawal && purpose != models.OTPPurposeTransfer && purpose != models.OTPPurposePayment {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Unsupported verification purpose."})
+		return
+	}
+	if purpose == models.OTPPurposePayment && !farmer.IsBuyer() {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "Only buyer accounts can request an order payment code."})
 		return
 	}
 
@@ -381,9 +385,11 @@ func (h *WalletHandler) SendOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{
-		"message": "Verification code sent. It expires in 5 minutes.",
-	})
+	message := "Verification code sent. It expires in 5 minutes."
+	if transport, ok := h.otp.(interface{ DevelopmentDelivery() bool }); ok && transport.DevelopmentDelivery() {
+		message = "Development mode: no SMS was sent. Your verification code is in the server log and expires in 5 minutes."
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"message": message})
 }
 
 func (h *WalletHandler) Withdraw(w http.ResponseWriter, r *http.Request) {
@@ -414,7 +420,7 @@ func (h *WalletHandler) Withdraw(w http.ResponseWriter, r *http.Request) {
 	// No money moves without proof of control of the account's phone.
 	if err := h.otp.Verify(r.Context(), farmer.ID, models.OTPPurposeWithdrawal, r.FormValue("code")); err != nil {
 		log.Printf("verify withdrawal code for user %d: %v", farmer.ID, err)
-		http.Redirect(w, r, "/wallet?error="+url.QueryEscape(otpUserMessage(err)), http.StatusSeeOther)
+		http.Redirect(w, r, "/wallet?error="+url.QueryEscape(otpVerificationMessage(err)), http.StatusSeeOther)
 		return
 	}
 
@@ -523,7 +529,7 @@ func (h *WalletHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 	// No money moves without proof of control of the account's phone.
 	if err := h.otp.Verify(r.Context(), farmer.ID, models.OTPPurposeTransfer, r.FormValue("code")); err != nil {
 		log.Printf("verify transfer code for user %d: %v", farmer.ID, err)
-		http.Redirect(w, r, "/wallet?error="+url.QueryEscape(otpUserMessage(err)), http.StatusSeeOther)
+		http.Redirect(w, r, "/wallet?error="+url.QueryEscape(otpVerificationMessage(err)), http.StatusSeeOther)
 		return
 	}
 

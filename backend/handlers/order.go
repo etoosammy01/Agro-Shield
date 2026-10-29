@@ -12,11 +12,11 @@ import (
 
 type OrderHandler struct {
 	orderService *services.OrderService
-	wallet       *services.WalletService
+	checkout     *Checkout
 }
 
-func NewOrderHandler(orderService *services.OrderService, wallet *services.WalletService) *OrderHandler {
-	return &OrderHandler{orderService: orderService, wallet: wallet}
+func NewOrderHandler(orderService *services.OrderService, checkout *Checkout) *OrderHandler {
+	return &OrderHandler{orderService: orderService, checkout: checkout}
 }
 
 // ============================================================
@@ -120,11 +120,16 @@ func deliveryErrorMessage(code string) string {
 }
 
 // ============================================================
-// POST /orders
+// POST /orders/place
 // ============================================================
 func (h *OrderHandler) Place(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST")
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	farmer, ok := middleware.FarmerFromContext(r)
-	if !ok {
+	if !ok || farmer == nil {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
@@ -134,16 +139,12 @@ func (h *OrderHandler) Place(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Invalid form", http.StatusBadRequest)
+	result, err := h.checkout.Pay(w, r, farmer)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	cropID, _ := strconv.Atoi(r.FormValue("crop_id"))
-	quantity, _ := strconv.ParseFloat(r.FormValue("quantity"), 64)
-
-	if _, _, err := h.wallet.PayForOrder(r.Context(), farmer.ID, cropID, quantity, r.FormValue("checkout_token")); err != nil {
-		http.Error(w, userError(err, "We couldn't place that order. No order was placed; check the quantity and your wallet balance, then try again."), http.StatusBadRequest)
+	if result == nil {
 		return
 	}
 

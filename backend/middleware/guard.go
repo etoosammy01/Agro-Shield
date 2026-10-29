@@ -77,6 +77,8 @@ var rateRules = []rateRule{
 	{path: "/wallet/withdraw", methods: postOnly(), limiter: NewRateLimiter(10, 20)},
 	{path: "/wallet/transfer", methods: postOnly(), limiter: NewRateLimiter(10, 20)},
 	{path: "/orders/pay", methods: postOnly(), limiter: NewRateLimiter(10, 20)},
+	{path: "/orders/place", methods: postOnly(), limiter: NewRateLimiter(10, 20)},
+	{path: "/marketplace", methods: postOnly(), limiter: NewRateLimiter(20, 30)},
 	{path: "/chat/send", methods: postOnly(), limiter: NewRateLimiter(30, 60)},
 	{path: "/chat/typing", methods: allMethods(), limiter: NewRateLimiter(600, 800)},
 	{path: "/chat/private", methods: postOnly(), limiter: NewRateLimiter(10, 20)},

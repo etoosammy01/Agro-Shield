@@ -883,7 +883,7 @@ func (r *WalletRepository) CreateWithdrawal(ctx context.Context, farmerID int, r
 // ways and the parts have to add up exactly, so the seller's share is derived
 // by subtracting the fee from the total rather than being rounded separately.
 // That makes buyer debit == seller credit + fee true by construction.
-func (r *WalletRepository) PayForOrder(ctx context.Context, buyerID, cropID int, quantity float64, checkoutToken string, commissionBasisPoints int64) (int64, bool, error) {
+func (r *WalletRepository) PayForOrder(ctx context.Context, buyerID, cropID int, quantity float64, checkoutToken string, commissionBasisPoints int64, expectedUnitPrice ...float64) (int64, bool, error) {
 	if buyerID <= 0 || cropID <= 0 {
 		return 0, false, fmt.Errorf("invalid buyer or crop")
 	}
@@ -912,7 +912,7 @@ func (r *WalletRepository) PayForOrder(ctx context.Context, buyerID, cropID int,
 	}
 	var existingOrderID int64
 	err = tx.QueryRowContext(ctx,
-		`SELECT id FROM orders WHERE checkout_token = $1`, checkoutToken,
+		`SELECT id FROM orders WHERE checkout_token = $1 AND buyer_id = $2`, checkoutToken, buyerID,
 	).Scan(&existingOrderID)
 	if err == nil {
 		return existingOrderID, true, tx.Commit()
@@ -922,12 +922,12 @@ func (r *WalletRepository) PayForOrder(ctx context.Context, buyerID, cropID int,
 	}
 
 	var sellerID int
-	var available float64
+	var available, unitPrice float64
 	var listed bool
 	err = tx.QueryRowContext(ctx, `
-		SELECT farmer_id, quantity, listed_for_sale
+		SELECT farmer_id, quantity, listed_for_sale, price_per_unit
 		FROM crops WHERE id = $1 FOR UPDATE`, cropID,
-	).Scan(&sellerID, &available, &listed)
+	).Scan(&sellerID, &available, &listed, &unitPrice)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, false, fmt.Errorf("this produce is not available for purchase")
 	}
@@ -939,6 +939,11 @@ func (r *WalletRepository) PayForOrder(ctx context.Context, buyerID, cropID int,
 	}
 	if sellerID == buyerID {
 		return 0, false, fmt.Errorf("you can't buy your own produce")
+	}
+	// Recheck the confirmed price while holding the crop lock: the seller may
+	// have changed it after the buyer entered their verification code.
+	if len(expectedUnitPrice) > 0 && unitPrice != expectedUnitPrice[0] {
+		return 0, false, fmt.Errorf("this product's price changed. Review it and request a new payment code")
 	}
 
 	// The total is rounded to whole kobo in SQL and returned as an integer, so
@@ -1033,6 +1038,18 @@ func (r *WalletRepository) PayForOrder(ctx context.Context, buyerID, cropID int,
 		}
 	}
 	return orderID, false, tx.Commit()
+}
+
+// OrderForCheckoutToken reads a buyer's completed receipt. It permits a retry
+// to confirm the original purchase after the payment OTP has been consumed.
+func (r *WalletRepository) OrderForCheckoutToken(ctx context.Context, buyerID int, token string) (int64, error) {
+	var orderID int64
+	err := r.db.QueryRowContext(ctx, `SELECT id FROM orders
+		WHERE buyer_id = $1 AND checkout_token = $2 AND status = 'completed'`, buyerID, token).Scan(&orderID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	return orderID, err
 }
 
 // PlatformRevenueTotal returns the commission collected so far and how many

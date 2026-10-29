@@ -60,32 +60,9 @@ func generateReference(orderID int64) (string, error) {
 // details are never trusted from the browser. Only eligible unpaid orders can
 // be paid through this endpoint; wallet-paid completed orders are rejected.
 func (s *PaymentService) Initiate(ctx context.Context, in InitiatePaymentInput) (*InitiatePaymentResult, error) {
-	if in.OrderID <= 0 || in.BuyerID <= 0 {
-		return nil, errors.New("valid order and buyer are required")
-	}
-	order, err := s.orders.GetByID(int(in.OrderID))
+	order, buyer, err := s.paymentDetails(in)
 	if err != nil {
-		return nil, fmt.Errorf("load order: %w", err)
-	}
-	if order == nil {
-		return nil, errors.New("order not found")
-	}
-	if order.BuyerID != in.BuyerID {
-		return nil, errors.New("order does not belong to this buyer")
-	}
-	status := strings.ToLower(strings.TrimSpace(order.Status))
-	if status != "pending" && status != "pending_payment" {
-		return nil, fmt.Errorf("order is not awaiting external payment")
-	}
-	if order.TotalPrice <= 0 {
-		return nil, errors.New("order total must be greater than zero")
-	}
-	buyer, err := s.farmers.GetByID(in.BuyerID)
-	if err != nil {
-		return nil, fmt.Errorf("load buyer: %w", err)
-	}
-	if buyer == nil || !buyer.IsBuyer() || strings.TrimSpace(buyer.Email) == "" {
-		return nil, errors.New("a registered buyer with an email address is required")
+		return nil, err
 	}
 	amount := fmt.Sprintf("%.2f", order.TotalPrice)
 	reference, err := generateReference(in.OrderID)
@@ -107,6 +84,43 @@ func (s *PaymentService) Initiate(ctx context.Context, in InitiatePaymentInput) 
 		return nil, errors.New("Flutterwave returned no checkout URL")
 	}
 	return &InitiatePaymentResult{CheckoutURL: checkoutURL, Reference: reference}, nil
+}
+
+// Preflight rejects ineligible orders before a payment OTP is spent.
+func (s *PaymentService) Preflight(_ context.Context, in InitiatePaymentInput) error {
+	_, _, err := s.paymentDetails(in)
+	return err
+}
+
+func (s *PaymentService) paymentDetails(in InitiatePaymentInput) (*models.Order, *models.Farmer, error) {
+	if in.OrderID <= 0 || in.BuyerID <= 0 {
+		return nil, nil, errors.New("valid order and buyer are required")
+	}
+	order, err := s.orders.GetByID(int(in.OrderID))
+	if err != nil {
+		return nil, nil, fmt.Errorf("load order: %w", err)
+	}
+	if order == nil {
+		return nil, nil, errors.New("order not found")
+	}
+	if order.BuyerID != in.BuyerID {
+		return nil, nil, errors.New("order does not belong to this buyer")
+	}
+	status := strings.ToLower(strings.TrimSpace(order.Status))
+	if status != "pending" && status != "pending_payment" {
+		return nil, nil, fmt.Errorf("order is not awaiting external payment")
+	}
+	if order.TotalPrice <= 0 {
+		return nil, nil, errors.New("order total must be greater than zero")
+	}
+	buyer, err := s.farmers.GetByID(in.BuyerID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("load buyer: %w", err)
+	}
+	if buyer == nil || !buyer.IsBuyer() || strings.TrimSpace(buyer.Email) == "" {
+		return nil, nil, errors.New("a registered buyer with an email address is required")
+	}
+	return order, buyer, nil
 }
 
 // --- Callback ----------------------------------------------------------

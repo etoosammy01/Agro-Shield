@@ -62,12 +62,20 @@ func (s *Service) Issue(ctx context.Context, farmerID int, phone, purpose string
 	}
 
 	if err := s.provider.Send(ctx, recipient, code, purpose); err != nil {
+		// Invalidate this exact challenge, preserving a newer resend. Delivery
+		// may have failed because the request was canceled, so cleanup needs its
+		// own bounded context to prevent an unsent code remaining usable.
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if cleanupErr := s.repo.Invalidate(cleanupCtx, farmerID, purpose, string(hash)); cleanupErr != nil {
+			err = errors.Join(err, fmt.Errorf("invalidate undelivered one-time passcode: %w", cleanupErr))
+		}
 		return fmt.Errorf("send one-time passcode: %w", err)
 	}
 	return nil
 }
 
-// Verify checks a submitted passcode against the stored hash and provider.
+// Verify checks the submitted passcode against its stored hash and consumes it.
 func (s *Service) Verify(ctx context.Context, farmerID int, purpose, code string) error {
 	return s.verify(ctx, farmerID, purpose, code, "")
 }
@@ -102,15 +110,7 @@ func (s *Service) verify(ctx context.Context, farmerID int, purpose, code, phone
 		return ErrTooManyAttempts
 	}
 
-	verificationErr := bcrypt.CompareHashAndPassword([]byte(active.CodeHash), []byte(code))
-	if verificationErr == nil {
-		verificationErr = s.provider.Verify(ctx, active.Phone, code)
-		if verificationErr != nil && !errors.Is(verificationErr, ErrInvalid) {
-			return fmt.Errorf("verify one-time passcode with provider: %w", verificationErr)
-		}
-	}
-
-	if verificationErr != nil {
+	if bcrypt.CompareHashAndPassword([]byte(active.CodeHash), []byte(code)) != nil {
 		attempts := active.Attempts
 		if err := s.repo.IncrementAttempts(ctx, active.ID); err != nil {
 			return fmt.Errorf("record failed one-time passcode attempt: %w", err)
