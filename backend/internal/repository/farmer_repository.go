@@ -122,7 +122,8 @@ func (r *FarmerRepository) GetByPhone(phone string) (*models.Farmer, error) {
         COALESCE(photo_url, '') AS photo_url,
         COALESCE(bank_name, ''), COALESCE(bank_code, ''), COALESCE(account_name, ''), COALESCE(account_number, ''), COALESCE(wallet_number, ''),
         created_at,
-        updated_at, selfie_captured_at, phone_verified_at
+        updated_at, selfie_captured_at, phone_verified_at,
+        EXISTS (SELECT 1 FROM wallets w WHERE w.farmer_id = farmers.id AND COALESCE(w.transaction_pin_hash, '') <> '')
     FROM farmers
     WHERE phone = $1
     AND deleted_at IS NULL
@@ -140,7 +141,7 @@ func (r *FarmerRepository) GetByPhone(phone string) (*models.Farmer, error) {
 		&farmer.PhotoURL,
 		&farmer.BankName, &farmer.BankCode, &farmer.AccountName, &farmer.AccountNumber, &farmer.WalletNumber,
 		&farmer.CreatedAt,
-		&farmer.UpdatedAt, &farmer.SelfieCapturedAt, &farmer.PhoneVerifiedAt,
+		&farmer.UpdatedAt, &farmer.SelfieCapturedAt, &farmer.PhoneVerifiedAt, &farmer.HasTransactionPIN,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -165,7 +166,8 @@ func (r *FarmerRepository) GetByID(id int) (*models.Farmer, error) {
         COALESCE(photo_url, '') AS photo_url,
         COALESCE(bank_name, ''), COALESCE(bank_code, ''), COALESCE(account_name, ''), COALESCE(account_number, ''), COALESCE(wallet_number, ''),
         created_at,
-        updated_at, selfie_captured_at, phone_verified_at
+        updated_at, selfie_captured_at, phone_verified_at,
+        EXISTS (SELECT 1 FROM wallets w WHERE w.farmer_id = farmers.id AND COALESCE(w.transaction_pin_hash, '') <> '')
     FROM farmers
     WHERE id = $1
     AND deleted_at IS NULL
@@ -183,7 +185,7 @@ func (r *FarmerRepository) GetByID(id int) (*models.Farmer, error) {
 		&farmer.PhotoURL,
 		&farmer.BankName, &farmer.BankCode, &farmer.AccountName, &farmer.AccountNumber, &farmer.WalletNumber,
 		&farmer.CreatedAt,
-		&farmer.UpdatedAt, &farmer.SelfieCapturedAt, &farmer.PhoneVerifiedAt,
+		&farmer.UpdatedAt, &farmer.SelfieCapturedAt, &farmer.PhoneVerifiedAt, &farmer.HasTransactionPIN,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -211,7 +213,8 @@ func (r *FarmerRepository) GetByWalletNumber(walletNumber string) (*models.Farme
         COALESCE(photo_url, '') AS photo_url,
         COALESCE(bank_name, ''), COALESCE(bank_code, ''), COALESCE(account_name, ''), COALESCE(account_number, ''), COALESCE(wallet_number, ''),
         created_at,
-        updated_at, selfie_captured_at, phone_verified_at
+        updated_at, selfie_captured_at, phone_verified_at,
+        EXISTS (SELECT 1 FROM wallets w WHERE w.farmer_id = farmers.id AND COALESCE(w.transaction_pin_hash, '') <> '')
     FROM farmers
     WHERE wallet_number = $1
     AND deleted_at IS NULL
@@ -229,7 +232,7 @@ func (r *FarmerRepository) GetByWalletNumber(walletNumber string) (*models.Farme
 		&farmer.PhotoURL,
 		&farmer.BankName, &farmer.BankCode, &farmer.AccountName, &farmer.AccountNumber, &farmer.WalletNumber,
 		&farmer.CreatedAt,
-		&farmer.UpdatedAt, &farmer.SelfieCapturedAt, &farmer.PhoneVerifiedAt,
+		&farmer.UpdatedAt, &farmer.SelfieCapturedAt, &farmer.PhoneVerifiedAt, &farmer.HasTransactionPIN,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -260,7 +263,8 @@ func (r *FarmerRepository) FindByAccountNumber(accountNumber string) ([]*models.
 			COALESCE(photo_url, '') AS photo_url,
 			COALESCE(bank_name, ''), COALESCE(bank_code, ''), COALESCE(account_name, ''), COALESCE(account_number, ''), COALESCE(wallet_number, ''),
 			created_at,
-			updated_at, selfie_captured_at, phone_verified_at
+			updated_at, selfie_captured_at, phone_verified_at,
+			EXISTS (SELECT 1 FROM wallets w WHERE w.farmer_id = farmers.id AND COALESCE(w.transaction_pin_hash, '') <> '')
 		FROM farmers
 		WHERE account_number = $1 AND account_number <> '' AND deleted_at IS NULL
 		ORDER BY id
@@ -285,7 +289,7 @@ func (r *FarmerRepository) FindByAccountNumber(accountNumber string) ([]*models.
 			&farmer.PhotoURL,
 			&farmer.BankName, &farmer.BankCode, &farmer.AccountName, &farmer.AccountNumber, &farmer.WalletNumber,
 			&farmer.CreatedAt,
-			&farmer.UpdatedAt, &farmer.SelfieCapturedAt, &farmer.PhoneVerifiedAt,
+			&farmer.UpdatedAt, &farmer.SelfieCapturedAt, &farmer.PhoneVerifiedAt, &farmer.HasTransactionPIN,
 		); err != nil {
 			return nil, err
 		}
@@ -300,7 +304,8 @@ func (r *FarmerRepository) ListForChat(excludeID int, search string) ([]models.F
         SELECT id, full_name, phone, COALESCE(email, ''),
             location, COALESCE(lga, location), COALESCE(state, ''), COALESCE(country, ''),
             role, COALESCE(photo_url, ''), COALESCE(bank_name, ''), COALESCE(bank_code, ''),
-            COALESCE(account_name, ''), COALESCE(account_number, ''), COALESCE(wallet_number, ''), created_at, updated_at, selfie_captured_at, phone_verified_at
+            COALESCE(account_name, ''), COALESCE(account_number, ''), COALESCE(wallet_number, ''), created_at, updated_at, selfie_captured_at, phone_verified_at,
+            EXISTS (SELECT 1 FROM wallets w WHERE w.farmer_id = farmers.id AND COALESCE(w.transaction_pin_hash, '') <> '')
         FROM farmers
         WHERE id <> $1 AND deleted_at IS NULL
         AND ($2 = '' OR full_name ILIKE '%' || $2 || '%' OR role ILIKE '%' || $2 || '%' OR location ILIKE '%' || $2 || '%')
@@ -313,7 +318,7 @@ func (r *FarmerRepository) ListForChat(excludeID int, search string) ([]models.F
 	var users []models.Farmer
 	for rows.Next() {
 		var user models.Farmer
-		if err := rows.Scan(&user.ID, &user.FullName, &user.Phone, &user.Email, &user.Location, &user.LGA, &user.State, &user.Country, &user.Role, &user.PhotoURL, &user.BankName, &user.BankCode, &user.AccountName, &user.AccountNumber, &user.WalletNumber, &user.CreatedAt, &user.UpdatedAt, &user.SelfieCapturedAt, &user.PhoneVerifiedAt); err != nil {
+		if err := rows.Scan(&user.ID, &user.FullName, &user.Phone, &user.Email, &user.Location, &user.LGA, &user.State, &user.Country, &user.Role, &user.PhotoURL, &user.BankName, &user.BankCode, &user.AccountName, &user.AccountNumber, &user.WalletNumber, &user.CreatedAt, &user.UpdatedAt, &user.SelfieCapturedAt, &user.PhoneVerifiedAt, &user.HasTransactionPIN); err != nil {
 			return nil, err
 		}
 		users = append(users, user)
@@ -552,6 +557,11 @@ func (r *FarmerRepository) DeleteAccount(ctx context.Context, farmerID int) erro
 	// unique because it includes the id, and it can never pass the Nigerian
 	// phone rules used by login and OTP.
 	placeholderPhone := fmt.Sprintf("deleted-%d", farmerID)
+	if _, err := tx.ExecContext(ctx, `UPDATE wallets SET transaction_pin_hash = NULL,
+		transaction_pin_created_at = NULL, transaction_pin_failed_attempts = 0,
+		transaction_pin_locked_until = NULL WHERE farmer_id = $1`, farmerID); err != nil {
+		return err
+	}
 	if _, err := tx.ExecContext(ctx, `
         UPDATE farmers
         SET full_name = 'Deleted account',

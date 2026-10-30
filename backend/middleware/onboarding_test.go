@@ -14,23 +14,27 @@ type onboardingFarmerReader struct{ farmer *models.Farmer }
 
 func (f onboardingFarmerReader) GetByID(int) (*models.Farmer, error) { return f.farmer, nil }
 
-func TestRequireAuthEnforcesBothOnboardingSteps(t *testing.T) {
+func TestRequireAuthEnforcesAllOnboardingSteps(t *testing.T) {
 	done := sql.NullTime{Time: time.Now(), Valid: true}
 	for _, role := range []string{"farmer", "buyer"} {
 		for _, tc := range []struct {
 			name          string
 			selfie, phone sql.NullTime
+			pin           bool
 			path, want    string
 		}{
-			{"existing uploaded photo", sql.NullTime{}, sql.NullTime{}, "/dashboard", "/complete-profile"},
-			{"verification alone cannot skip selfie", sql.NullTime{}, done, "/marketplace", "/complete-profile"},
-			{"selfie only", done, sql.NullTime{}, "/dashboard", "/verify-phone"},
-			{"completed", done, done, "/dashboard", ""},
-			{"selfie page available", sql.NullTime{}, sql.NullTime{}, "/complete-profile", ""},
-			{"phone page delegated to handler", done, sql.NullTime{}, "/verify-phone", ""},
+			{"existing uploaded photo", sql.NullTime{}, sql.NullTime{}, false, "/dashboard", "/complete-profile"},
+			{"PIN and verification cannot skip selfie", sql.NullTime{}, done, true, "/marketplace", "/complete-profile"},
+			{"PIN cannot skip phone verification", done, sql.NullTime{}, true, "/wallet", "/verify-phone"},
+			{"selfie only", done, sql.NullTime{}, false, "/dashboard", "/verify-phone"},
+			{"verified phone needs wallet PIN", done, done, false, "/wallet/transfer", "/create-transaction-pin"},
+			{"completed", done, done, true, "/dashboard", ""},
+			{"selfie page available", sql.NullTime{}, sql.NullTime{}, false, "/complete-profile", ""},
+			{"phone page delegated to handler", done, sql.NullTime{}, false, "/verify-phone", ""},
+			{"PIN page delegated to handler", done, done, false, "/create-transaction-pin", ""},
 		} {
 			t.Run(role+"/"+tc.name, func(t *testing.T) {
-				farmer := &models.Farmer{ID: 42, Role: role, PhotoURL: "/static/uploads/farmers/old.jpg", SelfieCapturedAt: tc.selfie, PhoneVerifiedAt: tc.phone}
+				farmer := &models.Farmer{ID: 42, Role: role, PhotoURL: "/static/uploads/farmers/old.jpg", SelfieCapturedAt: tc.selfie, PhoneVerifiedAt: tc.phone, HasTransactionPIN: tc.pin}
 				session := CreateSession(farmer.ID)
 				t.Cleanup(func() { DeleteSession(session) })
 				r := httptest.NewRequest(http.MethodGet, tc.path, nil)
@@ -57,7 +61,7 @@ func TestRequireAuthEnforcesBothOnboardingSteps(t *testing.T) {
 }
 
 func TestRequireAuthOnboardingStillRequiresSession(t *testing.T) {
-	for _, path := range []string{"/complete-profile", "/verify-phone"} {
+	for _, path := range []string{"/complete-profile", "/verify-phone", "/create-transaction-pin"} {
 		w := httptest.NewRecorder()
 		RequireAuth(onboardingFarmerReader{}, func(http.ResponseWriter, *http.Request) { t.Fatal("unauthenticated handler called") })(w, httptest.NewRequest("GET", path, nil))
 		if w.Header().Get("Location") != "/login" {

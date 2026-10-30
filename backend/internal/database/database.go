@@ -1059,6 +1059,11 @@ func RunOnboardingMigration(db *sql.DB) error {
 	if _, err := tx.Exec(`ALTER TABLE farmers
 		ADD COLUMN IF NOT EXISTS selfie_captured_at TIMESTAMP,
 		ADD COLUMN IF NOT EXISTS phone_verified_at TIMESTAMP;
+		ALTER TABLE wallets
+		ADD COLUMN IF NOT EXISTS transaction_pin_hash TEXT,
+		ADD COLUMN IF NOT EXISTS transaction_pin_created_at TIMESTAMP,
+		ADD COLUMN IF NOT EXISTS transaction_pin_failed_attempts INTEGER NOT NULL DEFAULT 0 CHECK (transaction_pin_failed_attempts >= 0),
+		ADD COLUMN IF NOT EXISTS transaction_pin_locked_until TIMESTAMPTZ;
 		ALTER TABLE otp_codes DROP CONSTRAINT IF EXISTS otp_codes_purpose_check;
 		ALTER TABLE otp_codes ADD CONSTRAINT otp_codes_purpose_check
 		CHECK (purpose IN ('withdrawal','transfer','password_reset','phone_verification','payment'));`); err != nil {

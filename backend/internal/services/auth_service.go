@@ -44,7 +44,7 @@ func NewAuthService(repo *repository.FarmerRepository) *AuthService {
 // Register creates a new farmer or buyer account. role should be "farmer" or
 // "buyer" — anything else defaults to "farmer".
 //
-// Selfie capture and phone verification follow registration. Bank details
+// Selfie capture, phone verification, and transaction PIN setup follow registration. Bank details
 // can be added later from the wallet.
 //
 // Returns ErrPhoneTaken if the phone number is already registered, and
@@ -117,10 +117,10 @@ func (s *AuthService) Register(firstName, lastName, phone, email, password, comm
 	return farmer, nil
 }
 
-// HasCompletedProfile requires both persisted onboarding steps. An existing
+// HasCompletedProfile requires all persisted onboarding steps. An existing
 // uploaded profile picture alone does not prove a selfie was captured.
 func HasCompletedProfile(farmer *models.Farmer) bool {
-	return farmer != nil && farmer.SelfieCapturedAt.Valid && farmer.PhoneVerifiedAt.Valid
+	return farmer != nil && farmer.SelfieCapturedAt.Valid && farmer.PhoneVerifiedAt.Valid && farmer.HasTransactionPIN
 }
 
 // OnboardingPath returns the next required step, or the dashboard when done.
@@ -130,6 +130,9 @@ func OnboardingPath(farmer *models.Farmer) string {
 	}
 	if !farmer.PhoneVerifiedAt.Valid {
 		return "/verify-phone"
+	}
+	if !farmer.HasTransactionPIN {
+		return "/create-transaction-pin"
 	}
 	return "/dashboard"
 }

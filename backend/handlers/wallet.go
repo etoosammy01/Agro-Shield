@@ -13,6 +13,7 @@ import (
 
 	"backend/internal/models"
 	"backend/internal/otp"
+	"backend/internal/repository"
 	"backend/internal/services"
 	"backend/middleware"
 	"backend/render"
@@ -449,6 +450,17 @@ func (h *WalletHandler) Withdraw(w http.ResponseWriter, r *http.Request) {
 // reaches the page.
 func walletUserMessage(err error) string {
 	switch {
+	case errors.Is(err, services.ErrTransactionPINUnavailable):
+		return services.ErrTransactionPINUnavailable.Error() + "."
+	case errors.Is(err, services.ErrInvalidTransactionPIN),
+		errors.Is(err, repository.ErrTransactionPINNotSet),
+		errors.Is(err, repository.ErrTransactionPINIncorrect),
+		errors.Is(err, repository.ErrTransactionPINLocked),
+		errors.Is(err, repository.ErrTransactionPINSetupUnavailable):
+		return err.Error() + "."
+	case errors.Is(err, otp.ErrInvalid), errors.Is(err, otp.ErrUnavailable),
+		errors.Is(err, otp.ErrTooManyAttempts), errors.Is(err, otp.ErrRateLimited):
+		return otpVerificationMessage(err)
 	case errors.Is(err, services.ErrWalletUnavailable),
 		errors.Is(err, services.ErrTransferUnavailable):
 		return "That could not be completed because of a technical issue. Check your wallet history before retrying; anything already on hold is listed there."
@@ -522,18 +534,7 @@ func (h *WalletHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 		h.redirectTransferError(w, r, err)
 		return
 	}
-	if err := h.wallet.PreflightTransfer(r.Context(), farmer.ID, r.FormValue("amount")); err != nil {
-		h.redirectTransferError(w, r, err)
-		return
-	}
-	// No money moves without proof of control of the account's phone.
-	if err := h.otp.Verify(r.Context(), farmer.ID, models.OTPPurposeTransfer, r.FormValue("code")); err != nil {
-		log.Printf("verify transfer code for user %d: %v", farmer.ID, err)
-		http.Redirect(w, r, "/wallet?error="+url.QueryEscape(otpVerificationMessage(err)), http.StatusSeeOther)
-		return
-	}
-
-	if err := h.wallet.RequestTransfer(r.Context(), farmer.ID, recipient.ID, r.FormValue("amount"), r.FormValue("note")); err != nil {
+	if err := h.wallet.RequestTransfer(r.Context(), farmer.ID, recipient.ID, r.FormValue("amount"), r.FormValue("note"), r.FormValue("pin"), r.FormValue("code")); err != nil {
 		log.Printf("wallet transfer request for user %d: %v", farmer.ID, err)
 		h.redirectTransferError(w, r, err)
 		return

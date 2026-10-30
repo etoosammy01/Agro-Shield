@@ -91,6 +91,7 @@ if (connectionStatus) {
   const amount = document.getElementById("transfer-amount");
   const note = document.getElementById("transfer-note");
   const code = document.getElementById("transfer-code");
+  const pin = document.getElementById("transfer-pin");
   const detailsStep = form && form.querySelector('[data-transfer-step="details"]');
   const confirmStep = form && form.querySelector('[data-transfer-step="confirm"]');
   const summaryName = form && form.querySelector("[data-transfer-summary-name]");
@@ -98,7 +99,7 @@ if (connectionStatus) {
   const summaryNote = form && form.querySelector("[data-transfer-summary-note]");
   const summaryNoteRow = form && form.querySelector("[data-transfer-summary-note-row]");
   if (!form || !recipient || !startButton || !submitButton || !backButton ||
-      !status || !name || !amount || !note || !code || !detailsStep || !confirmStep ||
+      !status || !name || !amount || !note || !code || !pin || !detailsStep || !confirmStep ||
       !summaryName || !summaryAmount || !summaryNote || !summaryNoteRow) return;
 
   let resolved = false;
@@ -202,6 +203,7 @@ if (connectionStatus) {
     detailsStep.hidden = true;
     confirmStep.hidden = false;
     code.required = true;
+    pin.required = true;
 
     // Send the passcode as soon as the confirmation step opens, rather than
     // making the sender request it with a separate button first. The resend
@@ -219,6 +221,8 @@ if (connectionStatus) {
     detailsStep.hidden = false;
     code.required = false;
     code.value = "";
+    pin.required = false;
+    pin.value = "";
     recipient.focus();
   });
 

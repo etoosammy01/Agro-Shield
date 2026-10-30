@@ -33,6 +33,8 @@ func (h *Login) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		data := LoginPageData{}
 		if r.URL.Query().Get("deleted") == "1" {
 			data.Notice = "Your account has been closed. Your order and payment history is kept for record-keeping."
+		} else if r.URL.Query().Get("onboarded") == "1" {
+			data.Notice = "Account setup complete. Your wallet transaction PIN is ready. Log in to continue."
 		} else if r.URL.Query().Get("verified") == "1" {
 			data.Notice = "Phone verified. Log in to continue."
 		}

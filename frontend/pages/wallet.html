@@ -278,11 +278,14 @@
                         <p class="wallet-inline-status" id="transfer-otp-status" role="status" aria-live="polite"></p>
                         <button class="wallet-button wallet-button-secondary" type="button" data-otp-purpose="transfer" data-otp-target="transfer-code" data-otp-status="transfer-otp-status">Resend code</button>
 
+                        <label class="wallet-label" for="transfer-pin">Wallet transaction PIN</label>
+                        <input id="transfer-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" autocomplete="off" placeholder="4-digit PIN">
+
                         <button class="wallet-button wallet-button-primary" type="submit" id="transfer-submit">Confirm and send for approval <span aria-hidden="true">→</span></button>
                         <button class="wallet-button wallet-button-secondary" type="button" id="transfer-back">← Back and edit</button>
                     </div>
                 </form>
-                <p class="wallet-footnote">The amount leaves your balance after you confirm the code and is held until an admin approves it. If it’s rejected, it comes straight back.</p>
+                <p class="wallet-footnote">The amount leaves your balance after you confirm your wallet PIN and verification code, and is held until an admin approves it. If it’s rejected, it comes straight back.</p>
             </article>
         </section>
 

@@ -17,6 +17,7 @@ import (
 	"unicode"
 
 	"backend/internal/models"
+	"backend/internal/otp"
 	"backend/internal/repository"
 )
 
@@ -27,10 +28,12 @@ type notifier interface {
 }
 
 type WalletService struct {
-	repo    walletStore
-	farmers farmerStore
-	lookups bankLookupStore
-	flutter *FlutterwaveClient
+	repo          walletStore
+	farmers       farmerStore
+	lookups       bankLookupStore
+	flutter       *FlutterwaveClient
+	transferPINs  transactionPINVerifier
+	transferCodes transferCodeVerifier
 
 	// notify delivers the messages that follow money movement. It may be nil: a
 	// wallet still has to move money when nobody can be told about it.
@@ -103,6 +106,20 @@ func (s *WalletService) SetStaleDepositAfter(age time.Duration) {
 	if age > 0 {
 		s.staleDepositAfter = age
 	}
+}
+
+type transactionPINVerifier interface {
+	Verify(context.Context, int, string) error
+}
+
+type transferCodeVerifier interface {
+	Verify(context.Context, int, string, string) error
+}
+
+// SetTransferVerification is configured at startup. Transfer requests fail closed
+// unless both wallet PIN and phone-code verification are available.
+func (s *WalletService) SetTransferVerification(pins transactionPINVerifier, codes transferCodeVerifier) {
+	s.transferPINs, s.transferCodes = pins, codes
 }
 
 // accountResolver resolves an account number at one specific bank. Flutterwave
@@ -1843,15 +1860,18 @@ func normalizeTransferNote(note string) (string, error) {
 	return cleaned, nil
 }
 
-// RequestTransfer reserves amount from the sender and records a transfer to
-// recipientID for admin approval.
+// RequestTransfer verifies the sender's wallet PIN and phone code before
+// reserving amount and recording a transfer for admin approval.
 //
 // The recipient is passed as an already-resolved account ID so the handler can
 // validate it — and let the user fix a mistyped number — before a passcode is
 // spent.
-func (s *WalletService) RequestTransfer(ctx context.Context, senderID, recipientID int, amount, note string) error {
+func (s *WalletService) RequestTransfer(ctx context.Context, senderID, recipientID int, amount, note, pin, code string) error {
 	if senderID <= 0 || recipientID <= 0 {
 		return errors.New("invalid transfer participants")
+	}
+	if senderID == recipientID {
+		return repository.ErrSelfTransfer
 	}
 	amount, _, err := normalizeWalletAmount(amount, false)
 	if err != nil {
@@ -1860,6 +1880,30 @@ func (s *WalletService) RequestTransfer(ctx context.Context, senderID, recipient
 	note, err = normalizeTransferNote(note)
 	if err != nil {
 		return err
+	}
+	if s.transferPINs == nil || s.transferCodes == nil {
+		return ErrTransactionPINUnavailable
+	}
+	if err := s.PreflightTransfer(ctx, senderID, amount); err != nil {
+		return err
+	}
+	sender, err := s.farmers.GetByID(senderID)
+	if err != nil {
+		return fmt.Errorf("%w: read sender: %v", ErrTransferUnavailable, err)
+	}
+	if sender == nil || sender.ID != senderID {
+		return repository.ErrInvalidTransferParticipants
+	}
+	// A wrong or locked PIN must not spend an otherwise valid phone code.
+	if err := s.transferPINs.Verify(ctx, senderID, pin); err != nil {
+		return err
+	}
+	if err := s.transferCodes.Verify(ctx, senderID, models.OTPPurposeTransfer, code); err != nil {
+		if errors.Is(err, otp.ErrInvalid) || errors.Is(err, otp.ErrUnavailable) ||
+			errors.Is(err, otp.ErrTooManyAttempts) || errors.Is(err, otp.ErrRateLimited) {
+			return err
+		}
+		return fmt.Errorf("%w: verify transfer code: %v", ErrTransferUnavailable, err)
 	}
 	reference, err := walletReference("TRANSFER", senderID)
 	if err != nil {
@@ -1871,10 +1915,9 @@ func (s *WalletService) RequestTransfer(ctx context.Context, senderID, recipient
 
 	// Told, rather than left to be found on the approvals page. The sender's
 	// balance is already reduced by this point, so a transfer nobody opens holds
-	// their money for as long as nobody opens it. The sender's name is a nicety,
-	// so a read that fails costs the name and not the notification.
+	// their money for as long as nobody opens it.
 	who := fmt.Sprintf("User #%d", senderID)
-	if sender, lookupErr := s.farmers.GetByID(senderID); lookupErr == nil && sender != nil && sender.FullName != "" {
+	if sender.FullName != "" {
 		who = fmt.Sprintf("%s (#%d)", sender.FullName, senderID)
 	}
 	// Skipped for the same reason as a withdrawal: an admin who sent this cannot

@@ -151,7 +151,7 @@ type farmerReader interface {
 // RequireAuth protects a handler. It checks for a valid session cookie,
 // loads the logged-in farmer, and attaches it to the request context.
 // Incomplete accounts can only reach onboarding pages; those handlers enforce
-// the order of the steps. Ordinary protected pages require both steps.
+// the order of the steps. Ordinary protected pages require every step.
 func RequireAuth(repo farmerReader, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sessionID, ok := SessionIDFromRequest(r)
@@ -174,7 +174,7 @@ func RequireAuth(repo farmerReader, next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		if r.URL.Path != "/complete-profile" && r.URL.Path != "/verify-phone" && !services.HasCompletedProfile(farmer) {
+		if r.URL.Path != "/complete-profile" && r.URL.Path != "/verify-phone" && r.URL.Path != "/create-transaction-pin" && !services.HasCompletedProfile(farmer) {
 			http.Redirect(w, r, services.OnboardingPath(farmer), http.StatusSeeOther)
 			return
 		}

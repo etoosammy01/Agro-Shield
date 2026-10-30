@@ -140,6 +140,9 @@ func RegisterRoutes(
 	verifyPhoneHandler := handlers.NewVerifyPhoneHandler(container.OTP)
 	http.HandleFunc("/verify-phone", middleware.OnlyPath("/verify-phone",
 		middleware.RequireAuth(container.FarmerRepo, verifyPhoneHandler.Handler)))
+	transactionPINHandler := handlers.NewTransactionPINHandler(container.TransactionPIN)
+	http.HandleFunc("/create-transaction-pin", middleware.OnlyPath("/create-transaction-pin",
+		middleware.RequireAuth(container.FarmerRepo, transactionPINHandler.Handler)))
 
 	http.HandleFunc(
 		"/complete-profile",
@@ -1100,6 +1103,7 @@ Disallow: /profile
 Disallow: /profile/edit
 Disallow: /complete-profile
 Disallow: /verify-phone
+Disallow: /create-transaction-pin
 Disallow: /storage
 Disallow: /marketplace
 Disallow: /market-insights

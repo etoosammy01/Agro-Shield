@@ -65,6 +65,14 @@
 #verification-code {
     letter-spacing: 0.2em;
 }
+#transaction-pin, #confirm-transaction-pin {
+    letter-spacing: 0.2em;
+}
+.pin-help {
+    margin: 8px 0 0;
+    color: var(--color-muted, #66756c);
+    font-size: 13px;
+}
 .onboarding-exit {
     display: block;
     margin-top: 20px;

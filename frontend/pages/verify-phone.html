@@ -15,9 +15,9 @@
     <section class="auth-right complete-profile-panel">
         <div class="auth-form-wrapper">
             <img class="auth-brand" src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield">
-            <p class="onboarding-step">Complete registration · Step 2 of 2</p>
+            <p class="onboarding-step">Complete registration · Step 2 of 3</p>
             <h2>Verify your phone number</h2>
-            <p class="complete-profile-subtitle">Verify the phone number you registered with. After verification, you'll log in to continue.</p>
+            <p class="complete-profile-subtitle">Verify the phone number you registered with, then create your transaction PIN.</p>
             {{if .Error}}<p class="message" role="alert">{{.Error}}</p>{{end}}
             {{if .Success}}<p class="onboarding-status" role="status">{{.Success}}</p>{{end}}
             <form action="/verify-phone" method="POST" data-verification-form>
@@ -35,7 +35,7 @@
                     <input id="verification-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code"
                            maxlength="6" minlength="6" pattern="[0-9]{6}" placeholder="6-digit code" required>
                 </div>
-                <button type="submit">Verify and proceed to login</button>
+                <button type="submit">Verify and continue</button>
             </form>
             <a class="onboarding-exit" href="/logout">Log out</a>
         </div>

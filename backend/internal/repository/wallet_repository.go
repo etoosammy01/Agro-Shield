@@ -103,9 +103,9 @@ func NewWalletRepository(db *sql.DB) *WalletRepository {
 func (r *WalletRepository) GetWallet(ctx context.Context, farmerID int) (*models.Wallet, error) {
 	var wallet models.Wallet
 	err := r.db.QueryRowContext(ctx, `
-		SELECT id, farmer_id, balance::text, currency, created_at, updated_at
+		SELECT id, farmer_id, balance::text, currency, created_at, updated_at, COALESCE(transaction_pin_hash, '') <> ''
 		FROM wallets WHERE farmer_id = $1`, farmerID,
-	).Scan(&wallet.ID, &wallet.FarmerID, &wallet.Balance, &wallet.Currency, &wallet.CreatedAt, &wallet.UpdatedAt)
+	).Scan(&wallet.ID, &wallet.FarmerID, &wallet.Balance, &wallet.Currency, &wallet.CreatedAt, &wallet.UpdatedAt, &wallet.HasTransactionPIN)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrWalletNotFound
 	}

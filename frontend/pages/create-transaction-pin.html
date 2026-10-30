@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/static/assets/favicon_io/favicon-32x32.png">
+    <title>Create Transaction PIN | Agro-Shield</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/register.css">
+    <link rel="stylesheet" href="/static/css/register-extra.css">
+    <link rel="stylesheet" href="/static/css/complete-profile.css">
+</head>
+<body>
+<main class="auth-container complete-profile-container">
+    <section class="auth-right complete-profile-panel">
+        <div class="auth-form-wrapper">
+            <img class="auth-brand" src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield">
+            <p class="onboarding-step">Complete registration · Step 3 of 3</p>
+            <h2>Create your transaction PIN</h2>
+            <p class="complete-profile-subtitle">Choose a four-digit PIN to authorize transfers from your Agro-Shield wallet. Keep your PIN private.</p>
+            {{if .WalletNumber}}<p class="onboarding-status">Wallet account: <strong>{{.WalletNumber}}</strong></p>{{end}}
+            {{if .Error}}<p class="message" role="alert">{{.Error}}</p>{{end}}
+            <form id="transaction-pin-form" action="/create-transaction-pin" method="POST">
+                <div class="form-group">
+                    <label for="transaction-pin">Transaction PIN</label>
+                    <input id="transaction-pin" name="pin" type="password" inputmode="numeric" autocomplete="new-password"
+                           maxlength="4" minlength="4" pattern="[0-9]{4}" aria-describedby="pin-help" placeholder="4-digit PIN" required>
+                    <p id="pin-help" class="pin-help">Use exactly four numbers.</p>
+                </div>
+                <div class="form-group">
+                    <label for="confirm-transaction-pin">Confirm transaction PIN</label>
+                    <input id="confirm-transaction-pin" name="confirm_pin" type="password" inputmode="numeric" autocomplete="new-password"
+                           maxlength="4" minlength="4" pattern="[0-9]{4}" placeholder="Re-enter your PIN" required>
+                </div>
+                <button type="submit">Create PIN and continue to login</button>
+            </form>
+            <a class="onboarding-exit" href="/logout">Log out</a>
+        </div>
+    </section>
+</main>
+<script src="/static/js/transaction-pin.js"></script>
+</body>
+</html>

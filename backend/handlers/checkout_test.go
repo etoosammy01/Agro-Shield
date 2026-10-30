@@ -77,7 +77,7 @@ func testCheckout(wallet *checkoutTestWallet, codes *checkoutTestOTP) *Checkout 
 }
 
 func checkoutTestBuyer() *models.Farmer {
-	return &models.Farmer{ID: 1, Role: "buyer", Phone: "08012345678", SelfieCapturedAt: sql.NullTime{Valid: true}, PhoneVerifiedAt: sql.NullTime{Valid: true}}
+	return &models.Farmer{ID: 1, Role: "buyer", Phone: "08012345678", SelfieCapturedAt: sql.NullTime{Valid: true}, PhoneVerifiedAt: sql.NullTime{Valid: true}, HasTransactionPIN: true}
 }
 
 func TestWalletPurchaseRequiresConfirmationBeforeCharging(t *testing.T) {

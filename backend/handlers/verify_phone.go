@@ -47,7 +47,7 @@ func (h *VerifyPhone) Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if farmer.PhoneVerifiedAt.Valid {
-		h.finish(w, r)
+		h.finish(w, r, farmer)
 		return
 	}
 	page := VerifyPhonePageData{Phone: farmer.Phone}
@@ -85,14 +85,18 @@ func (h *VerifyPhone) Handler(w http.ResponseWriter, r *http.Request) {
 			h.renderPage(w, http.StatusBadRequest, page)
 			return
 		}
-		h.finish(w, r)
+		h.finish(w, r, farmer)
 	default:
 		page.Error = "Choose Send code or Verify to continue."
 		h.renderPage(w, http.StatusBadRequest, page)
 	}
 }
 
-func (h *VerifyPhone) finish(w http.ResponseWriter, r *http.Request) {
+func (h *VerifyPhone) finish(w http.ResponseWriter, r *http.Request, farmer *models.Farmer) {
+	if !farmer.HasTransactionPIN {
+		http.Redirect(w, r, "/create-transaction-pin", http.StatusSeeOther)
+		return
+	}
 	if sessionID, ok := middleware.SessionIDFromRequest(r); ok {
 		middleware.DeleteSession(sessionID)
 	}

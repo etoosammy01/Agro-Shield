@@ -6,12 +6,13 @@ import (
 )
 
 type Wallet struct {
-	ID        int64
-	FarmerID  int
-	Balance   string
-	Currency  string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID                int64
+	FarmerID          int
+	Balance           string
+	Currency          string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	HasTransactionPIN bool
 }
 
 // WalletStatus is the small read-only snapshot the wallet page polls while it is
@@ -91,7 +92,6 @@ const (
 // 	DepositFailed     = "failed"
 // 	DepositExpired    = "expired"
 // )
-
 
 // WalletVirtualAccount is the farmer's permanent NGN funding account.
 //

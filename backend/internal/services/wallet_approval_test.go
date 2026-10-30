@@ -609,12 +609,14 @@ func TestRequestWithdrawalTellsEveryAdmin(t *testing.T) {
 // just as a withdrawal does.
 func TestRequestTransferTellsEveryAdmin(t *testing.T) {
 	store := &fakeApprovalStore{}
+	store.walletStore = &transferAuthMoneyStore{balance: "1000.00"}
 	notifier := &fakeNotifier{}
 	service := testApprovalService(store, clientWithTransport(&fakeTransport{status: http.StatusOK}))
 	service.farmers = &fakeFarmerStore{farmer: &models.Farmer{ID: 7, FullName: "Bola Farms"}}
 	service.notify = notifier
+	service.SetTransferVerification(NewTransactionPINService(&pinTestStore{expectedPIN: "0456"}), &transferAuthCodes{})
 
-	if err := service.RequestTransfer(context.Background(), 7, 42, "250", "seed money"); err != nil {
+	if err := service.RequestTransfer(context.Background(), 7, 42, "250", "seed money", "0456", "012345"); err != nil {
 		t.Fatalf("RequestTransfer() error = %v", err)
 	}
 	if store.createdTransfer == "" {

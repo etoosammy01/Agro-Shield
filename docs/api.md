@@ -69,7 +69,7 @@ Authenticates user.
 - `POST /wallet/bank` accepts `bank_name`, `bank_code`, `account_name`, and a 10-digit `account_number`.
 - `POST /wallet/otp/send` accepts `purpose=withdrawal`, `transfer`, or `payment` and sends a code to the authenticated account's phone. Order payment codes require a buyer account. The response contains a `message` or `error`; rate limits return HTTP 429.
 - `POST /wallet/withdraw` accepts a whole-naira `amount` and a six-digit `code`. After code verification the amount is reserved; it is paid after admin approval or returned if rejected or the transfer fails.
-- `POST /wallet/transfer` accepts `recipient`, `amount`, `note`, and a six-digit `code`. The transfer is submitted for admin approval after verification.
+- `POST /wallet/transfer` accepts `recipient`, `amount`, `note`, a four-digit wallet `pin`, and a six-digit `code`. The sender's wallet PIN is verified before the OTP is consumed; funds are reserved for admin approval only after both checks pass.
 - `GET /admin/wallet-withdrawals` and its `POST /approve` and `/reject` actions are restricted to user IDs in `WALLET_ADMIN_USER_IDS`.
 
 Flutterwave sends payment and transfer callbacks to `POST /webhooks/flutterwave`. Both are signature-checked; deposits and payouts are re-verified directly with Flutterwave before wallet balances or withdrawal status are changed.
@@ -78,8 +78,22 @@ Flutterwave sends payment and transfer callbacks to `POST /webhooks/flutterwave`
 
 `GET /verify-phone` displays the onboarding verification step after the selfie
 has been captured. `POST /verify-phone` accepts `action=send_code`, or
-`action=verify_code` and `code`. Successful verification ends the onboarding
-session and redirects to login.
+`action=verify_code` and `code`. Successful verification continues to transaction
+PIN creation. Accounts that already have a PIN return to login after reverifying
+their phone.
+
+## Transaction PIN onboarding
+
+`GET /create-transaction-pin` displays the final onboarding step after selfie
+capture and phone verification. `POST /create-transaction-pin` accepts `pin` and
+`confirm_pin`, both matching four-digit strings. The session determines the wallet
+owner; client-supplied account or wallet IDs are ignored. Only a salted bcrypt hash
+is stored in `wallets`, and setup cannot overwrite an existing PIN.
+Successful setup ends the onboarding session and redirects to
+`/login?onboarded=1`. Protected pages require all three onboarding steps, including
+for existing accounts without a wallet PIN. Wallet transfers require this PIN
+alongside OTP. Five incorrect PIN attempts lock verification for fifteen minutes;
+the attempt counter and lockout are stored on the wallet.
 
 ## Order payment verification
 

@@ -88,6 +88,7 @@ func TestWalletPageResolvesTransferRecipientAutomatically(t *testing.T) {
 		`data-transfer-step="confirm" hidden`,
 		`id="transfer-submit"`,
 		`id="transfer-code" name="code"`,
+		`id="transfer-pin" name="pin" type="password"`,
 		"phone or Agro-Shield wallet number",
 		"Confirm and send for approval",
 		"sent a 6-digit code to the phone number registered on your account",

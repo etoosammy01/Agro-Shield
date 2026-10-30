@@ -69,26 +69,25 @@ func TestPhoneVerificationUsesRegisteredNumberAndPurpose(t *testing.T) {
 	}
 }
 
-func TestPhoneVerificationSuccessRequiresLoginAgain(t *testing.T) {
+func TestPhoneVerificationSuccessContinuesToWalletPINSetup(t *testing.T) {
 	o := &onboardingOTP{}
 	f := &models.Farmer{ID: 12, Phone: "08012345678", SelfieCapturedAt: sql.NullTime{Time: time.Now(), Valid: true}}
 	w, session := onboardingRequest(t, f, NewVerifyPhoneHandler(o).Handler, "POST", "/verify-phone", url.Values{"action": {"verify_code"}, "code": {"123456"}, "phone": {"08099999999"}})
-	if w.Code != http.StatusSeeOther || w.Header().Get("Location") != "/login?verified=1" || o.verifiedPhone != f.Phone || o.code != "123456" {
-		t.Fatal("verification did not finish at login")
+	if w.Code != http.StatusSeeOther || w.Header().Get("Location") != "/create-transaction-pin" || o.verifiedPhone != f.Phone || o.code != "123456" {
+		t.Fatal("verification did not continue to wallet PIN setup")
 	}
-	cookies := w.Result().Cookies()
-	if len(cookies) != 1 || cookies[0].MaxAge != -1 {
-		t.Fatal("session cookie was not cleared")
+	if len(w.Result().Cookies()) != 0 {
+		t.Fatal("phone verification ended the session before PIN setup")
 	}
-	// Reusing the former cookie must not authenticate, even after the account
-	// has both completion timestamps.
 	f.PhoneVerifiedAt = sql.NullTime{Time: time.Now(), Valid: true}
-	r := httptest.NewRequest("GET", "/dashboard", nil)
-	r.AddCookie(&http.Cookie{Name: cookies[0].Name, Value: session})
+	r := httptest.NewRequest("GET", "/create-transaction-pin", nil)
+	cookie := httptest.NewRecorder()
+	middleware.SetSessionCookie(cookie, session)
+	r.AddCookie(cookie.Result().Cookies()[0])
 	check := httptest.NewRecorder()
-	middleware.RequireAuth(onboardingAccount{f}, func(http.ResponseWriter, *http.Request) { t.Fatal("old onboarding session still valid") })(check, r)
-	if check.Header().Get("Location") != "/login" {
-		t.Fatal("old session not rejected")
+	middleware.RequireAuth(onboardingAccount{f}, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })(check, r)
+	if check.Code != http.StatusNoContent {
+		t.Fatal("onboarding session could not reach wallet PIN setup")
 	}
 }
 

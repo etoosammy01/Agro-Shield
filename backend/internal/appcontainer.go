@@ -27,20 +27,21 @@ import (
 // ============================================================
 
 type Container struct {
-	Auth         *services.AuthService
-	Crop         *services.CropService
-	Order        *services.OrderService
-	Delivery     *services.DeliveryService // ← added
-	Cart         *services.CartService
-	AI           *services.AIService
-	Negotiation  *services.NegotiationService
-	Notification *services.NotificationService
-	Chat         *services.ChatService
-	Payment      *services.PaymentService // ← added
-	Wallet       *services.WalletService
-	OTP          *otp.Service // ← added
-	Feedback     *services.FeedbackService
-	MarketEvents *repository.MarketEventRepository
+	Auth           *services.AuthService
+	Crop           *services.CropService
+	Order          *services.OrderService
+	Delivery       *services.DeliveryService // ← added
+	Cart           *services.CartService
+	AI             *services.AIService
+	Negotiation    *services.NegotiationService
+	Notification   *services.NotificationService
+	Chat           *services.ChatService
+	Payment        *services.PaymentService // ← added
+	Wallet         *services.WalletService
+	OTP            *otp.Service // ← added
+	TransactionPIN *services.TransactionPINService
+	Feedback       *services.FeedbackService
+	MarketEvents   *repository.MarketEventRepository
 
 	// Used by authentication middleware.
 	FarmerRepo *repository.FarmerRepository
@@ -149,16 +150,17 @@ func NewContainer(
 	// Flutterwave API.
 	// ========================================================
 
-
 	walletService := services.NewWalletService(walletRepo, farmerRepo, bankLookupRepo, flutterwaveClient, walletAdminIDs, commissionBasisPoints, notificationService)
 	walletService.SetStaleDepositAfter(staleDepositAfter)
-	
+
 	paymentService := services.NewPaymentService(paymentRepo, orderRepo, farmerRepo, flutterwaveClient, walletService)
 
 	// One-time passcodes guard password resets and wallet payouts. The
 	// transport is chosen by config, so local development can run with the
 	// log-only sender and no SMS account.
 	otpService := otp.NewService(otpRepo, otpProvider)
+	transactionPINService := services.NewTransactionPINService(walletRepo)
+	walletService.SetTransferVerification(transactionPINService, otpService)
 
 	feedbackService := services.NewFeedbackService(
 		feedbackRepo,
@@ -242,9 +244,10 @@ func NewContainer(
 		// PAYMENT          ← added
 		// ----------------------------------------------------
 
-		Payment: paymentService,
-		Wallet:  walletService,
-		OTP:     otpService,
+		Payment:        paymentService,
+		Wallet:         walletService,
+		OTP:            otpService,
+		TransactionPIN: transactionPINService,
 
 		// ----------------------------------------------------
 		// FARMER REPOSITORY
