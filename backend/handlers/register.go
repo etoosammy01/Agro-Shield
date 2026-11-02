@@ -210,7 +210,7 @@ func (h *Register) submitRegistration(w http.ResponseWriter, r *http.Request) {
 	// A temporary session allows onboarding, but cannot access protected pages
 	// until selfie capture, phone verification, and transaction PIN setup are complete.
 	sessionID := middleware.CreateSession(farmer.ID)
-	middleware.SetSessionCookie(w, sessionID)
+	middleware.SetSessionCookie(w, r, sessionID)
 	h.notifyWelcomeEmail(farmer.ID, page.Email, page.FirstName)
 
 	http.Redirect(w, r, "/complete-profile", http.StatusSeeOther)

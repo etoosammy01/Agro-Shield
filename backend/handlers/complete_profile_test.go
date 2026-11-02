@@ -83,7 +83,7 @@ func TestSelfieUploadMustSaveBeforeAdvancing(t *testing.T) {
 			session := middleware.CreateSession(21)
 			t.Cleanup(func() { middleware.DeleteSession(session) })
 			cookie := httptest.NewRecorder()
-			middleware.SetSessionCookie(cookie, session)
+			middleware.SetSessionCookie(cookie, r, session)
 			r.AddCookie(cookie.Result().Cookies()[0])
 			saver := &testSelfieSaver{err: tc.saveErr}
 			w := httptest.NewRecorder()

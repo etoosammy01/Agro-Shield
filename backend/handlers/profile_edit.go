@@ -120,6 +120,6 @@ func (h *ProfileEdit) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		middleware.DeleteSession(sessionID)
 	}
 	middleware.DeleteFarmerSessions(farmer.ID)
-	middleware.ClearSessionCookie(w)
+	middleware.ClearSessionCookie(w, r)
 	http.Redirect(w, r, "/login?deleted=1", http.StatusSeeOther)
 }

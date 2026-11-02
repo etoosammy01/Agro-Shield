@@ -6,10 +6,7 @@ import (
 	"strings"
 )
 
-// SecurityHeaders adds conservative browser protections. The CSP deliberately
-// does not restrict script or style sources yet: the templates still contain
-// inline scripts/styles and an external Font Awesome stylesheet. Tightening
-// those sources without a compatibility pass would break existing pages.
+// SecurityHeaders adds conservative browser protections.
 func SecurityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		headers := w.Header()
@@ -17,8 +14,9 @@ func SecurityHeaders(next http.Handler) http.Handler {
 		headers.Set("X-Frame-Options", "DENY")
 		headers.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		headers.Set("Permissions-Policy", "geolocation=(self), microphone=(self), camera=(self)")
+		// TODO: Remove 'unsafe-inline' for script-src and style-src once inline scripts are moved to /static/ and inline handlers are refactored.
 		headers.Set("Content-Security-Policy",
-			"frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'")
+			"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'")
 		if RequestIsHTTPS(r) {
 			headers.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		}

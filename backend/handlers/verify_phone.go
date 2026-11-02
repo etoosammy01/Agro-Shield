@@ -100,7 +100,7 @@ func (h *VerifyPhone) finish(w http.ResponseWriter, r *http.Request, farmer *mod
 	if sessionID, ok := middleware.SessionIDFromRequest(r); ok {
 		middleware.DeleteSession(sessionID)
 	}
-	middleware.ClearSessionCookie(w)
+	middleware.ClearSessionCookie(w, r)
 	http.Redirect(w, r, "/login?verified=1", http.StatusSeeOther)
 }
 

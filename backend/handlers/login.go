@@ -60,7 +60,7 @@ func (h *Login) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		sessionID := middleware.CreateSession(farmer.ID)
-		middleware.SetSessionCookie(w, sessionID)
+		middleware.SetSessionCookie(w, r, sessionID)
 
 		http.Redirect(w, r, services.OnboardingPath(farmer), http.StatusSeeOther)
 

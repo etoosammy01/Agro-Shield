@@ -45,7 +45,7 @@ func onboardingRequest(t *testing.T, farmer *models.Farmer, handler http.Handler
 	r := httptest.NewRequest(method, path, strings.NewReader(form.Encode()))
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	cookies := httptest.NewRecorder()
-	middleware.SetSessionCookie(cookies, session)
+	middleware.SetSessionCookie(cookies, r, session)
 	r.AddCookie(cookies.Result().Cookies()[0])
 	w := httptest.NewRecorder()
 	middleware.RequireAuth(onboardingAccount{farmer}, handler)(w, r)
@@ -82,7 +82,7 @@ func TestPhoneVerificationSuccessContinuesToWalletPINSetup(t *testing.T) {
 	f.PhoneVerifiedAt = sql.NullTime{Time: time.Now(), Valid: true}
 	r := httptest.NewRequest("GET", "/create-transaction-pin", nil)
 	cookie := httptest.NewRecorder()
-	middleware.SetSessionCookie(cookie, session)
+	middleware.SetSessionCookie(cookie, r, session)
 	r.AddCookie(cookie.Result().Cookies()[0])
 	check := httptest.NewRecorder()
 	middleware.RequireAuth(onboardingAccount{f}, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })(check, r)

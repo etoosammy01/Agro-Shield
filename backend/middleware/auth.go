@@ -106,24 +106,27 @@ func getFarmerIDForSession(sessionID string) (int, bool) {
 }
 
 // SetSessionCookie writes the session cookie on login.
-func SetSessionCookie(w http.ResponseWriter, sessionID string) {
+func SetSessionCookie(w http.ResponseWriter, r *http.Request, sessionID string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,
 		Value:    sessionID,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   RequestIsHTTPS(r),
 		SameSite: http.SameSiteLaxMode,
 		Expires:  time.Now().Add(24 * time.Hour),
 	})
 }
 
 // ClearSessionCookie removes the cookie on logout / invalid session.
-func ClearSessionCookie(w http.ResponseWriter) {
+func ClearSessionCookie(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   RequestIsHTTPS(r),
+		SameSite: http.SameSiteLaxMode,
 		Expires:  time.Unix(0, 0),
 		MaxAge:   -1,
 	})
@@ -162,14 +165,14 @@ func RequireAuth(repo farmerReader, next http.HandlerFunc) http.HandlerFunc {
 
 		farmerID, ok := getFarmerIDForSession(sessionID)
 		if !ok {
-			ClearSessionCookie(w)
+			ClearSessionCookie(w, r)
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
 
 		farmer, err := repo.GetByID(farmerID)
 		if err != nil || farmer == nil {
-			ClearSessionCookie(w)
+			ClearSessionCookie(w, r)
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}

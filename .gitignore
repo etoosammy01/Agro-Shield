@@ -1,0 +1,6 @@
+# Local databases (may contain PII / password hashes)
+*.db
+*.sqlite
+
+# User-uploaded files
+uploads/
