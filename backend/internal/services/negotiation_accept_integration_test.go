@@ -4,13 +4,11 @@ import (
 	"database/sql"
 	"fmt"
 	"math/rand"
-	"os"
-	"strings"
 	"testing"
 
-	"backend/internal/database"
 	"backend/internal/models"
 	"backend/internal/repository"
+	"backend/internal/testdb"
 )
 
 // These tests run the real negotiation service against PostgreSQL because the
@@ -23,21 +21,7 @@ import (
 
 func negotiationTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-
-	dsn := strings.TrimSpace(os.Getenv("TEST_DATABASE_URL"))
-	if dsn == "" {
-		t.Skip("set TEST_DATABASE_URL to run negotiation integration tests")
-	}
-	db, err := database.ConnectDB(dsn)
-	if err != nil {
-		t.Fatalf("connect test database: %v", err)
-	}
-	t.Cleanup(func() { db.Close() })
-
-	if err := database.RunMigration(db); err != nil {
-		t.Fatalf("migrate test database: %v", err)
-	}
-	return db
+	return testdb.Open(t)
 }
 
 func negotiationTestUser(t *testing.T, db *sql.DB, role string) *models.Farmer {

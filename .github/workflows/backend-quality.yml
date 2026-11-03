@@ -1,0 +1,59 @@
+name: Backend quality
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: agro_test
+          POSTGRES_PASSWORD: isolated-ci-only
+          POSTGRES_DB: agroshield_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agro_test -d agroshield_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      TEST_DATABASE_URL: postgres://agro_test:isolated-ci-only@127.0.0.1:5432/agroshield_test?sslmode=disable
+      REQUIRE_DB_TESTS: '1'
+      TZ: UTC
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Verify evidence checker
+        run: python3 -m unittest discover -s ../scripts -p 'test_*.py'
+      - name: Tests with PostgreSQL
+        run: |
+          set -o pipefail
+          go test -count=1 -json ./... > ../test-results.json
+      - name: Require integration test evidence
+        if: always()
+        run: python3 ../scripts/check_db_tests.py ../test-results.json
+      - run: go vet ./...
+      - name: Race detector with PostgreSQL
+        run: |
+          go test -race -count=1 -json ./... > ../race-results.json
+          python3 ../scripts/check_db_tests.py ../race-results.json
+      - name: Upload execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-evidence
+          path: |
+            test-results.json
+            race-results.json
