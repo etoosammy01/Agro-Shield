@@ -1,0 +1,39 @@
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestDeleteAccountAnonymisesAndKeepsRecords","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestDeleteAccountRefusesWhileMoneyIsAttached","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestPayForOrderIsIdempotentPerCheckoutToken","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestConcurrentPayForOrderWithSameTokenChargesOnce","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestSearchAvailableFiltersByNameLocationAndSeller","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestOnboardingMigrationPreservesExistingSteps","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestPhoneVerificationAtomicConsumptionAndPhoneChange","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestInvalidatingFailedDeliveryPreservesNewerOTPAndIssuanceAudit","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestPhoneVerificationRejectsExpiredExhaustedAndMismatchedChallenges","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestUpdateProfileRejectsAnotherAccountsPhone","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestWalletPINPersistsOnWalletAndSurvivesMigration","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestWalletPINSetupRequiresVerificationAndCreatesOnlyOnce","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestWalletPINLockoutPersistsAndExpires","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestConcurrentWalletPINGuessesCannotBypassLockout","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestAccountClosureRemovesWalletPIN","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestRegistrationCreatesExactlyOneNGNWallet","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestEnsureWalletIsIdempotent","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestCreateDepositWithoutWalletIsRejected","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestCompleteDepositCreditsExactlyOnce","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestConcurrentCompleteDepositCreditsOnce","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestCompleteDepositRejectsMismatchedAmountOrCurrency/amount","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestCompleteDepositRejectsMismatchedAmountOrCurrency/currency","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"pass","Package":"backend/internal/repository","Test":"TestCompleteDepositRejectsMismatchedAmountOrCurrency"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestCompleteDepositRollsBackWhenLedgerWriteFails","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestMigrationPreservesExistingBalances","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestWithdrawalReservesAndRejectsInsufficientBalance","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestDepositRecordsProviderAndScopesTransactionIDUniqueness","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestVirtualAccountAttemptIsUniquePerFarmer","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestVirtualAccountDatabaseConstraintsRejectInvalidAccounts","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestVirtualAccountCreditIsExactAndIdempotent","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestVirtualAccountPendingTransferIsCreditedOnceWhenConfirmed","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestVirtualAccountReversalDebitsOnlyWhenFunded","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestConcurrentVirtualAccountCreditMovesMoneyOnce","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestWalletStatusReportsCommittedStateWithoutWriting","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"skip","Package":"backend/internal/repository","Test":"TestWalletStatusReportsMissingWallet","SkipReason":"set TEST_DATABASE_URL to run wallet integration tests"}
+{"Action":"pass","Package":"backend/internal/repository"}
+{"Action":"skip","Package":"backend/internal/services","Test":"TestAcceptNegotiationAddsTheDealToTheCart","SkipReason":"set TEST_DATABASE_URL to run negotiation integration tests"}
+{"Action":"skip","Package":"backend/internal/services","Test":"TestAcceptNegotiationTwiceAddsOneCartItem","SkipReason":"set TEST_DATABASE_URL to run negotiation integration tests"}
+{"Action":"pass","Package":"backend/internal/services"}
