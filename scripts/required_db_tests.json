@@ -65,6 +65,10 @@
   },
   {
     "package": "backend/internal/repository",
+    "test": "TestExplicitTimestampInterpretationIgnoresSessionTimezone"
+  },
+  {
+    "package": "backend/internal/repository",
     "test": "TestWalletPINPersistsOnWalletAndSurvivesMigration"
   },
   {
