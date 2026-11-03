@@ -1,0 +1,174 @@
+[
+  {
+    "package": "backend/internal/repository",
+    "test": "TestDeleteAccountAnonymisesAndKeepsRecords"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestDeleteAccountRefusesWhileMoneyIsAttached"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestPayForOrderIsIdempotentPerCheckoutToken"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestConcurrentPayForOrderWithSameTokenChargesOnce"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestSearchAvailableFiltersByNameLocationAndSeller"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestConcurrentDistinctCreditsPreserveBalance"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestConcurrentDebitsEnforceFundsAndOwnership"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestDepositRollbackCanRetryAfterConstraintConflict"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestMigrationRepeatPreservesConstraintsAndIndexes"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestMigrationRestoresSupportedLegacyWithdrawalColumns"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestOnboardingMigrationRollsBackOnConstraintFailure"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestOnboardingMigrationPreservesExistingSteps"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestPhoneVerificationAtomicConsumptionAndPhoneChange"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestInvalidatingFailedDeliveryPreservesNewerOTPAndIssuanceAudit"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestPhoneVerificationRejectsExpiredExhaustedAndMismatchedChallenges"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestUpdateProfileRejectsAnotherAccountsPhone"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestExplicitTimestampInterpretationIgnoresSessionTimezone"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestWalletPINPersistsOnWalletAndSurvivesMigration"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestWalletPINSetupRequiresVerificationAndCreatesOnlyOnce"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestWalletPINLockoutPersistsAndExpires"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestConcurrentWalletPINGuessesCannotBypassLockout"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestAccountClosureRemovesWalletPIN"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestRegistrationCreatesExactlyOneNGNWallet"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestEnsureWalletIsIdempotent"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestCreateDepositWithoutWalletIsRejected"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestCompleteDepositCreditsExactlyOnce"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestConcurrentCompleteDepositCreditsOnce"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestCompleteDepositRejectsMismatchedAmountOrCurrency"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestCompleteDepositRollsBackWhenLedgerWriteFails"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestMigrationPreservesExistingBalances"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestWithdrawalReservesAndRejectsInsufficientBalance"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestDepositRecordsProviderAndScopesTransactionIDUniqueness"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestVirtualAccountAttemptIsUniquePerFarmer"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestVirtualAccountDatabaseConstraintsRejectInvalidAccounts"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestVirtualAccountCreditIsExactAndIdempotent"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestVirtualAccountPendingTransferIsCreditedOnceWhenConfirmed"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestVirtualAccountReversalDebitsOnlyWhenFunded"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestConcurrentVirtualAccountCreditMovesMoneyOnce"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestWalletStatusReportsCommittedStateWithoutWriting"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestWalletStatusReportsMissingWallet"
+  },
+  {
+    "package": "backend/internal/services",
+    "test": "TestAcceptNegotiationAddsTheDealToTheCart"
+  },
+  {
+    "package": "backend/internal/services",
+    "test": "TestAcceptNegotiationTwiceAddsOneCartItem"
+  },
+  {
+    "package": "backend/internal/testdb",
+    "test": "TestSchemasAreIsolatedAndCleaned"
+  }
+]

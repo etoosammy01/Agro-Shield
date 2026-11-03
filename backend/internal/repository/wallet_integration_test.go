@@ -6,14 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"os"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"backend/internal/database"
 	"backend/internal/models"
+	"backend/internal/testdb"
 )
 
 // These tests exercise the wallet's financial guarantees against a real
@@ -27,30 +26,14 @@ import (
 // an in-memory stand-in would prove nothing about the money.
 //
 // They run only when TEST_DATABASE_URL is set and otherwise skip, so
-// `go test ./...` still passes on a machine with no database. Point it at a
-// throwaway database: the tests create and delete users.
+// local unit runs still work without PostgreSQL. REQUIRE_DB_TESTS=1 makes
+// missing configuration fail. The shared helper guards and isolates the database.
 
 // testDB opens the database named by TEST_DATABASE_URL and brings it up to the
-// current schema. It skips the test when the variable is unset.
+// current schema in a private schema; CI requires database configuration.
 func testDB(t *testing.T) *sql.DB {
 	t.Helper()
-
-	dsn := strings.TrimSpace(os.Getenv("TEST_DATABASE_URL"))
-	if dsn == "" {
-		t.Skip("set TEST_DATABASE_URL to run wallet integration tests")
-	}
-	db, err := database.ConnectDB(dsn)
-	if err != nil {
-		t.Fatalf("connect test database: %v", err)
-	}
-	t.Cleanup(func() { db.Close() })
-
-	// RunMigration is idempotent, so it is safe both for a fresh database and
-	// for one an earlier run already migrated.
-	if err := database.RunMigration(db); err != nil {
-		t.Fatalf("migrate test database: %v", err)
-	}
-	return db
+	return testdb.Open(t)
 }
 
 // createTestUser registers a user through FarmerRepository.Create — the same
