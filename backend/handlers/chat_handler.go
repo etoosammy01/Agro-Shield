@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"html/template"
 	"log"
 	"net/http"
 	"net/url"
@@ -14,6 +13,7 @@ import (
 	"backend/internal/repository"
 	"backend/internal/services"
 	"backend/middleware"
+	"backend/render"
 )
 
 // ============================================================
@@ -1126,29 +1126,9 @@ func (h *ChatHandler) renderList(
 
 // ============================================================
 // TEMPLATE RENDERER
-//
-// We use ParseFiles here because this matches the existing
-// Agro-Shield frontend structure:
-//
-// ../frontend/pages/
+// Parsed templates are initialized once by the shared HTML renderer.
 // ============================================================
 
-func (h *ChatHandler) renderTemplate(
-	w http.ResponseWriter,
-	templateName string,
-	data interface{},
-) error {
-
-	tmpl, err := template.ParseFiles(
-		"../frontend/pages/" + templateName,
-	)
-
-	if err != nil {
-		return err
-	}
-
-	return tmpl.Execute(
-		w,
-		data,
-	)
+func (h *ChatHandler) renderTemplate(w http.ResponseWriter, templateName string, data interface{}) error {
+	return render.RenderTemplates(w, templateName, data)
 }
