@@ -21,6 +21,30 @@
   },
   {
     "package": "backend/internal/repository",
+    "test": "TestConcurrentDistinctCreditsPreserveBalance"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestConcurrentDebitsEnforceFundsAndOwnership"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestDepositRollbackCanRetryAfterConstraintConflict"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestMigrationRepeatPreservesConstraintsAndIndexes"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestMigrationRestoresSupportedLegacyWithdrawalColumns"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestOnboardingMigrationRollsBackOnConstraintFailure"
+  },
+  {
+    "package": "backend/internal/repository",
     "test": "TestOnboardingMigrationPreservesExistingSteps"
   },
   {
