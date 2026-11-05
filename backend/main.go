@@ -45,6 +45,9 @@ func main() {
 	if err := database.RunMigration(db); err != nil {
 		log.Fatal(err)
 	}
+	if err := database.RunSessionMigration(db); err != nil {
+		log.Fatal(err)
+	}
 
 	// ============================================================
 	// 3. CREATE REPOSITORIES
@@ -119,6 +122,12 @@ func main() {
 	// shortlist at most once.
 	// ------------------------------------------------------------
 	bankLookupRepo := repository.NewBankLookupRepository(db)
+
+	// ------------------------------------------------------------
+	// SESSION REPOSITORY
+	// Stores persistent, hashed user sessions in PostgreSQL.
+	// ------------------------------------------------------------
+	sessionRepo := repository.NewSessionRepository(db)
 
 	// ------------------------------------------------------------
 	// ONE-TIME PASSCODE REPOSITORY          ← added
@@ -259,6 +268,7 @@ func main() {
 		paymentRepo,
 		walletRepo,
 		bankLookupRepo,
+		sessionRepo,
 		otpRepo,
 		otpProvider,
 		flutterwaveClient,

@@ -4,12 +4,14 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"net/http"
 	"sync"
 	"time"
 
 	"backend/internal/models"
 	"backend/internal/services"
+	"backend/internal/session"
 )
 
 type contextKey string
@@ -183,6 +185,73 @@ func RequireAuth(repo farmerReader, next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		MarkFarmerOnline(farmerID)
+		ctx := context.WithValue(r.Context(), farmerContextKey, farmer)
+		next(w, r.WithContext(ctx))
+	}
+}
+
+// sessionValidator checks whether a session token is valid in persistent storage.
+type sessionValidator interface {
+	Validate(ctx context.Context, token string) (int, error)
+}
+
+// Authenticator combines farmer lookup with persistent session validation.
+type Authenticator struct {
+	repo     farmerReader
+	sessions sessionValidator
+}
+
+// NewAuthenticator creates an authenticator using the farmer repository
+// and persistent session service.
+func NewAuthenticator(repo farmerReader, sessions sessionValidator) *Authenticator {
+	return &Authenticator{
+		repo:     repo,
+		sessions: sessions,
+	}
+}
+
+// RequireAuth protects a handler using persistent database-backed sessions.
+func (a *Authenticator) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token, ok := SessionIDFromRequest(r)
+		if !ok {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+
+		// Validate checks the hashed token against persistent session storage.
+		farmerID, err := a.sessions.Validate(r.Context(), token)
+
+		if errors.Is(err, session.ErrNotFound) {
+			ClearSessionCookie(w, r)
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		// A database failure is different from an invalid session.
+		if err != nil {
+			http.Error(w, "Unable to verify session", http.StatusInternalServerError)
+			return
+		}
+
+		farmer, err := a.repo.GetByID(farmerID)
+		if err != nil || farmer == nil {
+			ClearSessionCookie(w, r)
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+
+		// Preserve the existing onboarding restrictions.
+		if r.URL.Path != "/complete-profile" &&
+			r.URL.Path != "/verify-phone" &&
+			r.URL.Path != "/create-transaction-pin" &&
+			!services.HasCompletedProfile(farmer) {
+			http.Redirect(w, r, services.OnboardingPath(farmer), http.StatusSeeOther)
+			return
+		}
+
+		MarkFarmerOnline(farmerID)
+
+		// Make the authenticated farmer available to the next handler.
 		ctx := context.WithValue(r.Context(), farmerContextKey, farmer)
 		next(w, r.WithContext(ctx))
 	}
