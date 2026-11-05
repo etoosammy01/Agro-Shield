@@ -112,7 +112,7 @@ func TestPhoneVerificationPageHasReadOnlyPhoneAndLoginNotice(t *testing.T) {
 		t.Fatal("verification page did not render")
 	}
 	login := httptest.NewRecorder()
-	NewLoginHandler(nil).LoginHandler(login, httptest.NewRequest("GET", "/login?verified=1", nil))
+	NewLoginHandler(nil, nil).LoginHandler(login, httptest.NewRequest("GET", "/login?verified=1", nil))
 	if !strings.Contains(login.Body.String(), "Phone verified. Log in to continue.") {
 		t.Fatal("login notice missing")
 	}

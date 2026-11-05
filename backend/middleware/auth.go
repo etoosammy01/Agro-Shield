@@ -107,16 +107,23 @@ func getFarmerIDForSession(sessionID string) (int, bool) {
 	return id, ok
 }
 
-// SetSessionCookie writes the session cookie on login.
+// SetSessionCookie writes the session cookie using the default 24-hour lifetime.
+// This remains available for code that still uses the legacy session flow.
 func SetSessionCookie(w http.ResponseWriter, r *http.Request, sessionID string) {
+	SetSessionCookieWithExpiry(w, r, sessionID, time.Now().Add(24*time.Hour))
+}
+
+// SetSessionCookieWithExpiry writes a session cookie using the expiry
+// returned by the persistent session service.
+func SetSessionCookieWithExpiry(w http.ResponseWriter, r *http.Request, token string, expiresAt time.Time) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,
-		Value:    sessionID,
+		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   RequestIsHTTPS(r),
 		SameSite: http.SameSiteLaxMode,
-		Expires:  time.Now().Add(24 * time.Hour),
+		Expires:  expiresAt,
 	})
 }
 

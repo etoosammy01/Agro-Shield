@@ -17,12 +17,17 @@ type LoginPageData struct {
 }
 
 type Login struct {
-	service *services.AuthService
+	service  *services.AuthService
+	sessions *services.SessionService
 }
 
-func NewLoginHandler(service *services.AuthService) *Login {
+func NewLoginHandler(
+	service *services.AuthService,
+	sessions *services.SessionService,
+) *Login {
 	return &Login{
-		service: service,
+		service:  service,
+		sessions: sessions,
 	}
 }
 
@@ -59,8 +64,17 @@ func (h *Login) LoginHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		sessionID := middleware.CreateSession(farmer.ID)
-		middleware.SetSessionCookie(w, r, sessionID)
+		// Create a persistent session after successful authentication.
+		token, expiresAt, err := h.sessions.Create(r.Context(), farmer.ID)
+		if err != nil {
+			log.Println("failed to create login session:", err)
+			http.Error(w, "Unable to complete login. Please try again.", http.StatusInternalServerError)
+			return
+		}
+
+		// Store the raw token in the browser cookie.
+		// The database stores only its hash.
+		middleware.SetSessionCookieWithExpiry(w, r, token, expiresAt)
 
 		http.Redirect(w, r, services.OnboardingPath(farmer), http.StatusSeeOther)
 

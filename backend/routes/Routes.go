@@ -88,6 +88,7 @@ func RegisterRoutes(
 
 	registerHandler := handlers.NewRegisterHandler(
 		container.Auth,
+		container.Sessions,
 		welcomeEmail,
 	)
 
@@ -101,6 +102,7 @@ func RegisterRoutes(
 
 	loginHandler := handlers.NewLoginHandler(
 		container.Auth,
+		container.Sessions,
 	)
 
 	http.HandleFunc(

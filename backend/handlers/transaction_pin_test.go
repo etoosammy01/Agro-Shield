@@ -107,7 +107,7 @@ func TestWalletPINSetupPageAndLoginCompletionNotice(t *testing.T) {
 		t.Fatal("wallet PIN form did not render securely")
 	}
 	login := httptest.NewRecorder()
-	NewLoginHandler(nil).LoginHandler(login, httptest.NewRequest("GET", "/login?onboarded=1", nil))
+	NewLoginHandler(nil, nil).LoginHandler(login, httptest.NewRequest("GET", "/login?onboarded=1", nil))
 	if !strings.Contains(html.UnescapeString(login.Body.String()), "Your wallet transaction PIN is ready.") {
 		t.Fatal("onboarding completion notice missing")
 	}
