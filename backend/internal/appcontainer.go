@@ -38,7 +38,8 @@ type Container struct {
 	Chat           *services.ChatService
 	Payment        *services.PaymentService // ← added
 	Wallet         *services.WalletService
-	OTP            *otp.Service // ← added
+	OTP            *otp.Service             // ← added
+	Sessions       *services.SessionService // Persistent user sessions
 	TransactionPIN *services.TransactionPINService
 	Feedback       *services.FeedbackService
 	MarketEvents   *repository.MarketEventRepository
@@ -80,6 +81,7 @@ func NewContainer(
 	paymentRepo *repository.PaymentRepository,
 	walletRepo *repository.WalletRepository,
 	bankLookupRepo *repository.BankLookupRepository,
+	sessionRepo *repository.SessionRepository,
 	otpRepo *repository.OTPRepository,
 	otpProvider otp.Provider,
 	flutterwaveClient *services.FlutterwaveClient,
@@ -247,6 +249,7 @@ func NewContainer(
 		Payment:        paymentService,
 		Wallet:         walletService,
 		OTP:            otpService,
+		Sessions:       services.NewSessionService(sessionRepo),
 		TransactionPIN: transactionPINService,
 
 		// ----------------------------------------------------

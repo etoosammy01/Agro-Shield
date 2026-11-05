@@ -170,5 +170,25 @@
   {
     "package": "backend/internal/testdb",
     "test": "TestSchemasAreIsolatedAndCleaned"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestSessionCreateAndFindValid"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestSessionRejectsExpired"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestSessionRejectsRevoked"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestRevokeAllForFarmer"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestDeleteExpired"
   }
 ]
