@@ -487,6 +487,16 @@ func (r *FarmerRepository) DeleteAccount(ctx context.Context, farmerID int) erro
 		return ErrAccountHasFundingAccount
 	}
 
+	// Revoke every persistent session in the same transaction as the closure.
+	// The rows are retained so the existing revoked_at model stays intact.
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE sessions
+		SET revoked_at = CURRENT_TIMESTAMP
+		WHERE farmer_id = $1
+		  AND revoked_at IS NULL`, farmerID); err != nil {
+		return err
+	}
+
 	// Personal data with no record-keeping value is removed outright. Cart rows
 	// are transient; negotiations are the conversation around an offer, and the
 	// order itself keeps the agreed price and quantity.

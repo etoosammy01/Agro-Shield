@@ -17,7 +17,8 @@ type transactionPINCreator interface {
 }
 
 type TransactionPINSetup struct {
-	pins transactionPINCreator
+	pins     transactionPINCreator
+	sessions sessionRevoker
 }
 
 type TransactionPINPageData struct {
@@ -25,10 +26,12 @@ type TransactionPINPageData struct {
 	WalletNumber string
 }
 
-func NewTransactionPINHandler(pins transactionPINCreator) *TransactionPINSetup {
-	return &TransactionPINSetup{pins: pins}
+func NewTransactionPINHandler(pins transactionPINCreator, sessions sessionRevoker) *TransactionPINSetup {
+	return &TransactionPINSetup{
+		pins:     pins,
+		sessions: sessions,
+	}
 }
-
 func (h *TransactionPINSetup) Handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	farmer, ok := middleware.FarmerFromContext(r)
@@ -73,9 +76,15 @@ func (h *TransactionPINSetup) Handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TransactionPINSetup) finish(w http.ResponseWriter, r *http.Request) {
-	if sessionID, ok := middleware.SessionIDFromRequest(r); ok {
-		middleware.DeleteSession(sessionID)
+	// Revoke the persistent session after successful PIN setup.
+	if sessionToken, ok := middleware.SessionIDFromRequest(r); ok {
+		if err := h.sessions.Revoke(r.Context(), sessionToken); err != nil {
+			log.Printf("failed to revoke session after transaction PIN setup: %v", err)
+			http.Error(w, "Your PIN was saved, but we couldn't end your session. Please log in again.", http.StatusInternalServerError)
+			return
+		}
 	}
+
 	middleware.ClearSessionCookie(w, r)
 	http.Redirect(w, r, "/login?onboarded=1", http.StatusSeeOther)
 }

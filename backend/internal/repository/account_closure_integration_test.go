@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"testing"
+	"time"
 
 	"backend/internal/models"
 )
@@ -164,6 +166,90 @@ func TestDeleteAccountAnonymisesAndKeepsRecords(t *testing.T) {
 	})
 }
 
+func TestDeleteAccountRevokesAllSessions(t *testing.T) {
+	db := testDB(t)
+	repo := NewFarmerRepository(db)
+	sessions := NewSessionRepository(db)
+	ctx := context.Background()
+
+	farmer := createTestUser(t, db)
+	otherFarmer := createTestUser(t, db)
+
+	farmerSessions := []string{
+		createSessionForTest(t, db, farmer.ID),
+		createSessionForTest(t, db, farmer.ID),
+	}
+	otherSession := createSessionForTest(t, db, otherFarmer.ID)
+
+	if err := repo.DeleteAccount(ctx, farmer.ID); err != nil {
+		t.Fatalf("close account: %v", err)
+	}
+
+	for _, tokenHash := range farmerSessions {
+		assertSessionRevoked(t, sessions, tokenHash)
+	}
+
+	// Revocation keeps the rows; it must not delete the audit records.
+	var total, revoked int
+	if err := db.QueryRow(`
+		SELECT COUNT(*), COUNT(revoked_at)
+		FROM sessions
+		WHERE farmer_id = $1`, farmer.ID).Scan(&total, &revoked); err != nil {
+		t.Fatalf("count closed account sessions: %v", err)
+	}
+	if total != len(farmerSessions) {
+		t.Errorf("closed account session rows = %d, want %d", total, len(farmerSessions))
+	}
+	if revoked != total {
+		t.Errorf("revoked sessions = %d, want all %d", revoked, total)
+	}
+
+	assertSessionValid(t, sessions, otherSession, otherFarmer.ID)
+}
+
+func TestDeleteAccountFailureDoesNotPartiallyRevokeSessions(t *testing.T) {
+	db := testDB(t)
+	repo := NewFarmerRepository(db)
+	sessions := NewSessionRepository(db)
+	ctx := context.Background()
+
+	farmer := createTestUser(t, db)
+	tokenHash := createSessionForTest(t, db, farmer.ID)
+
+	// Claim the placeholder phone the anonymisation step writes, so closure
+	// fails after the session revocation statement has run.
+	var blockerID int
+	if err := db.QueryRow(`
+		INSERT INTO farmers (full_name, phone, password_hash, location, country)
+		VALUES ('Placeholder blocker', $1, 'test-password-hash', 'Kano', 'Nigeria')
+		RETURNING id`, fmt.Sprintf("deleted-%d", farmer.ID)).Scan(&blockerID); err != nil {
+		t.Fatalf("create placeholder blocker: %v", err)
+	}
+	t.Cleanup(func() {
+		if _, err := db.Exec(`DELETE FROM farmers WHERE id = $1`, blockerID); err != nil {
+			t.Logf("blocker cleanup: %v", err)
+		}
+	})
+
+	if err := repo.DeleteAccount(ctx, farmer.ID); err == nil {
+		t.Fatal("DeleteAccount succeeded despite conflicting placeholder phone")
+	}
+
+	assertStillActive(t, repo, farmer.ID)
+	assertSessionValid(t, sessions, tokenHash, farmer.ID)
+
+	var revoked sql.NullTime
+	if err := db.QueryRow(
+		`SELECT revoked_at FROM sessions WHERE session_token_hash = $1`,
+		tokenHash,
+	).Scan(&revoked); err != nil {
+		t.Fatalf("read session revocation: %v", err)
+	}
+	if revoked.Valid {
+		t.Fatal("failed closure left the session revoked")
+	}
+}
+
 func TestDeleteAccountRefusesWhileMoneyIsAttached(t *testing.T) {
 	db := testDB(t)
 	repo := NewFarmerRepository(db)
@@ -171,16 +257,21 @@ func TestDeleteAccountRefusesWhileMoneyIsAttached(t *testing.T) {
 
 	t.Run("balance", func(t *testing.T) {
 		farmer := createTestUser(t, db)
+		sessions := NewSessionRepository(db)
+		tokenHash := createSessionForTest(t, db, farmer.ID)
 		fundWallet(t, db, farmer.ID, "10.00")
 
 		if err := repo.DeleteAccount(ctx, farmer.ID); !errors.Is(err, ErrAccountHasBalance) {
 			t.Fatalf("error = %v, want ErrAccountHasBalance", err)
 		}
 		assertStillActive(t, repo, farmer.ID)
+		assertSessionValid(t, sessions, tokenHash, farmer.ID)
 	})
 
 	t.Run("pending deposit", func(t *testing.T) {
 		farmer := createTestUser(t, db)
+		sessions := NewSessionRepository(db)
+		tokenHash := createSessionForTest(t, db, farmer.ID)
 		if err := NewWalletRepository(db).CreateDeposit(ctx, farmer.ID, models.ProviderFlutterwave, uniqueRef("CLOSE"), "5.00"); err != nil {
 			t.Fatalf("create pending deposit: %v", err)
 		}
@@ -189,10 +280,13 @@ func TestDeleteAccountRefusesWhileMoneyIsAttached(t *testing.T) {
 			t.Fatalf("error = %v, want ErrAccountHasPendingRequest", err)
 		}
 		assertStillActive(t, repo, farmer.ID)
+		assertSessionValid(t, sessions, tokenHash, farmer.ID)
 	})
 
 	t.Run("funding account", func(t *testing.T) {
 		farmer := createTestUser(t, db)
+		sessions := NewSessionRepository(db)
+		tokenHash := createSessionForTest(t, db, farmer.ID)
 		if _, err := db.Exec(`
 			INSERT INTO wallet_virtual_accounts (farmer_id, tx_ref, status)
 			VALUES ($1, $2, 'pending')`, farmer.ID, uniqueRef("VA")); err != nil {
@@ -203,6 +297,7 @@ func TestDeleteAccountRefusesWhileMoneyIsAttached(t *testing.T) {
 			t.Fatalf("error = %v, want ErrAccountHasFundingAccount", err)
 		}
 		assertStillActive(t, repo, farmer.ID)
+		assertSessionValid(t, sessions, tokenHash, farmer.ID)
 	})
 }
 
@@ -215,5 +310,40 @@ func assertStillActive(t *testing.T, repo *FarmerRepository, farmerID int) {
 	}
 	if farmer == nil {
 		t.Fatal("account was closed despite the refusal")
+	}
+}
+
+func createSessionForTest(t *testing.T, db *sql.DB, farmerID int) string {
+	t.Helper()
+
+	tokenHash := uniqueRef("SESSION")
+	if err := NewSessionRepository(db).Create(
+		context.Background(),
+		tokenHash,
+		farmerID,
+		time.Now().Add(24*time.Hour),
+	); err != nil {
+		t.Fatalf("create session for farmer %d: %v", farmerID, err)
+	}
+	return tokenHash
+}
+
+func assertSessionValid(t *testing.T, repo *SessionRepository, tokenHash string, farmerID int) {
+	t.Helper()
+
+	gotFarmerID, err := repo.FindValid(context.Background(), tokenHash)
+	if err != nil {
+		t.Fatalf("session %q should remain valid: %v", tokenHash, err)
+	}
+	if gotFarmerID != farmerID {
+		t.Errorf("session farmer ID = %d, want %d", gotFarmerID, farmerID)
+	}
+}
+
+func assertSessionRevoked(t *testing.T, repo *SessionRepository, tokenHash string) {
+	t.Helper()
+
+	if _, err := repo.FindValid(context.Background(), tokenHash); !errors.Is(err, ErrSessionNotFound) {
+		t.Errorf("session %q error = %v, want ErrSessionNotFound", tokenHash, err)
 	}
 }

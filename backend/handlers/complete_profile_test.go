@@ -80,14 +80,16 @@ func TestSelfieUploadMustSaveBeforeAdvancing(t *testing.T) {
 			r := httptest.NewRequest("POST", "/complete-profile", &body)
 			r.Header.Set("Content-Type", writer.FormDataContentType())
 			r.Header.Set("Accept", "application/json")
-			session := middleware.CreateSession(21)
-			t.Cleanup(func() { middleware.DeleteSession(session) })
+			authenticator := middleware.NewAuthenticator(
+				onboardingAccount{&models.Farmer{ID: 21}},
+				onboardingTokenValidator{onboardingTestToken: 21},
+			)
 			cookie := httptest.NewRecorder()
-			middleware.SetSessionCookie(cookie, r, session)
+			middleware.SetSessionCookie(cookie, r, onboardingTestToken)
 			r.AddCookie(cookie.Result().Cookies()[0])
 			saver := &testSelfieSaver{err: tc.saveErr}
 			w := httptest.NewRecorder()
-			middleware.RequireAuth(onboardingAccount{&models.Farmer{ID: 21}}, NewCompleteProfileHandler(saver).Handler)(w, r)
+			authenticator.RequireAuth(NewCompleteProfileHandler(saver).Handler)(w, r)
 			if w.Code != tc.want {
 				t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
 			}

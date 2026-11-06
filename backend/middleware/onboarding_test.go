@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
@@ -8,11 +9,22 @@ import (
 	"time"
 
 	"backend/internal/models"
+	"backend/internal/session"
 )
 
 type onboardingFarmerReader struct{ farmer *models.Farmer }
 
 func (f onboardingFarmerReader) GetByID(int) (*models.Farmer, error) { return f.farmer, nil }
+
+type onboardingSessionValidator map[string]int
+
+func (v onboardingSessionValidator) Validate(_ context.Context, token string) (int, error) {
+	farmerID, ok := v[token]
+	if !ok {
+		return 0, session.ErrNotFound
+	}
+	return farmerID, nil
+}
 
 func TestRequireAuthEnforcesAllOnboardingSteps(t *testing.T) {
 	done := sql.NullTime{Time: time.Now(), Valid: true}
@@ -35,13 +47,16 @@ func TestRequireAuthEnforcesAllOnboardingSteps(t *testing.T) {
 		} {
 			t.Run(role+"/"+tc.name, func(t *testing.T) {
 				farmer := &models.Farmer{ID: 42, Role: role, PhotoURL: "/static/uploads/farmers/old.jpg", SelfieCapturedAt: tc.selfie, PhoneVerifiedAt: tc.phone, HasTransactionPIN: tc.pin}
-				session := CreateSession(farmer.ID)
-				t.Cleanup(func() { DeleteSession(session) })
+				token := "onboarding-session-token"
+				authenticator := NewAuthenticator(
+					onboardingFarmerReader{farmer},
+					onboardingSessionValidator{token: farmer.ID},
+				)
 				r := httptest.NewRequest(http.MethodGet, tc.path, nil)
-				r.AddCookie(&http.Cookie{Name: sessionCookieName, Value: session})
+				r.AddCookie(&http.Cookie{Name: sessionCookieName, Value: token})
 				w := httptest.NewRecorder()
 				called := false
-				RequireAuth(onboardingFarmerReader{farmer}, func(w http.ResponseWriter, r *http.Request) {
+				authenticator.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
 					called = true
 					if current, ok := FarmerFromContext(r); !ok || current.ID != farmer.ID {
 						t.Fatal("authenticated account missing")
@@ -61,11 +76,35 @@ func TestRequireAuthEnforcesAllOnboardingSteps(t *testing.T) {
 }
 
 func TestRequireAuthOnboardingStillRequiresSession(t *testing.T) {
-	for _, path := range []string{"/complete-profile", "/verify-phone", "/create-transaction-pin"} {
-		w := httptest.NewRecorder()
-		RequireAuth(onboardingFarmerReader{}, func(http.ResponseWriter, *http.Request) { t.Fatal("unauthenticated handler called") })(w, httptest.NewRequest("GET", path, nil))
-		if w.Header().Get("Location") != "/login" {
-			t.Fatal("missing login redirect")
-		}
+	authenticator := NewAuthenticator(onboardingFarmerReader{}, onboardingSessionValidator{})
+	for _, tc := range []struct {
+		name        string
+		cookie      *http.Cookie
+		wantCleared bool
+	}{
+		{"missing cookie", nil, false},
+		{"invalid token", &http.Cookie{Name: sessionCookieName, Value: "unknown-token"}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, path := range []string{"/complete-profile", "/verify-phone", "/create-transaction-pin"} {
+				r := httptest.NewRequest("GET", path, nil)
+				if tc.cookie != nil {
+					r.AddCookie(tc.cookie)
+				}
+				w := httptest.NewRecorder()
+				authenticator.RequireAuth(func(http.ResponseWriter, *http.Request) {
+					t.Fatal("unauthenticated handler called")
+				})(w, r)
+				if w.Header().Get("Location") != "/login" {
+					t.Fatal("missing login redirect")
+				}
+				if tc.wantCleared {
+					cookies := w.Result().Cookies()
+					if len(cookies) != 1 || cookies[0].MaxAge != -1 {
+						t.Fatal("invalid session cookie was not cleared")
+					}
+				}
+			}
+		})
 	}
 }

@@ -30,11 +30,11 @@ func TestWalletVirtualAccountPathsMatchTheFrontend(t *testing.T) {
 
 	// Both actions require a session. A logged-out visitor must be sent to
 	// login rather than reaching a handler that reads a farmer from context.
-	if count := strings.Count(routes, "RequireAuth(container.FarmerRepo, walletHandler.CreateVirtualAccount)"); count != 1 {
-		t.Errorf("CreateVirtualAccount is wrapped by RequireAuth %d times, want once", count)
+	if count := strings.Count(routes, "authenticator.RequireAuth(walletHandler.CreateVirtualAccount)"); count != 1 {
+		t.Errorf("CreateVirtualAccount is wrapped by persistent authentication %d times, want once", count)
 	}
-	if count := strings.Count(routes, "RequireAuth(container.FarmerRepo, walletHandler.CheckVirtualAccount)"); count != 1 {
-		t.Errorf("CheckVirtualAccount is wrapped by RequireAuth %d times, want once", count)
+	if count := strings.Count(routes, "authenticator.RequireAuth(walletHandler.CheckVirtualAccount)"); count != 1 {
+		t.Errorf("CheckVirtualAccount is wrapped by persistent authentication %d times, want once", count)
 	}
 }
 

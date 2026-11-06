@@ -2,8 +2,6 @@ package middleware
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"net/http"
 	"sync"
@@ -20,91 +18,32 @@ const farmerContextKey contextKey = "farmer"
 
 const sessionCookieName = "agroshield_session"
 
-// In-memory session store: sessionID -> farmerID.
-// Good enough for a single-server setup. If you later scale to multiple
-// server instances, swap this for a shared store (e.g. Redis).
-type sessionStore struct {
+// Presence is intentionally process-local. Persistent sessions live in the
+// database, but online status is only a short-lived chat indicator.
+type presenceStore struct {
 	mu       sync.RWMutex
-	sessions map[string]int
 	lastSeen map[int]time.Time
 }
 
-var store = &sessionStore{
-	sessions: make(map[string]int),
+var online = &presenceStore{
 	lastSeen: make(map[int]time.Time),
 }
 
 const onlineWindow = 60 * time.Second
 
-func newSessionID() string {
-	b := make([]byte, 32)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
-}
-
-// CreateSession creates a new session for a farmer and returns the session ID.
-func CreateSession(farmerID int) string {
-	id := newSessionID()
-	store.mu.Lock()
-	store.sessions[id] = farmerID
-	store.mu.Unlock()
-	return id
-}
-
-// DeleteSession removes a session (used on logout).
-func DeleteSession(sessionID string) {
-	store.mu.Lock()
-	farmerID, exists := store.sessions[sessionID]
-	delete(store.sessions, sessionID)
-	if exists {
-		hasAnotherSession := false
-		for _, sessionFarmerID := range store.sessions {
-			if sessionFarmerID == farmerID {
-				hasAnotherSession = true
-				break
-			}
-		}
-		if !hasAnotherSession {
-			delete(store.lastSeen, farmerID)
-		}
-	}
-	store.mu.Unlock()
-}
-
-// DeleteFarmerSessions removes every session belonging to a farmer. Used when
-// an account is closed: the account's own tab must not keep a working session,
-// and any other signed-in device must be signed out too.
-func DeleteFarmerSessions(farmerID int) {
-	store.mu.Lock()
-	for sessionID, sessionFarmerID := range store.sessions {
-		if sessionFarmerID == farmerID {
-			delete(store.sessions, sessionID)
-		}
-	}
-	delete(store.lastSeen, farmerID)
-	store.mu.Unlock()
-}
-
 // MarkFarmerOnline records recent authenticated activity for presence checks.
 func MarkFarmerOnline(farmerID int) {
-	store.mu.Lock()
-	store.lastSeen[farmerID] = time.Now()
-	store.mu.Unlock()
+	online.mu.Lock()
+	online.lastSeen[farmerID] = time.Now()
+	online.mu.Unlock()
 }
 
 // IsFarmerOnline reports whether a user has been active recently.
 func IsFarmerOnline(farmerID int) bool {
-	store.mu.RLock()
-	lastSeen, ok := store.lastSeen[farmerID]
-	store.mu.RUnlock()
+	online.mu.RLock()
+	lastSeen, ok := online.lastSeen[farmerID]
+	online.mu.RUnlock()
 	return ok && time.Since(lastSeen) <= onlineWindow
-}
-
-func getFarmerIDForSession(sessionID string) (int, bool) {
-	store.mu.RLock()
-	defer store.mu.RUnlock()
-	id, ok := store.sessions[sessionID]
-	return id, ok
 }
 
 // SetSessionCookie writes the session cookie on login.
@@ -143,7 +82,8 @@ func SessionIDFromRequest(r *http.Request) (string, bool) {
 	return cookie.Value, true
 }
 
-// FarmerFromContext retrieves the logged-in farmer attached by RequireAuth.
+// FarmerFromContext retrieves the logged-in farmer attached by the
+// persistent authenticator.
 func FarmerFromContext(r *http.Request) (*models.Farmer, bool) {
 	farmer, ok := r.Context().Value(farmerContextKey).(*models.Farmer)
 	return farmer, ok
@@ -151,43 +91,6 @@ func FarmerFromContext(r *http.Request) (*models.Farmer, bool) {
 
 type farmerReader interface {
 	GetByID(int) (*models.Farmer, error)
-}
-
-// RequireAuth protects a handler. It checks for a valid session cookie,
-// loads the logged-in farmer, and attaches it to the request context.
-// Incomplete accounts can only reach onboarding pages; those handlers enforce
-// the order of the steps. Ordinary protected pages require every step.
-func RequireAuth(repo farmerReader, next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		sessionID, ok := SessionIDFromRequest(r)
-		if !ok {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-
-		farmerID, ok := getFarmerIDForSession(sessionID)
-		if !ok {
-			ClearSessionCookie(w, r)
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-
-		farmer, err := repo.GetByID(farmerID)
-		if err != nil || farmer == nil {
-			ClearSessionCookie(w, r)
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-
-		if r.URL.Path != "/complete-profile" && r.URL.Path != "/verify-phone" && r.URL.Path != "/create-transaction-pin" && !services.HasCompletedProfile(farmer) {
-			http.Redirect(w, r, services.OnboardingPath(farmer), http.StatusSeeOther)
-			return
-		}
-
-		MarkFarmerOnline(farmerID)
-		ctx := context.WithValue(r.Context(), farmerContextKey, farmer)
-		next(w, r.WithContext(ctx))
-	}
 }
 
 // sessionValidator checks whether a session token is valid in persistent storage.

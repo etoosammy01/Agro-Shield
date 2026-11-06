@@ -15,8 +15,14 @@ type phoneVerifier interface {
 	VerifyPhone(context.Context, int, string, string) error
 }
 
+// sessionRevoker defines the session operation needed by this handler.
+type sessionRevoker interface {
+	Revoke(context.Context, string) error
+}
+
 type VerifyPhone struct {
-	otp phoneVerifier
+	otp      phoneVerifier
+	sessions sessionRevoker
 }
 
 type VerifyPhonePageData struct {
@@ -26,8 +32,11 @@ type VerifyPhonePageData struct {
 	CodeSent bool
 }
 
-func NewVerifyPhoneHandler(otp phoneVerifier) *VerifyPhone {
-	return &VerifyPhone{otp: otp}
+func NewVerifyPhoneHandler(otp phoneVerifier, sessions sessionRevoker) *VerifyPhone {
+	return &VerifyPhone{
+		otp:      otp,
+		sessions: sessions,
+	}
 }
 
 func (h *VerifyPhone) Handler(w http.ResponseWriter, r *http.Request) {
@@ -93,13 +102,21 @@ func (h *VerifyPhone) Handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *VerifyPhone) finish(w http.ResponseWriter, r *http.Request, farmer *models.Farmer) {
+	// Keep the session active if the farmer still needs to create a PIN.
 	if !farmer.HasTransactionPIN {
 		http.Redirect(w, r, "/create-transaction-pin", http.StatusSeeOther)
 		return
 	}
-	if sessionID, ok := middleware.SessionIDFromRequest(r); ok {
-		middleware.DeleteSession(sessionID)
+
+	// Revoke the persistent session before logging the farmer out.
+	if sessionToken, ok := middleware.SessionIDFromRequest(r); ok {
+		if err := h.sessions.Revoke(r.Context(), sessionToken); err != nil {
+			log.Printf("failed to revoke session after phone verification: %v", err)
+			http.Error(w, "Unable to complete verification. Please try again.", http.StatusInternalServerError)
+			return
+		}
 	}
+
 	middleware.ClearSessionCookie(w, r)
 	http.Redirect(w, r, "/login?verified=1", http.StatusSeeOther)
 }

@@ -207,11 +207,24 @@ func (h *Register) submitRegistration(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("User registered successfully as", page.Role)
 
-	// A temporary session allows onboarding, but cannot access protected pages
-	// until selfie capture, phone verification, and transaction PIN setup are complete.
-	sessionID := middleware.CreateSession(farmer.ID)
-	middleware.SetSessionCookie(w, r, sessionID)
+	// Send the welcome email because the account has already been created.
 	h.notifyWelcomeEmail(farmer.ID, page.Email, page.FirstName)
+
+	// Create a persistent session so the farmer can continue onboarding.
+	sessionToken, _, err := h.sessions.Create(r.Context(), farmer.ID)
+	if err != nil {
+		log.Printf("failed to create registration session: %v", err)
+		http.Error(
+			w,
+			"Your account was created, but we couldn't start your session. Please log in.",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	// Store the raw token in the browser cookie.
+	// Only its SHA-256 hash is stored in the database.
+	middleware.SetSessionCookie(w, r, sessionToken)
 
 	http.Redirect(w, r, "/complete-profile", http.StatusSeeOther)
 }

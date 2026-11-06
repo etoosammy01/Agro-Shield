@@ -5,6 +5,14 @@
   },
   {
     "package": "backend/internal/repository",
+    "test": "TestDeleteAccountRevokesAllSessions"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestDeleteAccountFailureDoesNotPartiallyRevokeSessions"
+  },
+  {
+    "package": "backend/internal/repository",
     "test": "TestDeleteAccountRefusesWhileMoneyIsAttached"
   },
   {

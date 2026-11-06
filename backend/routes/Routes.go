@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"backend/handlers"
-	app "backend/internal"
+	"backend/internal"
 	"backend/internal/services"
 	"backend/middleware"
 	"backend/ussd"
@@ -17,6 +17,12 @@ func RegisterRoutes(
 	container *app.Container,
 	welcomeEmail services.WelcomeEmailNotifier,
 ) {
+
+	// Use database-backed sessions to authenticate protected routes.
+	authenticator := middleware.NewAuthenticator(
+		container.FarmerRepo,
+		container.Sessions,
+	)
 	// USSD gateways post menu selections to this provider-neutral endpoint.
 	ussdHandler := ussd.NewHandler(container.FarmerRepo, container.Crop, services.NewWeatherService(), container.Order, container.Notification)
 	http.Handle("/ussd", ussdHandler)
@@ -88,6 +94,7 @@ func RegisterRoutes(
 
 	registerHandler := handlers.NewRegisterHandler(
 		container.Auth,
+		container.Sessions,
 		welcomeEmail,
 	)
 
@@ -101,6 +108,7 @@ func RegisterRoutes(
 
 	loginHandler := handlers.NewLoginHandler(
 		container.Auth,
+		container.Sessions,
 	)
 
 	http.HandleFunc(
@@ -111,12 +119,14 @@ func RegisterRoutes(
 		),
 	)
 
+	logoutHandler := handlers.NewLogoutHandler(container.Sessions)
+
 	http.HandleFunc(
 		"/logout",
 		middleware.OnlyPath(
 			"/logout",
 			middleware.OnlyGet(
-				handlers.LogoutHandler,
+				logoutHandler.LogoutHandler,
 			),
 		),
 	)
@@ -137,21 +147,24 @@ func RegisterRoutes(
 	completeProfileHandler := handlers.NewCompleteProfileHandler(
 		container.Auth,
 	)
-	verifyPhoneHandler := handlers.NewVerifyPhoneHandler(container.OTP)
+	verifyPhoneHandler := handlers.NewVerifyPhoneHandler(
+		container.OTP,
+		container.Sessions,
+	)
 	http.HandleFunc("/verify-phone", middleware.OnlyPath("/verify-phone",
-		middleware.RequireAuth(container.FarmerRepo, verifyPhoneHandler.Handler)))
-	transactionPINHandler := handlers.NewTransactionPINHandler(container.TransactionPIN)
+		authenticator.RequireAuth(verifyPhoneHandler.Handler)))
+	transactionPINHandler := handlers.NewTransactionPINHandler(
+		container.TransactionPIN,
+		container.Sessions,
+	)
 	http.HandleFunc("/create-transaction-pin", middleware.OnlyPath("/create-transaction-pin",
-		middleware.RequireAuth(container.FarmerRepo, transactionPINHandler.Handler)))
+		authenticator.RequireAuth(transactionPINHandler.Handler)))
 
 	http.HandleFunc(
 		"/complete-profile",
 		middleware.OnlyPath(
 			"/complete-profile",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				completeProfileHandler.Handler,
-			),
+			authenticator.RequireAuth(completeProfileHandler.Handler),
 		),
 	)
 	// ========================================================
@@ -174,10 +187,7 @@ func RegisterRoutes(
 		middleware.OnlyPath(
 			"/dashboard",
 			middleware.OnlyGet(
-				middleware.RequireAuth(
-					container.FarmerRepo,
-					dashboardHandler.DashBoard,
-				),
+				authenticator.RequireAuth(dashboardHandler.DashBoard),
 			),
 		),
 	)
@@ -186,7 +196,7 @@ func RegisterRoutes(
 		"/market-insights",
 		middleware.OnlyPath(
 			"/market-insights",
-			middleware.OnlyGet(middleware.RequireAuth(container.FarmerRepo, dashboardHandler.MarketInsights)),
+			middleware.OnlyGet(authenticator.RequireAuth(dashboardHandler.MarketInsights)),
 		),
 	)
 
@@ -206,10 +216,7 @@ func RegisterRoutes(
 		middleware.OnlyPath(
 			"/profile",
 			middleware.OnlyGet(
-				middleware.RequireAuth(
-					container.FarmerRepo,
-					profileHandler.ProfileHandler,
-				),
+				authenticator.RequireAuth(profileHandler.ProfileHandler),
 			),
 		),
 	)
@@ -222,10 +229,7 @@ func RegisterRoutes(
 		"/profile/edit",
 		middleware.OnlyPath(
 			"/profile/edit",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				profileEditHandler.Handler,
-			),
+			authenticator.RequireAuth(profileEditHandler.Handler),
 		),
 	)
 
@@ -235,10 +239,7 @@ func RegisterRoutes(
 		"/profile/delete",
 		middleware.OnlyPath(
 			"/profile/delete",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				profileEditHandler.DeleteHandler,
-			),
+			authenticator.RequireAuth(profileEditHandler.DeleteHandler),
 		),
 	)
 
@@ -250,16 +251,13 @@ func RegisterRoutes(
 		container.Crop,
 	)
 	salesHandler := handlers.NewSalesHandler(container.Order)
-	http.HandleFunc("/sales", middleware.OnlyPath("/sales", middleware.RequireAuth(container.FarmerRepo, salesHandler.Handler)))
+	http.HandleFunc("/sales", middleware.OnlyPath("/sales", authenticator.RequireAuth(salesHandler.Handler)))
 
 	http.HandleFunc(
 		"/storage",
 		middleware.OnlyPath(
 			"/storage",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				storageHandler.StorageHandler,
-			),
+			authenticator.RequireAuth(storageHandler.StorageHandler),
 		),
 	)
 
@@ -274,10 +272,7 @@ func RegisterRoutes(
 		"/marketplace",
 		middleware.OnlyPath(
 			"/marketplace",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				marketplaceHandler.MarketplaceHandler,
-			),
+			authenticator.RequireAuth(marketplaceHandler.MarketplaceHandler),
 		),
 	)
 
@@ -293,20 +288,18 @@ func RegisterRoutes(
 		"/feedback",
 		middleware.OnlyPath(
 			"/feedback",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				func(w http.ResponseWriter, r *http.Request) {
-					switch r.Method {
-					case http.MethodPost:
-						feedbackHandler.CreateFeedback(w, r)
+			authenticator.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+				switch r.Method {
+				case http.MethodPost:
+					feedbackHandler.CreateFeedback(w, r)
 
-					case http.MethodGet:
-						feedbackHandler.GetFeedbackByFarmer(w, r)
+				case http.MethodGet:
+					feedbackHandler.GetFeedbackByFarmer(w, r)
 
-					default:
-						http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-					}
-				},
+				default:
+					http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+				}
+			},
 			),
 		),
 	)
@@ -315,10 +308,7 @@ func RegisterRoutes(
 		"/feedback/rating",
 		middleware.OnlyPath(
 			"/feedback/rating",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				feedbackHandler.GetFarmerRating,
-			),
+			authenticator.RequireAuth(feedbackHandler.GetFarmerRating),
 		),
 	)
 
@@ -335,10 +325,7 @@ func RegisterRoutes(
 		"/product",
 		middleware.OnlyPath(
 			"/product",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				productHandler.ProductDetailsHandler,
-			),
+			authenticator.RequireAuth(productHandler.ProductDetailsHandler),
 		),
 	)
 
@@ -355,10 +342,7 @@ func RegisterRoutes(
 		"/cart",
 		middleware.OnlyPath(
 			"/cart",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				cartHandler.Handler,
-			),
+			authenticator.RequireAuth(cartHandler.Handler),
 		),
 	)
 
@@ -378,10 +362,7 @@ func RegisterRoutes(
 		"/notifications",
 		middleware.OnlyPath(
 			"/notifications",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				notificationHandler.NotificationsHandler,
-			),
+			authenticator.RequireAuth(notificationHandler.NotificationsHandler),
 		),
 	)
 
@@ -393,10 +374,7 @@ func RegisterRoutes(
 		"/notifications/read",
 		middleware.OnlyPath(
 			"/notifications/read",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				notificationHandler.MarkAsReadHandler,
-			),
+			authenticator.RequireAuth(notificationHandler.MarkAsReadHandler),
 		),
 	)
 
@@ -408,10 +386,7 @@ func RegisterRoutes(
 		"/notifications/read-all",
 		middleware.OnlyPath(
 			"/notifications/read-all",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				notificationHandler.MarkAllAsReadHandler,
-			),
+			authenticator.RequireAuth(notificationHandler.MarkAllAsReadHandler),
 		),
 	)
 
@@ -431,10 +406,7 @@ func RegisterRoutes(
 		"/ai-assistant",
 		middleware.OnlyPath(
 			"/ai-assistant",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				aiHandler.Handler,
-			),
+			authenticator.RequireAuth(aiHandler.Handler),
 		),
 	)
 
@@ -442,10 +414,7 @@ func RegisterRoutes(
 		"/ai-diagnosis-history",
 		middleware.OnlyPath(
 			"/ai-diagnosis-history",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				diagnosisHistoryHandler.Handler,
-			),
+			authenticator.RequireAuth(diagnosisHistoryHandler.Handler),
 		),
 	)
 
@@ -467,10 +436,7 @@ func RegisterRoutes(
 		middleware.OnlyPath(
 			"/negotiations",
 			middleware.OnlyGet(
-				middleware.RequireAuth(
-					container.FarmerRepo,
-					negotiationHandler.ListHandler,
-				),
+				authenticator.RequireAuth(negotiationHandler.ListHandler),
 			),
 		),
 	)
@@ -485,10 +451,7 @@ func RegisterRoutes(
 		"/negotiation",
 		middleware.OnlyPath(
 			"/negotiation",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				negotiationHandler.ThreadHandler,
-			),
+			authenticator.RequireAuth(negotiationHandler.ThreadHandler),
 		),
 	)
 
@@ -500,10 +463,7 @@ func RegisterRoutes(
 		"/negotiation/start",
 		middleware.OnlyPath(
 			"/negotiation/start",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				negotiationHandler.StartHandler,
-			),
+			authenticator.RequireAuth(negotiationHandler.StartHandler),
 		),
 	)
 
@@ -555,10 +515,7 @@ func RegisterRoutes(
 		middleware.OnlyPath(
 			"/chat",
 			middleware.OnlyGet(
-				middleware.RequireAuth(
-					container.FarmerRepo,
-					chatHandler.ListHandler,
-				),
+				authenticator.RequireAuth(chatHandler.ListHandler),
 			),
 		),
 	)
@@ -580,10 +537,7 @@ func RegisterRoutes(
 		middleware.OnlyPath(
 			"/chat/view",
 			middleware.OnlyGet(
-				middleware.RequireAuth(
-					container.FarmerRepo,
-					chatHandler.ViewHandler,
-				),
+				authenticator.RequireAuth(chatHandler.ViewHandler),
 			),
 		),
 	)
@@ -593,10 +547,7 @@ func RegisterRoutes(
 		middleware.OnlyPath(
 			"/chat/presence",
 			middleware.OnlyGet(
-				middleware.RequireAuth(
-					container.FarmerRepo,
-					chatHandler.PresenceHandler,
-				),
+				authenticator.RequireAuth(chatHandler.PresenceHandler),
 			),
 		),
 	)
@@ -615,10 +566,7 @@ func RegisterRoutes(
 		"/chat/typing",
 		middleware.OnlyPath(
 			"/chat/typing",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				chatHandler.TypingHandler,
-			),
+			authenticator.RequireAuth(chatHandler.TypingHandler),
 		),
 	)
 
@@ -632,10 +580,7 @@ func RegisterRoutes(
 		"/chat/send",
 		middleware.OnlyPath(
 			"/chat/send",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				chatHandler.SendMessageHandler,
-			),
+			authenticator.RequireAuth(chatHandler.SendMessageHandler),
 		),
 	)
 
@@ -654,10 +599,7 @@ func RegisterRoutes(
 		"/chat/group/create",
 		middleware.OnlyPath(
 			"/chat/group/create",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				chatHandler.CreateGroupHandler,
-			),
+			authenticator.RequireAuth(chatHandler.CreateGroupHandler),
 		),
 	)
 
@@ -675,10 +617,7 @@ func RegisterRoutes(
 		"/chat/private",
 		middleware.OnlyPath(
 			"/chat/private",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				chatHandler.CreatePrivateChatHandler,
-			),
+			authenticator.RequireAuth(chatHandler.CreatePrivateChatHandler),
 		),
 	)
 
@@ -692,10 +631,7 @@ func RegisterRoutes(
 		"/chat/member/add",
 		middleware.OnlyPath(
 			"/chat/member/add",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				chatHandler.AddMemberHandler,
-			),
+			authenticator.RequireAuth(chatHandler.AddMemberHandler),
 		),
 	)
 
@@ -709,10 +645,7 @@ func RegisterRoutes(
 		"/chat/member/remove",
 		middleware.OnlyPath(
 			"/chat/member/remove",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				chatHandler.RemoveMemberHandler,
-			),
+			authenticator.RequireAuth(chatHandler.RemoveMemberHandler),
 		),
 	)
 
@@ -726,10 +659,7 @@ func RegisterRoutes(
 		"/chat/leave",
 		middleware.OnlyPath(
 			"/chat/leave",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				chatHandler.LeaveGroupHandler,
-			),
+			authenticator.RequireAuth(chatHandler.LeaveGroupHandler),
 		),
 	)
 
@@ -743,10 +673,7 @@ func RegisterRoutes(
 		"/chat/message/delete",
 		middleware.OnlyPath(
 			"/chat/message/delete",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				chatHandler.DeleteMessageHandler,
-			),
+			authenticator.RequireAuth(chatHandler.DeleteMessageHandler),
 		),
 	)
 	// ========================================================
@@ -762,10 +689,7 @@ func RegisterRoutes(
 		middleware.OnlyPath(
 			"/orders",
 			middleware.OnlyGet(
-				middleware.RequireAuth(
-					container.FarmerRepo,
-					orderHandler.List,
-				),
+				authenticator.RequireAuth(orderHandler.List),
 			),
 		),
 	)
@@ -777,10 +701,7 @@ func RegisterRoutes(
 		middleware.OnlyPath(
 			"/order",
 			middleware.OnlyGet(
-				middleware.RequireAuth(
-					container.FarmerRepo,
-					orderHandler.Detail,
-				),
+				authenticator.RequireAuth(orderHandler.Detail),
 			),
 		),
 	)
@@ -791,10 +712,7 @@ func RegisterRoutes(
 		"/orders/place",
 		middleware.OnlyPath(
 			"/orders/place",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				orderHandler.Place,
-			),
+			authenticator.RequireAuth(orderHandler.Place),
 		),
 	)
 
@@ -811,10 +729,7 @@ func RegisterRoutes(
 		middleware.OnlyPath(
 			"/deliveries",
 			middleware.OnlyGet(
-				middleware.RequireAuth(
-					container.FarmerRepo,
-					deliveryHandler.List,
-				),
+				authenticator.RequireAuth(deliveryHandler.List),
 			),
 		),
 	)
@@ -826,10 +741,7 @@ func RegisterRoutes(
 		middleware.OnlyPath(
 			"/delivery",
 			middleware.OnlyGet(
-				middleware.RequireAuth(
-					container.FarmerRepo,
-					deliveryHandler.Detail,
-				),
+				authenticator.RequireAuth(deliveryHandler.Detail),
 			),
 		),
 	)
@@ -840,10 +752,7 @@ func RegisterRoutes(
 		"/deliveries/create",
 		middleware.OnlyPath(
 			"/deliveries/create",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				deliveryHandler.Create,
-			),
+			authenticator.RequireAuth(deliveryHandler.Create),
 		),
 	)
 
@@ -853,10 +762,7 @@ func RegisterRoutes(
 		"/deliveries/status",
 		middleware.OnlyPath(
 			"/deliveries/status",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				deliveryHandler.UpdateStatus,
-			),
+			authenticator.RequireAuth(deliveryHandler.UpdateStatus),
 		),
 	)
 
@@ -866,10 +772,7 @@ func RegisterRoutes(
 		"/deliveries/tracking",
 		middleware.OnlyPath(
 			"/deliveries/tracking",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				deliveryHandler.UpdateTracking,
-			),
+			authenticator.RequireAuth(deliveryHandler.UpdateTracking),
 		),
 	)
 
@@ -879,10 +782,7 @@ func RegisterRoutes(
 		"/deliveries/delivered",
 		middleware.OnlyPath(
 			"/deliveries/delivered",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				deliveryHandler.MarkDelivered,
-			),
+			authenticator.RequireAuth(deliveryHandler.MarkDelivered),
 		),
 	)
 
@@ -892,10 +792,7 @@ func RegisterRoutes(
 		"/deliveries/failed",
 		middleware.OnlyPath(
 			"/deliveries/failed",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				deliveryHandler.MarkFailed,
-			),
+			authenticator.RequireAuth(deliveryHandler.MarkFailed),
 		),
 	)
 
@@ -905,10 +802,7 @@ func RegisterRoutes(
 		"/deliveries/cancel",
 		middleware.OnlyPath(
 			"/deliveries/cancel",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				deliveryHandler.Cancel,
-			),
+			authenticator.RequireAuth(deliveryHandler.Cancel),
 		),
 	)
 
@@ -929,119 +823,119 @@ func RegisterRoutes(
 
 	http.HandleFunc("/wallet", middleware.OnlyPath(
 		"/wallet",
-		middleware.OnlyGet(middleware.RequireAuth(container.FarmerRepo, walletHandler.Page)),
+		middleware.OnlyGet(authenticator.RequireAuth(walletHandler.Page)),
 	))
 	// Read-only snapshot for the open wallet page. It returns committed values
 	// only, so the page can notice a confirmed credit without computing one.
 	http.HandleFunc("/wallet/status", middleware.OnlyPath(
 		"/wallet/status",
-		middleware.OnlyGet(middleware.RequireAuth(container.FarmerRepo, walletHandler.Status)),
+		middleware.OnlyGet(authenticator.RequireAuth(walletHandler.Status)),
 	))
 	http.HandleFunc("/wallet/otp/send", middleware.OnlyPath(
 		"/wallet/otp/send",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.SendOTP),
+		authenticator.RequireAuth(walletHandler.SendOTP),
 	))
 	http.HandleFunc("/wallet/deposit", middleware.OnlyPath(
 		"/wallet/deposit",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.Deposit),
+		authenticator.RequireAuth(walletHandler.Deposit),
 	))
 	// The permanent funding account. Setup is a POST because it carries a BVN or
 	// NIN; the check is a POST as well so a link preview or refresh cannot ask
 	// the provider anything.
 	http.HandleFunc("/wallet/virtual-account", middleware.OnlyPath(
 		"/wallet/virtual-account",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.CreateVirtualAccount),
+		authenticator.RequireAuth(walletHandler.CreateVirtualAccount),
 	))
 	http.HandleFunc("/wallet/virtual-account/check", middleware.OnlyPath(
 		"/wallet/virtual-account/check",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.CheckVirtualAccount),
+		authenticator.RequireAuth(walletHandler.CheckVirtualAccount),
 	))
 	http.HandleFunc("/wallet/withdraw", middleware.OnlyPath(
 		"/wallet/withdraw",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.Withdraw),
+		authenticator.RequireAuth(walletHandler.Withdraw),
 	))
 	http.HandleFunc("/wallet/transfer", middleware.OnlyPath(
 		"/wallet/transfer",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.Transfer),
+		authenticator.RequireAuth(walletHandler.Transfer),
 	))
 	http.HandleFunc("/wallet/transfer/recipient", middleware.OnlyPath(
 		"/wallet/transfer/recipient",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.LookupTransferRecipient),
+		authenticator.RequireAuth(walletHandler.LookupTransferRecipient),
 	))
 	// A user may release their own request while it is still pending. The
 	// service refuses once an admin has started paying it, because the money may
 	// already be on its way.
 	http.HandleFunc("/wallet/withdraw/cancel", middleware.OnlyPath(
 		"/wallet/withdraw/cancel",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.CancelWithdrawal),
+		authenticator.RequireAuth(walletHandler.CancelWithdrawal),
 	))
 	http.HandleFunc("/wallet/transfer/cancel", middleware.OnlyPath(
 		"/wallet/transfer/cancel",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.CancelTransfer),
+		authenticator.RequireAuth(walletHandler.CancelTransfer),
 	))
 	http.HandleFunc("/wallet/bank", middleware.OnlyPath(
 		"/wallet/bank",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.SaveBankDetails),
+		authenticator.RequireAuth(walletHandler.SaveBankDetails),
 	))
 	http.HandleFunc("/wallet/banks", middleware.OnlyPath(
 		"/wallet/banks",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.Banks),
+		authenticator.RequireAuth(walletHandler.Banks),
 	))
 	http.HandleFunc("/wallet/lookup-account", middleware.OnlyPath(
 		"/wallet/lookup-account",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.LookupAccount),
+		authenticator.RequireAuth(walletHandler.LookupAccount),
 	))
 	http.HandleFunc("/admin/wallet-withdrawals", middleware.OnlyPath(
 		"/admin/wallet-withdrawals",
-		middleware.OnlyGet(middleware.RequireAuth(container.FarmerRepo, walletHandler.AdminPage)),
+		middleware.OnlyGet(authenticator.RequireAuth(walletHandler.AdminPage)),
 	))
 	// Admins are managed from the approvals page itself, so granting the role no
 	// longer needs a database client or a restart.
 	http.HandleFunc("/admin/wallet-admins", middleware.OnlyPath(
 		"/admin/wallet-admins",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.SetWalletAdmin),
+		authenticator.RequireAuth(walletHandler.SetWalletAdmin),
 	))
 	http.HandleFunc("/admin/wallet-withdrawals/approve", middleware.OnlyPath(
 		"/admin/wallet-withdrawals/approve",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.ApproveWithdrawal),
+		authenticator.RequireAuth(walletHandler.ApproveWithdrawal),
 	))
 	http.HandleFunc("/admin/wallet-withdrawals/reject", middleware.OnlyPath(
 		"/admin/wallet-withdrawals/reject",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.RejectWithdrawal),
+		authenticator.RequireAuth(walletHandler.RejectWithdrawal),
 	))
 	http.HandleFunc("/admin/wallet-withdrawals/reconcile", middleware.OnlyPath(
 		"/admin/wallet-withdrawals/reconcile",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.ReconcileWithdrawal),
+		authenticator.RequireAuth(walletHandler.ReconcileWithdrawal),
 	))
 	// The way back for a payout that never reached Flutterwave: the row is
 	// 'processing' with funds reserved and no way to release them, because
 	// Reject only matches 'pending'.
 	http.HandleFunc("/admin/wallet-withdrawals/return-to-queue", middleware.OnlyPath(
 		"/admin/wallet-withdrawals/return-to-queue",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.ReturnWithdrawalToQueue),
+		authenticator.RequireAuth(walletHandler.ReturnWithdrawalToQueue),
 	))
 	// For a payout that reached Flutterwave but never recorded its transfer id:
 	// the id is what settlement matches on, so without it neither the webhook nor
 	// reconcile can pay or refund the row.
 	http.HandleFunc("/admin/wallet-withdrawals/record-transfer", middleware.OnlyPath(
 		"/admin/wallet-withdrawals/record-transfer",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.RecordTransferID),
+		authenticator.RequireAuth(walletHandler.RecordTransferID),
 	))
 	// Wallet-to-wallet transfers are reviewed on the same approvals page, so
 	// they need no listing route of their own.
 	http.HandleFunc("/admin/wallet-transfers/approve", middleware.OnlyPath(
 		"/admin/wallet-transfers/approve",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.ApproveTransfer),
+		authenticator.RequireAuth(walletHandler.ApproveTransfer),
 	))
 	http.HandleFunc("/admin/wallet-transfers/reject", middleware.OnlyPath(
 		"/admin/wallet-transfers/reject",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.RejectTransfer),
+		authenticator.RequireAuth(walletHandler.RejectTransfer),
 	))
 	// Recreates a missing wallet for an existing account. It creates an empty
 	// NGN wallet and never moves money, so it is safe to repeat.
 	http.HandleFunc("/admin/wallets/repair", middleware.OnlyPath(
 		"/admin/wallets/repair",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.RepairWallet),
+		authenticator.RequireAuth(walletHandler.RepairWallet),
 	))
 
 	// Initiate a payment for an order - requires the buyer to
@@ -1053,10 +947,7 @@ func RegisterRoutes(
 		"/orders/pay",
 		middleware.OnlyPath(
 			"/orders/pay",
-			middleware.RequireAuth(
-				container.FarmerRepo,
-				paymentHandler.InitiatePayment,
-			),
+			authenticator.RequireAuth(paymentHandler.InitiatePayment),
 		),
 	)
 
