@@ -33,6 +33,7 @@ import (
 // ============================================================
 
 type Container struct {
+	OrderDispute *services.OrderDisputeService
 	Auth         *services.AuthService
 	Crop         *services.CropService
 	Order        *services.OrderService

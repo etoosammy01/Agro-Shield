@@ -1,4 +1,3 @@
-
 package services
 
 import (
@@ -11,8 +10,8 @@ import (
 )
 
 var (
-	ErrInvalidDisputeInput = errors.New("invalid dispute details")
-	ErrInvalidDisputeReason = errors.New("unsupported dispute reason")
+	ErrInvalidDisputeInput   = errors.New("invalid dispute details")
+	ErrInvalidDisputeReason  = errors.New("unsupported dispute reason")
 	ErrInvalidSellerResponse = errors.New("seller response is required")
 )
 
@@ -34,10 +33,10 @@ func NewOrderDisputeService(repo orderDisputeStore) *OrderDisputeService {
 }
 
 type CreateOrderDisputeInput struct {
-	OrderID        int64
-	DeliveryID     *int64
-	ReasonCode     string
-	Description    string
+	OrderID         int64
+	DeliveryID      *int64
+	ReasonCode      string
+	Description     string
 	RequestedAmount string
 }
 
