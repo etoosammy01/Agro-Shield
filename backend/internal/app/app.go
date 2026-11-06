@@ -57,6 +57,7 @@ type Container struct {
 // ============================================================
 
 func NewContainer(
+	orderDisputeRepo *repository.OrderDisputeRepository,
 	farmerRepo *repository.FarmerRepository,
 	cropRepo *repository.CropRepository,
 	orderRepo *repository.OrderRepository,
@@ -155,7 +156,7 @@ func NewContainer(
 
 	walletService := services.NewWalletService(walletRepo, farmerRepo, bankLookupRepo, flutterwaveClient, walletAdminIDs, commissionBasisPoints, notificationService)
 	walletService.SetStaleDepositAfter(staleDepositAfter)
-	
+
 	paymentService := services.NewPaymentService(paymentRepo, orderRepo, farmerRepo, flutterwaveClient, walletService)
 
 	feedbackService := services.NewFeedbackService(
