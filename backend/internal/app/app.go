@@ -146,6 +146,7 @@ func NewContainer(
 		orderRepo,
 		marketEventRepo,
 	)
+	orderDisputeService := services.NewOrderDisputeService(orderDisputeRepo)
 
 	// ========================================================
 	// 6. PAYMENT SERVICE          ← added
@@ -200,6 +201,8 @@ func NewContainer(
 		// ----------------------------------------------------
 
 		Delivery: deliveryService,
+
+		OrderDispute: orderDisputeService,
 
 		// ----------------------------------------------------
 		// CART
