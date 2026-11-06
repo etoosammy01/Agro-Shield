@@ -146,10 +146,14 @@ func NewContainer(
 		orderRepo,
 		marketEventRepo,
 	)
+
+	// ========================================================
+	// 6. ORDERDISPUTE SERVICE
+	// ========================================================
 	orderDisputeService := services.NewOrderDisputeService(orderDisputeRepo)
 
 	// ========================================================
-	// 6. PAYMENT SERVICE          ← added
+	// 7. PAYMENT SERVICE          ← added
 	//
 	// Coordinates payment records in PostgreSQL with the
 	// Flutterwave API.
@@ -165,7 +169,7 @@ func NewContainer(
 	)
 
 	// ========================================================
-	// 7. RETURN APPLICATION CONTAINER
+	// 8. RETURN APPLICATION CONTAINER
 	// ========================================================
 
 	return &Container{
@@ -201,6 +205,10 @@ func NewContainer(
 		// ----------------------------------------------------
 
 		Delivery: deliveryService,
+
+		// ----------------------------------------------------
+		// ORDERDISPUTE
+		// ----------------------------------------------------
 
 		OrderDispute: orderDisputeService,
 
