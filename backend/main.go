@@ -75,6 +75,11 @@ func main() {
 	deliveryRepo := repository.NewDeliveryRepository(db)
 
 	// ------------------------------------------------------------
+	// ORDERDISPUTE REPOSITORY
+	// ------------------------------------------------------------
+	orderDisputeRepo := repository.NewOrderDisputeRepository(db)
+
+	// ------------------------------------------------------------
 	// DIAGNOSIS REPOSITORY
 	// ------------------------------------------------------------
 	diagnosisRepo := repository.NewDiagnosisRepository(db)
@@ -248,6 +253,7 @@ func main() {
 		cropRepo,
 		orderRepo,
 		deliveryRepo, // ← now correctly created and passed
+		orderDisputeRepo,
 		cartRepo,
 		diagnosisRepo,
 		negotiationRepo,
