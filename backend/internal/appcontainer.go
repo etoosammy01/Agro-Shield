@@ -27,6 +27,7 @@ import (
 // ============================================================
 
 type Container struct {
+	OrderDispute   *services.OrderDisputeService
 	Auth           *services.AuthService
 	Crop           *services.CropService
 	Order          *services.OrderService
@@ -56,6 +57,7 @@ func NewContainer(
 	cropRepo *repository.CropRepository,
 	orderRepo *repository.OrderRepository,
 	deliveryRepo *repository.DeliveryRepository, // ← added
+	orderDisputeRepo *repository.OrderDisputeRepository,
 	cartRepo *repository.CartRepository,
 	diagnosisRepo *repository.DiagnosisRepository,
 	negotiationRepo *repository.NegotiationRepository,
@@ -142,6 +144,8 @@ func NewContainer(
 		orderRepo,
 		marketEventRepo,
 	)
+
+	orderDisputeService := services.NewOrderDisputeService(orderDisputeRepo)
 
 	// ========================================================
 	// 6. PAYMENT SERVICE          ← added
@@ -236,9 +240,13 @@ func NewContainer(
 		// ----------------------------------------------------
 		// CHAT
 		// ----------------------------------------------------
-
 		Chat:         chatService,
 		MarketEvents: marketEventRepo,
+
+		// ----------------------------------------------------
+		// ORDERDISPUTE
+		// ----------------------------------------------------
+		OrderDispute: orderDisputeService,
 
 		// ----------------------------------------------------
 		// PAYMENT          ← added
