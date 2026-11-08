@@ -25,6 +25,7 @@ func (h *OrderDisputeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
+
 	}
 
 	farmer, ok := middleware.FarmerFromContext(r)
@@ -78,6 +79,10 @@ func (h *OrderDisputeHandler) Create(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, repository.ErrDisputeNotPaid):
 			writeJSON(w, http.StatusConflict, map[string]string{"error": "This order does not have a confirmed wallet payment"})
 
+		case errors.Is(err, repository.ErrActiveDisputeExists):
+			writeJSON(w, http.StatusConflict, map[string]string{
+				"error": "An active dispute already exists for this order",
+			})
 		default:
 			log.Printf("create order dispute for buyer %d: %v", farmer.ID, err)
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Could not create dispute"})

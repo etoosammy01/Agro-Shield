@@ -12,6 +12,7 @@ import (
 )
 
 var (
+	ErrActiveDisputeExists  = errors.New("an active dispute already exists for this order")
 	ErrDisputeOrderNotFound = errors.New("order not found")
 	ErrDisputeNotPaid       = errors.New("order has no confirmed wallet payment")
 	ErrDisputeNotBuyer      = errors.New("only the order buyer can open this dispute")
@@ -186,6 +187,30 @@ func (r *OrderDisputeRepository) Create(
 	}
 	if !amountValid {
 		return ErrDisputeAmount
+	}
+	// The order row is already locked. This check serializes dispute
+	// submissions for the same order before the unique index backstop.
+	var activeDisputeExists bool
+
+	err = tx.QueryRowContext(ctx, `
+    SELECT EXISTS (
+        SELECT 1
+        FROM order_disputes
+        WHERE order_id = $1
+          AND status IN ($2, $3, $4)
+    )
+`, d.OrderID,
+		models.DisputeSubmitted,
+		models.DisputeSellerResponded,
+		models.DisputeUnderReview,
+	).Scan(&activeDisputeExists)
+
+	if err != nil {
+		return fmt.Errorf("check active dispute: %w", err)
+	}
+
+	if activeDisputeExists {
+		return ErrActiveDisputeExists
 	}
 
 	d.SellerID = sellerID
