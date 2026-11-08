@@ -33,6 +33,7 @@ import (
 // ============================================================
 
 type Container struct {
+	OrderDispute *services.OrderDisputeService
 	Auth         *services.AuthService
 	Crop         *services.CropService
 	Order        *services.OrderService
@@ -56,6 +57,7 @@ type Container struct {
 // ============================================================
 
 func NewContainer(
+	orderDisputeRepo *repository.OrderDisputeRepository,
 	farmerRepo *repository.FarmerRepository,
 	cropRepo *repository.CropRepository,
 	orderRepo *repository.OrderRepository,
@@ -146,7 +148,12 @@ func NewContainer(
 	)
 
 	// ========================================================
-	// 6. PAYMENT SERVICE          ← added
+	// 6. ORDERDISPUTE SERVICE
+	// ========================================================
+	orderDisputeService := services.NewOrderDisputeService(orderDisputeRepo)
+
+	// ========================================================
+	// 7. PAYMENT SERVICE          ← added
 	//
 	// Coordinates payment records in PostgreSQL with the
 	// Flutterwave API.
@@ -154,7 +161,7 @@ func NewContainer(
 
 	walletService := services.NewWalletService(walletRepo, farmerRepo, bankLookupRepo, flutterwaveClient, walletAdminIDs, commissionBasisPoints, notificationService)
 	walletService.SetStaleDepositAfter(staleDepositAfter)
-	
+
 	paymentService := services.NewPaymentService(paymentRepo, orderRepo, farmerRepo, flutterwaveClient, walletService)
 
 	feedbackService := services.NewFeedbackService(
@@ -162,7 +169,7 @@ func NewContainer(
 	)
 
 	// ========================================================
-	// 7. RETURN APPLICATION CONTAINER
+	// 8. RETURN APPLICATION CONTAINER
 	// ========================================================
 
 	return &Container{
@@ -198,6 +205,12 @@ func NewContainer(
 		// ----------------------------------------------------
 
 		Delivery: deliveryService,
+
+		// ----------------------------------------------------
+		// ORDERDISPUTE
+		// ----------------------------------------------------
+
+		OrderDispute: orderDisputeService,
 
 		// ----------------------------------------------------
 		// CART
