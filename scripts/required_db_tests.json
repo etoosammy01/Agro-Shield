@@ -170,5 +170,21 @@
   {
     "package": "backend/internal/testdb",
     "test": "TestSchemasAreIsolatedAndCleaned"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestCreateOrderDisputeAndPreventDuplicateActive"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestOrderDisputeEnforcesBuyerAndPaymentOwnership"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestOrderDisputeSellerResponseAndAdminRejection"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestConcurrentDisputeSubmissionsCreateOnlyOneActiveDispute"
   }
 ]
