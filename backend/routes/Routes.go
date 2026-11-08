@@ -755,6 +755,32 @@ func RegisterRoutes(
 
 	orderHandler := handlers.NewOrderHandler(container.Order, checkoutHandler)
 
+	disputeHandler := handlers.NewOrderDisputeHandler(container.OrderDispute)
+
+	// Buyer submits an order dispute.
+	http.HandleFunc(
+		"/orders/disputes",
+		middleware.OnlyPath(
+			"/orders/disputes",
+			middleware.RequireAuth(
+				container.FarmerRepo,
+				disputeHandler.Create,
+			),
+		),
+	)
+
+	// Seller responds to a dispute.
+	http.HandleFunc(
+		"/orders/disputes/respond",
+		middleware.OnlyPath(
+			"/orders/disputes/respond",
+			middleware.RequireAuth(
+				container.FarmerRepo,
+				disputeHandler.Respond,
+			),
+		),
+	)
+
 	// Order list (buyer purchases / farmer sales)
 	// GET /orders
 	http.HandleFunc(

@@ -10,6 +10,7 @@ import (
 )
 
 var (
+	ErrDisputeAdminOnly = errors.New("administrator access required")
 	ErrInvalidDisputeInput   = errors.New("invalid dispute details")
 	ErrInvalidDisputeReason  = errors.New("unsupported dispute reason")
 	ErrInvalidSellerResponse = errors.New("seller response is required")
@@ -22,14 +23,26 @@ type orderDisputeStore interface {
 	ListBySeller(context.Context, int) ([]models.OrderDispute, error)
 	AddSellerResponse(context.Context, int64, int, string) error
 	ListEvents(context.Context, int64) ([]models.OrderDisputeEvent, error)
+	StartAdminReview(context.Context, int64, int) error
+	Reject(context.Context, int64, int, string) error
 }
 
 type OrderDisputeService struct {
-	repo orderDisputeStore
+	repo   orderDisputeStore
+	admins disputeAdminChecker
+}
+type disputeAdminChecker interface {
+	IsAdmin(int) bool
 }
 
-func NewOrderDisputeService(repo orderDisputeStore) *OrderDisputeService {
-	return &OrderDisputeService{repo: repo}
+func NewOrderDisputeService(
+	repo orderDisputeStore,
+	admins disputeAdminChecker,
+) *OrderDisputeService {
+	return &OrderDisputeService{
+		repo:   repo,
+		admins: admins,
+	}
 }
 
 type CreateOrderDisputeInput struct {
