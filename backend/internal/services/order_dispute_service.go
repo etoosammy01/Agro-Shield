@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	ErrDisputeAdminOnly = errors.New("administrator access required")
+	ErrDisputeAdminOnly      = errors.New("administrator access required")
 	ErrInvalidDisputeInput   = errors.New("invalid dispute details")
 	ErrInvalidDisputeReason  = errors.New("unsupported dispute reason")
 	ErrInvalidSellerResponse = errors.New("seller response is required")
@@ -37,11 +37,17 @@ type disputeAdminChecker interface {
 
 func NewOrderDisputeService(
 	repo orderDisputeStore,
-	admins disputeAdminChecker,
+	admins ...disputeAdminChecker,
 ) *OrderDisputeService {
+	var adminChecker disputeAdminChecker
+
+	if len(admins) > 0 {
+		adminChecker = admins[0]
+	}
+
 	return &OrderDisputeService{
 		repo:   repo,
-		admins: admins,
+		admins: adminChecker,
 	}
 }
 

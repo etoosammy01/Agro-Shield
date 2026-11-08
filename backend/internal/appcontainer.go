@@ -145,8 +145,6 @@ func NewContainer(
 		marketEventRepo,
 	)
 
-	orderDisputeService := services.NewOrderDisputeService(orderDisputeRepo)
-
 	// ========================================================
 	// 6. PAYMENT SERVICE          ← added
 	//
@@ -171,7 +169,15 @@ func NewContainer(
 	)
 
 	// ========================================================
-	// 7. RETURN APPLICATION CONTAINER
+	// 7. ORDERDISPUTESERVICE
+	// ========================================================
+
+	orderDisputeService := services.NewOrderDisputeService(
+		orderDisputeRepo,
+		walletService,
+	)
+	// ========================================================
+	// 8. RETURN APPLICATION CONTAINER
 	// ========================================================
 
 	return &Container{

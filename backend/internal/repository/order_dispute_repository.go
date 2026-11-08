@@ -471,3 +471,147 @@ func (r *OrderDisputeRepository) ListEvents(
 
 // Keep the time import available for model-compatible timestamp handling.
 var _ = time.Time{}
+
+func (r *OrderDisputeRepository) StartAdminReview(
+	ctx context.Context,
+	disputeID int64,
+	adminID int,
+) error {
+	if disputeID <= 0 || adminID <= 0 {
+		return fmt.Errorf("invalid dispute or administrator")
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var currentStatus string
+	err = tx.QueryRowContext(ctx, `
+		SELECT status FROM order_disputes
+		WHERE id = $1
+		FOR UPDATE
+	`, disputeID).Scan(&currentStatus)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrDisputeNotFound
+	}
+	if err != nil {
+		return err
+	}
+
+	if currentStatus != models.DisputeSubmitted &&
+		currentStatus != models.DisputeSellerResponded {
+		return ErrDisputeState
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		UPDATE order_disputes
+		SET status = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2
+	`, models.DisputeUnderReview, disputeID)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO order_dispute_events (
+			dispute_id, actor_id, actor_role, event_type,
+			from_status, to_status, note
+		)
+		VALUES ($1, $2, 'admin', 'admin_review_started', $3, $4, $5)
+	`,
+		disputeID,
+		adminID,
+		currentStatus,
+		models.DisputeUnderReview,
+		"Administrator started reviewing this dispute",
+	)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (r *OrderDisputeRepository) Reject(
+	ctx context.Context,
+	disputeID int64,
+	adminID int,
+	reason string,
+) error {
+	if disputeID <= 0 || adminID <= 0 {
+		return fmt.Errorf("invalid dispute or administrator")
+	}
+
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return fmt.Errorf("rejection reason is required")
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var currentStatus string
+	err = tx.QueryRowContext(ctx, `
+		SELECT status FROM order_disputes
+		WHERE id = $1
+		FOR UPDATE
+	`, disputeID).Scan(&currentStatus)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrDisputeNotFound
+	}
+	if err != nil {
+		return err
+	}
+
+	switch currentStatus {
+	case models.DisputeSubmitted,
+		models.DisputeSellerResponded,
+		models.DisputeUnderReview:
+	default:
+		return ErrDisputeState
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		UPDATE order_disputes
+		SET status = $1,
+		    resolution_note = $2,
+		    resolved_by = $3,
+		    resolved_at = CURRENT_TIMESTAMP,
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE id = $4
+	`,
+		models.DisputeResolvedRejected,
+		reason,
+		adminID,
+		disputeID,
+	)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO order_dispute_events (
+			dispute_id, actor_id, actor_role, event_type,
+			from_status, to_status, note
+		)
+		VALUES ($1, $2, 'admin', 'dispute_rejected', $3, $4, $5)
+	`,
+		disputeID,
+		adminID,
+		currentStatus,
+		models.DisputeResolvedRejected,
+		reason,
+	)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}

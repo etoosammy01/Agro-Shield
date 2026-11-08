@@ -1,17 +1,12 @@
 package handlers
 
 import (
-	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"strings"
 
-	"backend/internal/models"
 	"backend/internal/repository"
 	"backend/internal/services"
 	"backend/middleware"
@@ -146,148 +141,86 @@ func (h *OrderDisputeHandler) Respond(w http.ResponseWriter, r *http.Request) {
 }
 
 // Ensure the handler and model remain connected through the expected API type.
-var _ *models.OrderDispute
 
-func (r *OrderDisputeRepository) StartAdminReview(
-	ctx context.Context,
-	disputeID int64,
-	adminID int,
-) error {
-	if disputeID <= 0 || adminID <= 0 {
-		return fmt.Errorf("invalid dispute or administrator")
+func (h *OrderDisputeHandler) AdminReview(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
 	}
 
-	tx, err := r.db.BeginTx(ctx, nil)
+	farmer, ok := middleware.FarmerFromContext(r)
+	if !ok || farmer == nil {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		DisputeID int64 `json:"dispute_id"`
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	err := h.service.StartAdminReview(r.Context(), req.DisputeID, farmer.ID)
 	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	var currentStatus string
-	err = tx.QueryRowContext(ctx, `
-		SELECT status FROM order_disputes
-		WHERE id = $1
-		FOR UPDATE
-	`, disputeID).Scan(&currentStatus)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return ErrDisputeNotFound
-	}
-	if err != nil {
-		return err
+		h.writeAdminError(w, err)
+		return
 	}
 
-	if currentStatus != models.DisputeSubmitted &&
-		currentStatus != models.DisputeSellerResponded {
-		return ErrDisputeState
-	}
-
-	_, err = tx.ExecContext(ctx, `
-		UPDATE order_disputes
-		SET status = $1, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $2
-	`, models.DisputeUnderReview, disputeID)
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.ExecContext(ctx, `
-		INSERT INTO order_dispute_events (
-			dispute_id, actor_id, actor_role, event_type,
-			from_status, to_status, note
-		)
-		VALUES ($1, $2, 'admin', 'admin_review_started', $3, $4, $5)
-	`,
-		disputeID,
-		adminID,
-		currentStatus,
-		models.DisputeUnderReview,
-		"Administrator started reviewing this dispute",
-	)
-	if err != nil {
-		return err
-	}
-
-	return tx.Commit()
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "Dispute moved into administrator review",
+	})
 }
 
-func (r *OrderDisputeRepository) Reject(
-	ctx context.Context,
-	disputeID int64,
-	adminID int,
-	reason string,
-) error {
-	if disputeID <= 0 || adminID <= 0 {
-		return fmt.Errorf("invalid dispute or administrator")
+func (h *OrderDisputeHandler) AdminReject(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
 	}
 
-	reason = strings.TrimSpace(reason)
-	if reason == "" {
-		return fmt.Errorf("rejection reason is required")
+	farmer, ok := middleware.FarmerFromContext(r)
+	if !ok || farmer == nil {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
 	}
 
-	tx, err := r.db.BeginTx(ctx, nil)
+	var req struct {
+		DisputeID int64  `json:"dispute_id"`
+		Reason    string `json:"reason"`
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 8<<10)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	err := h.service.Reject(r.Context(), req.DisputeID, farmer.ID, req.Reason)
 	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	var currentStatus string
-	err = tx.QueryRowContext(ctx, `
-		SELECT status FROM order_disputes
-		WHERE id = $1
-		FOR UPDATE
-	`, disputeID).Scan(&currentStatus)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return ErrDisputeNotFound
-	}
-	if err != nil {
-		return err
+		h.writeAdminError(w, err)
+		return
 	}
 
-	switch currentStatus {
-	case models.DisputeSubmitted,
-		models.DisputeSellerResponded,
-		models.DisputeUnderReview:
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "Dispute rejected and decision recorded",
+	})
+}
+
+func (h *OrderDisputeHandler) writeAdminError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, services.ErrDisputeAdminOnly):
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "Administrator access required"})
+	case errors.Is(err, services.ErrInvalidDisputeInput):
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+	case errors.Is(err, repository.ErrDisputeNotFound):
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "Dispute not found"})
+	case errors.Is(err, repository.ErrDisputeState):
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "Dispute cannot be changed in its current state"})
 	default:
-		return ErrDisputeState
+		log.Printf("administrator dispute action failed: %v", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Could not process dispute"})
 	}
-
-	_, err = tx.ExecContext(ctx, `
-		UPDATE order_disputes
-		SET status = $1,
-		    resolution_note = $2,
-		    resolved_by = $3,
-		    resolved_at = CURRENT_TIMESTAMP,
-		    updated_at = CURRENT_TIMESTAMP
-		WHERE id = $4
-	`,
-		models.DisputeResolvedRejected,
-		reason,
-		adminID,
-		disputeID,
-	)
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.ExecContext(ctx, `
-		INSERT INTO order_dispute_events (
-			dispute_id, actor_id, actor_role, event_type,
-			from_status, to_status, note
-		)
-		VALUES ($1, $2, 'admin', 'dispute_rejected', $3, $4, $5)
-	`,
-		disputeID,
-		adminID,
-		currentStatus,
-		models.DisputeResolvedRejected,
-		reason,
-	)
-	if err != nil {
-		return err
-	}
-
-	return tx.Commit()
 }
