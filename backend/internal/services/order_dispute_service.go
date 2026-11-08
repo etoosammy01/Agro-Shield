@@ -172,3 +172,40 @@ func (s *OrderDisputeService) ListEvents(
 	}
 	return s.repo.ListEvents(ctx, disputeID)
 }
+
+func (s *OrderDisputeService) StartAdminReview(
+	ctx context.Context,
+	disputeID int64,
+	adminID int,
+) error {
+	if disputeID <= 0 || adminID <= 0 {
+		return ErrInvalidDisputeInput
+	}
+
+	if s.admins == nil || !s.admins.IsAdmin(adminID) {
+		return ErrDisputeAdminOnly
+	}
+
+	return s.repo.StartAdminReview(ctx, disputeID, adminID)
+}
+
+func (s *OrderDisputeService) Reject(
+	ctx context.Context,
+	disputeID int64,
+	adminID int,
+	reason string,
+) error {
+	reason = strings.TrimSpace(reason)
+
+	if disputeID <= 0 || adminID <= 0 {
+		return ErrInvalidDisputeInput
+	}
+	if s.admins == nil || !s.admins.IsAdmin(adminID) {
+		return ErrDisputeAdminOnly
+	}
+	if reason == "" || len(reason) > 5000 {
+		return ErrInvalidDisputeInput
+	}
+
+	return s.repo.Reject(ctx, disputeID, adminID, reason)
+}
