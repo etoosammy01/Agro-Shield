@@ -331,6 +331,18 @@ func main() {
 	defer stopReconciliation()
 	go container.Wallet.RunReconciliation(reconcileCtx, services.DefaultReconciliationInterval)
 
+	// The session cleanup loop shares the same lifecycle: one immediate pass,
+	// then an hourly tick, cancelled during graceful shutdown. main waits for
+	// it to exit before returning, so the deferred db.Close() never closes the
+	// database underneath a running worker.
+	cleanupCtx, stopSessionCleanup := context.WithCancel(context.Background())
+	defer stopSessionCleanup()
+	sessionCleanupDone := make(chan struct{})
+	go func() {
+		defer close(sessionCleanupDone)
+		container.Sessions.RunCleanup(cleanupCtx, services.DefaultSessionCleanupInterval)
+	}()
+
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
 		Handler:           middleware.RequestLogger(middleware.Compression(middleware.Recoverer(middleware.RequestGuard(http.DefaultServeMux)))),
@@ -350,6 +362,7 @@ func main() {
 
 		log.Println("shutdown requested; draining HTTP connections")
 		stopReconciliation()
+		stopSessionCleanup()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		if err := server.Shutdown(shutdownCtx); err != nil {
@@ -366,6 +379,7 @@ func main() {
 		log.Fatal(err)
 	}
 	<-shutdownComplete
+	<-sessionCleanupDone
 }
 
 func newOTPProvider(cfg config.Config) (otp.Provider, error) {

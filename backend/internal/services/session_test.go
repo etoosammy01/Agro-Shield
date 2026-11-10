@@ -24,6 +24,11 @@ type fakeSessionRepository struct {
 	revokeErr    error
 	revokeAllErr error
 	cleanupErr   error
+
+	// cleanupCalls receives one value each time DeleteExpired is invoked.
+	// It stays nil in tests that do not exercise the background worker, so
+	// those tests never block on it.
+	cleanupCalls chan struct{}
 }
 
 func (f *fakeSessionRepository) Create(
@@ -84,6 +89,15 @@ func (f *fakeSessionRepository) RevokeAllForFarmer(
 func (f *fakeSessionRepository) DeleteExpired(
 	_ context.Context,
 ) (int64, error) {
+	if f.cleanupCalls != nil {
+		// Non-blocking send: a slow test must never stall the worker, and a
+		// full buffer only means the test already stopped consuming signals.
+		select {
+		case f.cleanupCalls <- struct{}{}:
+		default:
+		}
+	}
+
 	if f.cleanupErr != nil {
 		return 0, f.cleanupErr
 	}
@@ -220,5 +234,141 @@ func TestSessionServiceCleanupExpired(t *testing.T) {
 
 	if deleted != 5 {
 		t.Errorf("deleted = %d, want 5", deleted)
+	}
+}
+
+// startCleanupWorker runs RunCleanup in the background and returns a stop
+// function that cancels the context and waits for the worker to exit, so no
+// goroutine leaks out of a test.
+func startCleanupWorker(
+	t *testing.T,
+	service *SessionService,
+	repo *fakeSessionRepository,
+	interval time.Duration,
+) (stop func()) {
+	t.Helper()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		service.RunCleanup(ctx, interval)
+	}()
+
+	return func() {
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatal("session cleanup worker did not stop after cancellation")
+		}
+	}
+}
+
+// awaitCleanupPasses waits for the worker to invoke DeleteExpired n times.
+func awaitCleanupPasses(t *testing.T, repo *fakeSessionRepository, n int) {
+	t.Helper()
+
+	for i := 0; i < n; i++ {
+		select {
+		case <-repo.cleanupCalls:
+		case <-time.After(2 * time.Second):
+			t.Fatalf("cleanup pass %d of %d did not run", i+1, n)
+		}
+	}
+}
+
+func TestSessionCleanupWorkerRunsAtStartup(t *testing.T) {
+	repo := &fakeSessionRepository{
+		deletedCount: 3,
+		cleanupCalls: make(chan struct{}, 16),
+	}
+	service := NewSessionService(repo)
+
+	stop := startCleanupWorker(t, service, repo, time.Hour)
+
+	// RunCleanup performs its first pass before the ticker starts, so the
+	// signal must arrive without waiting for any interval.
+	awaitCleanupPasses(t, repo, 1)
+
+	stop()
+}
+
+func TestSessionCleanupWorkerRunsOnTicks(t *testing.T) {
+	repo := &fakeSessionRepository{
+		deletedCount: 1,
+		cleanupCalls: make(chan struct{}, 64),
+	}
+	service := NewSessionService(repo)
+
+	stop := startCleanupWorker(t, service, repo, 10*time.Millisecond)
+	defer stop()
+
+	// One pass at startup plus at least one more from a tick.
+	awaitCleanupPasses(t, repo, 2)
+}
+
+func TestSessionCleanupWorkerStopsOnCancel(t *testing.T) {
+	repo := &fakeSessionRepository{cleanupCalls: make(chan struct{}, 16)}
+	service := NewSessionService(repo)
+
+	stop := startCleanupWorker(t, service, repo, time.Hour)
+
+	// The startup pass confirms the worker is inside its loop before it is
+	// asked to stop.
+	awaitCleanupPasses(t, repo, 1)
+
+	stop()
+}
+
+func TestSessionCleanupWorkerKeepsRunningAfterRepositoryError(t *testing.T) {
+	repo := &fakeSessionRepository{
+		cleanupErr:   errors.New("database unavailable"),
+		cleanupCalls: make(chan struct{}, 64),
+	}
+	service := NewSessionService(repo)
+
+	stop := startCleanupWorker(t, service, repo, 10*time.Millisecond)
+	defer stop()
+
+	// The startup pass fails, and the next tick must still be attempted.
+	awaitCleanupPasses(t, repo, 2)
+}
+
+func TestSessionCleanupWorkerWithZeroIntervalUsesOneHourDefault(t *testing.T) {
+	repo := &fakeSessionRepository{cleanupCalls: make(chan struct{}, 16)}
+	service := NewSessionService(repo)
+
+	stop := startCleanupWorker(t, service, repo, 0)
+	defer stop()
+
+	// Only the startup pass should have run: the effective interval is one
+	// hour, so no tick can fire while this test is executing.
+	awaitCleanupPasses(t, repo, 1)
+
+	select {
+	case <-repo.cleanupCalls:
+		t.Error("unexpected extra cleanup pass; zero interval did not use the one-hour default")
+	default:
+	}
+}
+
+func TestEffectiveCleanupInterval(t *testing.T) {
+	tests := []struct {
+		name     string
+		interval time.Duration
+		want     time.Duration
+	}{
+		{"zero falls back to the default", 0, DefaultSessionCleanupInterval},
+		{"negative falls back to the default", -time.Minute, DefaultSessionCleanupInterval},
+		{"positive intervals are kept", 30 * time.Minute, 30 * time.Minute},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := effectiveCleanupInterval(tt.interval); got != tt.want {
+				t.Errorf("effectiveCleanupInterval(%v) = %v, want %v", tt.interval, got, tt.want)
+			}
+		})
 	}
 }

@@ -5,11 +5,16 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"log"
 	"time"
 )
 
 // Session lifetime matches the intended browser cookie lifetime.
 const sessionLifetime = 24 * time.Hour
+
+// DefaultSessionCleanupInterval is used by RunCleanup when the caller passes
+// a non-positive interval.
+const DefaultSessionCleanupInterval = time.Hour
 
 // sessionRepository describes the database operations required by this service.
 // Using an interface keeps the service independent of the concrete repository.
@@ -96,6 +101,51 @@ func (s *SessionService) CleanupExpired(
 	ctx context.Context,
 ) (int64, error) {
 	return s.repo.DeleteExpired(ctx)
+}
+
+// RunCleanup deletes expired and revoked sessions until ctx is cancelled. It
+// runs once at startup as well, so rows left behind while the server was down
+// do not wait a whole interval before being removed.
+func (s *SessionService) RunCleanup(
+	ctx context.Context,
+	interval time.Duration,
+) {
+	interval = effectiveCleanupInterval(interval)
+
+	s.cleanupPass(ctx)
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.cleanupPass(ctx)
+		}
+	}
+}
+
+// cleanupPass performs one deletion round. Errors are logged instead of
+// returned so a transient database failure cannot terminate the worker.
+func (s *SessionService) cleanupPass(ctx context.Context) {
+	deleted, err := s.CleanupExpired(ctx)
+	if err != nil {
+		log.Printf("session cleanup: %v", err)
+		return
+	}
+
+	log.Printf("session cleanup removed %d expired or revoked sessions", deleted)
+}
+
+// effectiveCleanupInterval falls back to the default interval when the caller
+// passes zero or a negative duration, because time.NewTicker would panic.
+func effectiveCleanupInterval(interval time.Duration) time.Duration {
+	if interval <= 0 {
+		return DefaultSessionCleanupInterval
+	}
+
+	return interval
 }
 
 // hashSessionToken converts a raw token into its SHA-256 hexadecimal hash.
