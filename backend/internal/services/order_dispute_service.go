@@ -62,12 +62,9 @@ type CreateOrderDisputeInput struct {
 // These are the proposed initial dispute reasons.
 // The product owner can approve or amend this list.
 var validDisputeReasons = map[string]bool{
-	"item_not_received": true,
-	"damaged_item":      true,
-	"wrong_item":        true,
-	"missing_quantity":  true,
-	"quality_issue":     true,
-	"other":             true,
+	models.DisputeReasonNonDelivery:     true,
+	models.DisputeReasonMissingQuantity: true,
+	models.DisputeReasonQualityIssue:    true,
 }
 
 func (s *OrderDisputeService) Create(

@@ -12,16 +12,17 @@ const (
 )
 
 const (
+	DisputeReasonNonDelivery     = "non_delivery"
+	DisputeReasonMissingQuantity = "missing_quantity"
+	DisputeReasonQualityIssue    = "quality_issue"
+)
+
+const (
 	RefundRequested      = "requested"
 	RefundProcessing     = "processing"
 	RefundSucceeded      = "succeeded"
 	RefundFailed         = "failed"
 	RefundRequiresReview = "requires_review"
-)
-
-const (
-	RefundMethodWallet      = "wallet"
-	RefundMethodFlutterwave = "flutterwave"
 )
 
 // OrderDispute represents a buyer's complaint about an order
@@ -44,8 +45,8 @@ type OrderDispute struct {
 	UpdatedAt       time.Time
 }
 
-// OrderDisputeEvidence records evidence attached to a dispute.
-// StorageKey identifies the file in private storage.
+// OrderDisputeEvidence stores evidence associated with a dispute.
+// StorageKey points to a privately stored file.
 type OrderDisputeEvidence struct {
 	ID               int64
 	DisputeID        int64
@@ -57,7 +58,7 @@ type OrderDisputeEvidence struct {
 	CreatedAt        time.Time
 }
 
-// OrderDisputeEvent provides a history of actions taken on a dispute.
+// OrderDisputeEvent preserves the history of dispute actions.
 type OrderDisputeEvent struct {
 	ID         int64
 	DisputeID  int64
@@ -71,22 +72,31 @@ type OrderDisputeEvent struct {
 	CreatedAt  time.Time
 }
 
-// OrderRefund records an approved refund and its settlement status.
-type OrderRefund struct {
-	ID               int64
-	DisputeID        int64
-	OrderID          int64
-	PaymentID        *int64
-	PaymentMethod    string
-	Amount           string
-	Currency         string
-	Status           string
-	IdempotencyKey   string
-	Reference        string
-	ProviderRefundID *string
-	RequestedBy      int
-	FailureReason    *string
-	ProcessedAt      *time.Time
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+// Refund is the Member 5 refund record.
+// RequestedAmount is what the buyer claims.
+// ApprovedAmount is what the administrator authorizes.
+// Neither amount moves money by itself.
+type Refund struct {
+	ID              int64
+	DisputeID       int64
+	OrderID         int64
+	BuyerID         int
+	SellerID        int
+	ReasonCode      string
+	RequestedAmount string
+	ApprovedAmount  *string
+	Currency        string
+	Status          string
+	IdempotencyKey  string
+	Reference       string
+	RequestedBy     int
+	ApprovedBy      *int
+	ApprovalNote    *string
+	FailureReason   *string
+	ProcessedAt     *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
+
+// Compatibility alias for any existing code referring to OrderRefund.
+type OrderRefund = Refund
