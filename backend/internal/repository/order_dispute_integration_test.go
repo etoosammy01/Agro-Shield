@@ -59,7 +59,7 @@ func createPaidOrderForDispute(t *testing.T) (*sql.DB, int, int, int64) {
 		`, crop.ID)
 
 		db.Exec(`
-			DELETE FROM order_refunds
+			DELETE FROM refunds
 			WHERE order_id IN (
 				SELECT id FROM orders WHERE crop_id = $1
 			)
