@@ -81,6 +81,24 @@ func (r *OTPRepository) LatestActive(ctx context.Context, farmerID int, purpose 
 	return &code, nil
 }
 
+// PendingPhone returns the number staged for a farmer's phone change, or an
+// empty string when none is pending. It is used before issuing a phone-change
+// challenge so the code is always bound to the number the profile service
+// staged.
+func (r *OTPRepository) PendingPhone(ctx context.Context, farmerID int) (string, error) {
+	var pending sql.NullString
+	err := r.db.QueryRowContext(ctx, `
+		SELECT pending_phone FROM farmers
+		WHERE id = $1 AND deleted_at IS NULL`, farmerID).Scan(&pending)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrAccountNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+	return pending.String, nil
+}
+
 // IncrementAttempts records a failed verification against this code.
 func (r *OTPRepository) IncrementAttempts(ctx context.Context, id int64) error {
 	_, err := r.db.ExecContext(ctx, `UPDATE otp_codes SET attempts = attempts + 1 WHERE id = $1`, id)
@@ -143,6 +161,60 @@ func (r *OTPRepository) ConsumeAndVerifyPhone(ctx context.Context, id int64, far
 	if _, err := tx.ExecContext(ctx, `UPDATE farmers SET phone_verified_at = CURRENT_TIMESTAMP,
 		updated_at = CURRENT_TIMESTAMP WHERE id = $1`, farmerID); err != nil {
 		return err
+	}
+	return tx.Commit()
+}
+
+// ConsumeAndApplyPhoneChange spends a phone-change challenge and atomically
+// swaps the verified phone number. The account is locked before the challenge,
+// matching ConsumeAndVerifyPhone's lock order, so a pending change cannot race
+// a profile update or account closure.
+func (r *OTPRepository) ConsumeAndApplyPhoneChange(ctx context.Context, id int64, farmerID int, phone string) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var accountID int
+	if err := tx.QueryRowContext(ctx, `SELECT id FROM farmers
+		WHERE id = $1 AND pending_phone = $2 AND selfie_captured_at IS NOT NULL AND deleted_at IS NULL
+		FOR UPDATE`, farmerID, phone).Scan(&accountID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNoActiveOTP
+		}
+		return err
+	}
+	result, err := tx.ExecContext(ctx, `UPDATE otp_codes SET consumed_at = $1
+		WHERE id = $2 AND farmer_id = $3 AND phone = $4 AND purpose = $5
+		AND consumed_at IS NULL AND expires_at > $1 AND attempts < 5`,
+		time.Now(), id, farmerID, phone, models.OTPPurposePhoneChange)
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count != 1 {
+		return ErrNoActiveOTP
+	}
+	result, err = tx.ExecContext(ctx, `UPDATE farmers
+		SET phone = $2, pending_phone = NULL, phone_verified_at = CURRENT_TIMESTAMP,
+		updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1 AND deleted_at IS NULL`, farmerID, phone)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return ErrPhoneExists
+		}
+		return err
+	}
+	updated, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if updated != 1 {
+		return ErrNoActiveOTP
 	}
 	return tx.Commit()
 }

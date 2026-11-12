@@ -44,7 +44,11 @@ func (h *ProfileEdit) Handler(w http.ResponseWriter, r *http.Request) {
 	state := r.FormValue("state")
 	country := r.FormValue("country")
 
-	if err := h.auth.UpdateProfile(farmer.ID, fullName, phone, email, community, lga, state, country); err != nil {
+	if services.NormalizeNigerianPhone(phone) != services.NormalizeNigerianPhone(farmer.Phone) {
+		http.Redirect(w, r, "/profile?error="+url.QueryEscape("Use the phone-change verification process to update your phone number."), http.StatusSeeOther)
+		return
+	}
+	if err := h.auth.UpdateProfile(farmer.ID, fullName, email, community, lga, state, country); err != nil {
 		log.Println("profile update failed:", err)
 		message := "We couldn't save your profile changes. Please check the details and try again."
 		if errors.Is(err, repository.ErrPhoneExists) {

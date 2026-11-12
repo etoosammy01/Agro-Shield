@@ -1,11 +1,12 @@
 package repository
 
 import (
+	"context"
 	"errors"
 	"testing"
 )
 
-// Saving a profile with a number another account already holds must not put the
+// Staging a profile number another account already holds must not put the
 // database's constraint text in front of the user, and must not change either
 // account. The repository maps it to ErrPhoneExists for the handler to explain.
 func TestUpdateProfileRejectsAnotherAccountsPhone(t *testing.T) {
@@ -14,10 +15,9 @@ func TestUpdateProfileRejectsAnotherAccountsPhone(t *testing.T) {
 	second := createTestUser(t, db)
 
 	repo := NewFarmerRepository(db)
-	err := repo.UpdateProfile(second.ID, second.FullName, first.Phone, second.Email,
-		second.Location, second.LGA, second.State, second.Country)
+	err := repo.StagePhoneChange(context.Background(), second.ID, first.Phone)
 	if !errors.Is(err, ErrPhoneExists) {
-		t.Fatalf("update profile with another account's phone = %v, want ErrPhoneExists", err)
+		t.Fatalf("stage profile number with another account's phone = %v, want ErrPhoneExists", err)
 	}
 
 	stored, err := repo.GetByID(second.ID)

@@ -9,10 +9,11 @@ type OTPProvider = otp.Provider
 type LogOTPProvider = otp.LogProvider
 
 var (
-	ErrOTPInvalid         = otp.ErrInvalid
-	ErrOTPUnavailable     = otp.ErrUnavailable
-	ErrOTPTooManyAttempts = otp.ErrTooManyAttempts
-	ErrOTPRateLimited     = otp.ErrRateLimited
-	ErrOTPUnusablePhone   = otp.ErrUnusablePhone
-	NewOTPService         = otp.NewService
+	ErrOTPInvalid            = otp.ErrInvalid
+	ErrOTPUnavailable        = otp.ErrUnavailable
+	ErrOTPTooManyAttempts    = otp.ErrTooManyAttempts
+	ErrOTPRateLimited        = otp.ErrRateLimited
+	ErrOTPUnusablePhone      = otp.ErrUnusablePhone
+	ErrPhoneChangeNotPending = otp.ErrPhoneChangeNotPending
+	NewOTPService            = otp.NewService
 )

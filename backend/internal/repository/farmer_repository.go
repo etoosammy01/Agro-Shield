@@ -33,6 +33,8 @@ var (
 	ErrAccountHasBalance        = errors.New("account still has a wallet balance")
 	ErrAccountHasPendingRequest = errors.New("account has pending wallet activity")
 	ErrAccountHasFundingAccount = errors.New("account has a funding account")
+	ErrNoPendingPhoneChange     = errors.New("no pending phone change")
+	ErrPhoneAlreadyCurrent      = errors.New("the current phone number cannot be staged for a change")
 )
 
 // isUniqueViolation reports whether err is a PostgreSQL unique-constraint
@@ -122,7 +124,7 @@ func (r *FarmerRepository) GetByPhone(phone string) (*models.Farmer, error) {
         COALESCE(photo_url, '') AS photo_url,
         COALESCE(bank_name, ''), COALESCE(bank_code, ''), COALESCE(account_name, ''), COALESCE(account_number, ''), COALESCE(wallet_number, ''),
         created_at,
-        updated_at, selfie_captured_at, phone_verified_at,
+        updated_at, selfie_captured_at, phone_verified_at, pending_phone,
         EXISTS (SELECT 1 FROM wallets w WHERE w.farmer_id = farmers.id AND COALESCE(w.transaction_pin_hash, '') <> '')
     FROM farmers
     WHERE phone = $1
@@ -141,7 +143,7 @@ func (r *FarmerRepository) GetByPhone(phone string) (*models.Farmer, error) {
 		&farmer.PhotoURL,
 		&farmer.BankName, &farmer.BankCode, &farmer.AccountName, &farmer.AccountNumber, &farmer.WalletNumber,
 		&farmer.CreatedAt,
-		&farmer.UpdatedAt, &farmer.SelfieCapturedAt, &farmer.PhoneVerifiedAt, &farmer.HasTransactionPIN,
+		&farmer.UpdatedAt, &farmer.SelfieCapturedAt, &farmer.PhoneVerifiedAt, &farmer.PendingPhone, &farmer.HasTransactionPIN,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -166,7 +168,7 @@ func (r *FarmerRepository) GetByID(id int) (*models.Farmer, error) {
         COALESCE(photo_url, '') AS photo_url,
         COALESCE(bank_name, ''), COALESCE(bank_code, ''), COALESCE(account_name, ''), COALESCE(account_number, ''), COALESCE(wallet_number, ''),
         created_at,
-        updated_at, selfie_captured_at, phone_verified_at,
+        updated_at, selfie_captured_at, phone_verified_at, pending_phone,
         EXISTS (SELECT 1 FROM wallets w WHERE w.farmer_id = farmers.id AND COALESCE(w.transaction_pin_hash, '') <> '')
     FROM farmers
     WHERE id = $1
@@ -185,7 +187,7 @@ func (r *FarmerRepository) GetByID(id int) (*models.Farmer, error) {
 		&farmer.PhotoURL,
 		&farmer.BankName, &farmer.BankCode, &farmer.AccountName, &farmer.AccountNumber, &farmer.WalletNumber,
 		&farmer.CreatedAt,
-		&farmer.UpdatedAt, &farmer.SelfieCapturedAt, &farmer.PhoneVerifiedAt, &farmer.HasTransactionPIN,
+		&farmer.UpdatedAt, &farmer.SelfieCapturedAt, &farmer.PhoneVerifiedAt, &farmer.PendingPhone, &farmer.HasTransactionPIN,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -213,7 +215,7 @@ func (r *FarmerRepository) GetByWalletNumber(walletNumber string) (*models.Farme
         COALESCE(photo_url, '') AS photo_url,
         COALESCE(bank_name, ''), COALESCE(bank_code, ''), COALESCE(account_name, ''), COALESCE(account_number, ''), COALESCE(wallet_number, ''),
         created_at,
-        updated_at, selfie_captured_at, phone_verified_at,
+        updated_at, selfie_captured_at, phone_verified_at, pending_phone,
         EXISTS (SELECT 1 FROM wallets w WHERE w.farmer_id = farmers.id AND COALESCE(w.transaction_pin_hash, '') <> '')
     FROM farmers
     WHERE wallet_number = $1
@@ -232,7 +234,7 @@ func (r *FarmerRepository) GetByWalletNumber(walletNumber string) (*models.Farme
 		&farmer.PhotoURL,
 		&farmer.BankName, &farmer.BankCode, &farmer.AccountName, &farmer.AccountNumber, &farmer.WalletNumber,
 		&farmer.CreatedAt,
-		&farmer.UpdatedAt, &farmer.SelfieCapturedAt, &farmer.PhoneVerifiedAt, &farmer.HasTransactionPIN,
+		&farmer.UpdatedAt, &farmer.SelfieCapturedAt, &farmer.PhoneVerifiedAt, &farmer.PendingPhone, &farmer.HasTransactionPIN,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -263,7 +265,7 @@ func (r *FarmerRepository) FindByAccountNumber(accountNumber string) ([]*models.
 			COALESCE(photo_url, '') AS photo_url,
 			COALESCE(bank_name, ''), COALESCE(bank_code, ''), COALESCE(account_name, ''), COALESCE(account_number, ''), COALESCE(wallet_number, ''),
 			created_at,
-			updated_at, selfie_captured_at, phone_verified_at,
+			updated_at, selfie_captured_at, phone_verified_at, pending_phone,
 			EXISTS (SELECT 1 FROM wallets w WHERE w.farmer_id = farmers.id AND COALESCE(w.transaction_pin_hash, '') <> '')
 		FROM farmers
 		WHERE account_number = $1 AND account_number <> '' AND deleted_at IS NULL
@@ -289,7 +291,7 @@ func (r *FarmerRepository) FindByAccountNumber(accountNumber string) ([]*models.
 			&farmer.PhotoURL,
 			&farmer.BankName, &farmer.BankCode, &farmer.AccountName, &farmer.AccountNumber, &farmer.WalletNumber,
 			&farmer.CreatedAt,
-			&farmer.UpdatedAt, &farmer.SelfieCapturedAt, &farmer.PhoneVerifiedAt, &farmer.HasTransactionPIN,
+			&farmer.UpdatedAt, &farmer.SelfieCapturedAt, &farmer.PhoneVerifiedAt, &farmer.PendingPhone, &farmer.HasTransactionPIN,
 		); err != nil {
 			return nil, err
 		}
@@ -304,7 +306,7 @@ func (r *FarmerRepository) ListForChat(excludeID int, search string) ([]models.F
         SELECT id, full_name, phone, COALESCE(email, ''),
             location, COALESCE(lga, location), COALESCE(state, ''), COALESCE(country, ''),
             role, COALESCE(photo_url, ''), COALESCE(bank_name, ''), COALESCE(bank_code, ''),
-            COALESCE(account_name, ''), COALESCE(account_number, ''), COALESCE(wallet_number, ''), created_at, updated_at, selfie_captured_at, phone_verified_at,
+            COALESCE(account_name, ''), COALESCE(account_number, ''), COALESCE(wallet_number, ''), created_at, updated_at, selfie_captured_at, phone_verified_at, pending_phone,
             EXISTS (SELECT 1 FROM wallets w WHERE w.farmer_id = farmers.id AND COALESCE(w.transaction_pin_hash, '') <> '')
         FROM farmers
         WHERE id <> $1 AND deleted_at IS NULL
@@ -318,7 +320,7 @@ func (r *FarmerRepository) ListForChat(excludeID int, search string) ([]models.F
 	var users []models.Farmer
 	for rows.Next() {
 		var user models.Farmer
-		if err := rows.Scan(&user.ID, &user.FullName, &user.Phone, &user.Email, &user.Location, &user.LGA, &user.State, &user.Country, &user.Role, &user.PhotoURL, &user.BankName, &user.BankCode, &user.AccountName, &user.AccountNumber, &user.WalletNumber, &user.CreatedAt, &user.UpdatedAt, &user.SelfieCapturedAt, &user.PhoneVerifiedAt, &user.HasTransactionPIN); err != nil {
+		if err := rows.Scan(&user.ID, &user.FullName, &user.Phone, &user.Email, &user.Location, &user.LGA, &user.State, &user.Country, &user.Role, &user.PhotoURL, &user.BankName, &user.BankCode, &user.AccountName, &user.AccountNumber, &user.WalletNumber, &user.CreatedAt, &user.UpdatedAt, &user.SelfieCapturedAt, &user.PhoneVerifiedAt, &user.PendingPhone, &user.HasTransactionPIN); err != nil {
 			return nil, err
 		}
 		users = append(users, user)
@@ -326,38 +328,110 @@ func (r *FarmerRepository) ListForChat(excludeID int, search string) ([]models.F
 	return users, rows.Err()
 }
 
-// UpdateProfile updates the editable personal details.
-func (r *FarmerRepository) UpdateProfile(id int, fullName, phone, email, community, lga, state, country string) error {
+// UpdateProfileDetails updates the editable personal details without changing
+// the verified phone. Phone replacement is handled by phone-change staging and
+// verification instead.
+func (r *FarmerRepository) UpdateProfileDetails(id int, fullName, email, community, lga, state, country string) error {
 	tx, err := r.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	var oldPhone string
-	if err := tx.QueryRow(`SELECT phone FROM farmers WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`, id).Scan(&oldPhone); err != nil {
+	var updated int
+	if err := tx.QueryRow(`SELECT id FROM farmers WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`, id).Scan(&updated); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrAccountNotFound
+		}
 		return err
 	}
 	query := `
 	UPDATE farmers
-	SET full_name = $1, phone = $2, email = $3, location = $4, lga = $5, state = $6, country = $7,
-	phone_verified_at = CASE WHEN phone = $2 THEN phone_verified_at ELSE NULL END,
-	updated_at = CURRENT_TIMESTAMP
-	WHERE id = $8
-	`
-	_, err = tx.Exec(query, fullName, phone, email, community, lga, state, country, id)
+	SET full_name = $1, email = $2, location = $3, lga = $4, state = $5, country = $6, updated_at = CURRENT_TIMESTAMP
+	WHERE id = $7 AND deleted_at IS NULL`
+	if _, err := tx.Exec(query, fullName, email, community, lga, state, country, id); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// StagePhoneChange stores a pending phone number and retires any unconsumed
+// phone-change challenge for the account when the pending number changes.
+// Re-staging the same pending number keeps the number and its active
+// challenges intact. The verified phone is never changed here;
+// ConsumeAndApplyPhoneChange performs the replacement later.
+func (r *FarmerRepository) StagePhoneChange(ctx context.Context, farmerID int, phone string) error {
+	if farmerID <= 0 {
+		return ErrAccountNotFound
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		// Another account already holds this number. The caller shows a message
-		// about the phone field rather than the database's constraint text.
-		if isUniqueViolation(err) {
-			return ErrPhoneExists
+		return err
+	}
+	defer tx.Rollback()
+	var id int
+	var currentPhone string
+	var pendingPhone sql.NullString
+	if err := tx.QueryRowContext(ctx, `SELECT id, phone, pending_phone FROM farmers WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`, farmerID).Scan(&id, &currentPhone, &pendingPhone); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrAccountNotFound
 		}
 		return err
 	}
-	if oldPhone != phone {
-		if _, err := tx.Exec(`UPDATE otp_codes SET consumed_at = CURRENT_TIMESTAMP
-			WHERE farmer_id = $1 AND purpose = $2 AND consumed_at IS NULL`, id, models.OTPPurposePhoneVerification); err != nil {
+	var ownerID int64
+	if err := tx.QueryRowContext(ctx, `SELECT id FROM farmers WHERE phone = $1 AND id <> $2 AND deleted_at IS NULL LIMIT 1`, phone, farmerID).Scan(&ownerID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			ownerID = 0
+		} else {
 			return err
 		}
+	}
+	if ownerID != 0 && ownerID != int64(farmerID) {
+		return ErrPhoneExists
+	}
+	if phone == currentPhone {
+		return ErrPhoneAlreadyCurrent
+	}
+	if pendingPhone.Valid && pendingPhone.String == phone {
+		// The caller is retrying the same pending number; keep the staged
+		// number and its active OTPs so a rate-limited retry does not strand
+		// a valid code.
+		return tx.Commit()
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE farmers SET pending_phone = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND deleted_at IS NULL`, phone, farmerID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE otp_codes SET consumed_at = CURRENT_TIMESTAMP
+		WHERE farmer_id = $1 AND purpose = $2 AND consumed_at IS NULL`, farmerID, models.OTPPurposePhoneChange); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// CancelPhoneChange clears a pending phone number and retires its unconsumed
+// phone-change challenge atomically. It reports ErrNoPendingPhoneChange when no
+// replacement is waiting on an OTP.
+func (r *FarmerRepository) CancelPhoneChange(ctx context.Context, farmerID int) error {
+	if farmerID <= 0 {
+		return ErrAccountNotFound
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var pending sql.NullString
+	if err := tx.QueryRowContext(ctx, `SELECT pending_phone FROM farmers WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`, farmerID).Scan(&pending); err != nil {
+		return err
+	}
+	if !pending.Valid || pending.String == "" {
+		return ErrNoPendingPhoneChange
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE farmers SET pending_phone = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND deleted_at IS NULL`, farmerID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE otp_codes SET consumed_at = CURRENT_TIMESTAMP
+		WHERE farmer_id = $1 AND purpose = $2 AND consumed_at IS NULL`, farmerID, models.OTPPurposePhoneChange); err != nil {
+		return err
 	}
 	return tx.Commit()
 }

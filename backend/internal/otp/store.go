@@ -16,5 +16,7 @@ type Store interface {
 	IncrementAttempts(ctx context.Context, id int64) error
 	Consume(ctx context.Context, id int64) error
 	ConsumeAndVerifyPhone(ctx context.Context, id int64, farmerID int, phone string) error
+	ConsumeAndApplyPhoneChange(ctx context.Context, id int64, farmerID int, phone string) error
+	PendingPhone(ctx context.Context, farmerID int) (string, error)
 	CountIssuedSince(ctx context.Context, farmerID int, purpose string, since time.Time) (int, error)
 }

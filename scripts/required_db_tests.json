@@ -190,5 +190,53 @@
   {
     "package": "backend/internal/repository",
     "test": "TestDeleteExpired"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestStagePhoneChangeStagesPendingNumber"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestStagePhoneChangeRejectsOwnedNumber"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestStagePhoneChangeReplacesPendingNumberAndInvalidatesOtp"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestStagePhoneChangeRestagesSameNumberKeepsOtpActive"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestCancelPhoneChangeClearsPendingAndInvalidatesOtp"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestUpdateProfileDetailsDoesNotChangePhone"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestConsumeAndApplyPhoneChangeSuccess"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestConsumeAndApplyPhoneChangeRejectsWrongPurpose"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestConsumeAndApplyPhoneChangeRejectsExpiredOTP"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestConsumeAndApplyPhoneChangeRejectsPhoneAlreadyOwned"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestConsumeAndApplyPhoneChangeRejectsWrongPendingPhone"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestConsumeAndApplyPhoneChangeConcurrentPhoneClaim"
   }
 ]

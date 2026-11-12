@@ -29,6 +29,14 @@ var (
 	ErrDeletePasswordRequired = errors.New("password is required")
 	ErrDeletePasswordWrong    = errors.New("password is incorrect")
 	ErrDeletePhoneMismatch    = errors.New("phone number does not match this account")
+
+	// ErrNoPendingPhoneChange reports that the account has no staged phone
+	// replacement waiting for an OTP.
+	ErrNoPendingPhoneChange = repository.ErrNoPendingPhoneChange
+
+	// ErrPhoneAlreadyCurrent reports that the number is the account's own
+	// verified number and therefore cannot be staged as a replacement.
+	ErrPhoneAlreadyCurrent = repository.ErrPhoneAlreadyCurrent
 )
 
 type AuthService struct {
@@ -179,10 +187,29 @@ func (s *AuthService) FindByPhone(phone string) (*models.Farmer, error) {
 	return s.repo.GetByPhone(strings.TrimSpace(phone))
 }
 
-// UpdateProfile edits a user's name, phone and location.
-func (s *AuthService) UpdateProfile(id int, fullName, phone, email, community, lga, state, country string) error {
+// RequestPhoneChange stages a phone replacement for verification. It does not
+// send an OTP; OTPService.RequestPhoneChange owns issuance after staging.
+func (s *AuthService) RequestPhoneChange(ctx context.Context, farmerID int, phone string) error {
+	normalized := NormalizeNigerianPhone(phone)
+	if normalized == "" {
+		return otp.ErrUnusablePhone
+	}
+	return s.repo.StagePhoneChange(ctx, farmerID, normalized)
+}
+
+// CancelPhoneChange clears a staged phone replacement and retires its pending
+// OTP challenge.
+func (s *AuthService) CancelPhoneChange(ctx context.Context, farmerID int) error {
+	if farmerID <= 0 {
+		return repository.ErrAccountNotFound
+	}
+	return s.repo.CancelPhoneChange(ctx, farmerID)
+}
+
+// UpdateProfile edits a user's name and personal details without changing the
+// verified phone.
+func (s *AuthService) UpdateProfile(id int, fullName, email, community, lga, state, country string) error {
 	fullName = strings.TrimSpace(fullName)
-	phone = strings.TrimSpace(phone)
 	email = strings.TrimSpace(email)
 	community = strings.TrimSpace(community)
 	lga = strings.TrimSpace(lga)
@@ -191,16 +218,10 @@ func (s *AuthService) UpdateProfile(id int, fullName, phone, email, community, l
 	if fullName == "" {
 		return errors.New("full name is required")
 	}
-	if phone == "" {
-		return errors.New("phone is required")
-	}
-	if NormalizeNigerianPhone(phone) == "" {
-		return otp.ErrUnusablePhone
-	}
 	if community == "" || lga == "" || state == "" || country == "" {
 		return errors.New("community, LGA, state, and country are required")
 	}
-	return s.repo.UpdateProfile(id, fullName, phone, email, community, lga, state, country)
+	return s.repo.UpdateProfileDetails(id, fullName, email, community, lga, state, country)
 }
 
 // UpdatePhoto sets the user's passport photograph.

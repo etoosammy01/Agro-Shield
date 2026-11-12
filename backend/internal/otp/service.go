@@ -124,7 +124,9 @@ func (s *Service) verify(ctx context.Context, farmerID int, purpose, code, phone
 		return ErrInvalid
 	}
 
-	if phone != "" {
+	if purpose == models.OTPPurposePhoneChange {
+		err = s.repo.ConsumeAndApplyPhoneChange(ctx, active.ID, farmerID, active.Phone)
+	} else if phone != "" {
 		err = s.repo.ConsumeAndVerifyPhone(ctx, active.ID, farmerID, active.Phone)
 	} else {
 		err = s.repo.Consume(ctx, active.ID)

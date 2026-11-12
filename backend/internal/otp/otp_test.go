@@ -14,9 +14,13 @@ import (
 )
 
 type mockStore struct {
-	active   *models.OTPCode
-	issued   int
-	verified bool
+	active       *models.OTPCode
+	issued       int
+	verified     bool
+	pendingPhone string
+	pendingErr   error
+	applyErr     error
+	applied      bool
 }
 
 func (s *mockStore) Issue(_ context.Context, farmerID int, phone, purpose, hash string, expires time.Time) error {
@@ -72,6 +76,24 @@ func (s *mockStore) ConsumeAndVerifyPhone(ctx context.Context, id int64, farmerI
 	}
 	s.verified = true
 	return nil
+}
+
+func (s *mockStore) ConsumeAndApplyPhoneChange(ctx context.Context, id int64, farmerID int, phone string) error {
+	if s.applyErr != nil {
+		return s.applyErr
+	}
+	if s.active == nil || s.active.FarmerID != farmerID || s.active.Phone != phone {
+		return repository.ErrNoActiveOTP
+	}
+	if err := s.Consume(ctx, id); err != nil {
+		return err
+	}
+	s.applied = true
+	return nil
+}
+
+func (s *mockStore) PendingPhone(_ context.Context, _ int) (string, error) {
+	return s.pendingPhone, s.pendingErr
 }
 
 func (s *mockStore) CountIssuedSince(_ context.Context, _ int, _ string, _ time.Time) (int, error) {

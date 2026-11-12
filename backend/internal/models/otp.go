@@ -13,6 +13,7 @@ const (
 	OTPPurposeTransfer          = "transfer"
 	OTPPurposePasswordReset     = "password_reset"
 	OTPPurposePhoneVerification = "phone_verification"
+	OTPPurposePhoneChange       = "phone_change"
 	OTPPurposePayment           = "payment"
 )
 
@@ -33,7 +34,7 @@ type OTPCode struct {
 // ValidOTPPurpose reports whether purpose is one this application issues.
 func ValidOTPPurpose(purpose string) bool {
 	switch purpose {
-	case OTPPurposeWithdrawal, OTPPurposeTransfer, OTPPurposePasswordReset, OTPPurposePhoneVerification, OTPPurposePayment:
+	case OTPPurposeWithdrawal, OTPPurposeTransfer, OTPPurposePasswordReset, OTPPurposePhoneVerification, OTPPurposePhoneChange, OTPPurposePayment:
 		return true
 	default:
 		return false

@@ -91,7 +91,7 @@ func TestPhoneVerificationAtomicConsumptionAndPhoneChange(t *testing.T) {
 	if !stored.PhoneVerifiedAt.Valid {
 		t.Fatal("phone verification not persisted")
 	}
-	if err := farmers.UpdateProfile(f.ID, f.FullName, f.Phone, f.Email, f.Location, f.LGA, f.State, f.Country); err != nil {
+	if err := farmers.UpdateProfileDetails(f.ID, f.FullName, f.Email, f.Location, f.LGA, f.State, f.Country); err != nil {
 		t.Fatal(err)
 	}
 	stored, err = farmers.GetByID(f.ID)
@@ -101,28 +101,35 @@ func TestPhoneVerificationAtomicConsumptionAndPhoneChange(t *testing.T) {
 	if !stored.PhoneVerifiedAt.Valid {
 		t.Fatal("unchanged phone lost verification")
 	}
-	oldChallenge := issue(models.OTPPurposePhoneVerification)
 	newPhone := f.Phone + "1"
-	if err := farmers.UpdateProfile(f.ID, f.FullName, newPhone, f.Email, f.Location, f.LGA, f.State, f.Country); err != nil {
+	if err := farmers.StagePhoneChange(ctx, f.ID, newPhone); err != nil {
+		t.Fatal(err)
+	}
+	if err := otp.Issue(ctx, f.ID, newPhone, models.OTPPurposePhoneChange, "test-hash", time.Now().Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	changeCode, err := otp.LatestActive(ctx, f.ID, models.OTPPurposePhoneChange)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := otp.ConsumeAndApplyPhoneChange(ctx, changeCode.ID, f.ID, newPhone); err != nil {
 		t.Fatal(err)
 	}
 	stored, err = farmers.GetByID(f.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stored.PhoneVerifiedAt.Valid || !stored.SelfieCapturedAt.Valid {
-		t.Fatal("phone change did not reset only phone verification")
+	if stored.Phone != newPhone {
+		t.Fatalf("phone = %q, want %q", stored.Phone, newPhone)
 	}
-	if _, err := otp.LatestActive(ctx, f.ID, models.OTPPurposePhoneVerification); !errors.Is(err, ErrNoActiveOTP) {
+	if stored.PendingPhone.Valid {
+		t.Fatal("phone change left a pending phone")
+	}
+	if !stored.PhoneVerifiedAt.Valid {
+		t.Fatal("phone change did not mark the new number verified")
+	}
+	if _, err := otp.LatestActive(ctx, f.ID, models.OTPPurposePhoneChange); !errors.Is(err, ErrNoActiveOTP) {
 		t.Fatal("phone change left active challenge")
-	}
-	if err := otp.ConsumeAndVerifyPhone(ctx, oldChallenge, f.ID, f.Phone); !errors.Is(err, ErrNoActiveOTP) {
-		t.Fatal("old number verified after change")
-	}
-	f.Phone = newPhone
-	walletCode := issue(models.OTPPurposeTransfer)
-	if err := otp.ConsumeAndVerifyPhone(ctx, walletCode, f.ID, f.Phone); !errors.Is(err, ErrNoActiveOTP) {
-		t.Fatal("wallet OTP granted phone verification")
 	}
 }
 
