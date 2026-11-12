@@ -781,6 +781,42 @@ func RegisterRoutes(
 		),
 	)
 
+	// Administrator starts reviewing a dispute.
+	http.HandleFunc(
+		"/admin/order-disputes/review",
+		middleware.OnlyPath(
+			"/admin/order-disputes/review",
+			middleware.RequireAuth(
+				container.FarmerRepo,
+				disputeHandler.AdminReview,
+			),
+		),
+	)
+
+	// Administrator rejects a dispute.
+	http.HandleFunc(
+		"/admin/order-disputes/reject",
+		middleware.OnlyPath(
+			"/admin/order-disputes/reject",
+			middleware.RequireAuth(
+				container.FarmerRepo,
+				disputeHandler.AdminReject,
+			),
+		),
+	)
+
+	// Administrator approves a refund amount.
+	http.HandleFunc(
+		"/admin/order-disputes/approve-refund",
+		middleware.OnlyPath(
+			"/admin/order-disputes/approve-refund",
+			middleware.RequireAuth(
+				container.FarmerRepo,
+				disputeHandler.ApproveRefund,
+			),
+		),
+	)
+
 	// Order list (buyer purchases / farmer sales)
 	// GET /orders
 	http.HandleFunc(

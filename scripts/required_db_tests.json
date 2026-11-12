@@ -186,5 +186,17 @@
   {
     "package": "backend/internal/repository",
     "test": "TestConcurrentDisputeSubmissionsCreateOnlyOneActiveDispute"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestApproveRefundValidatesAmountAndPreventsDuplicate"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestApproveQualityRefundRequiresBuyerVideoEvidence"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestSuccessfulRefundSettlementResolvesDispute"
   }
 ]

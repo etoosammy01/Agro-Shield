@@ -229,3 +229,105 @@ func (h *OrderDisputeHandler) writeAdminError(w http.ResponseWriter, err error) 
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Could not process dispute"})
 	}
 }
+
+
+func (h *OrderDisputeHandler) ApproveRefund(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	farmer, ok := middleware.FarmerFromContext(r)
+	if !ok || farmer == nil {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		DisputeID      int64  `json:"dispute_id"`
+		ApprovedAmount string `json:"approved_amount"`
+		ApprovalNote   string `json:"approval_note"`
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 8<<10)
+	decoder := json.NewDecoder(r.Body)
+
+	if err := decoder.Decode(&req); err != nil {
+		http.Error(w, "Invalid refund approval request", http.StatusBadRequest)
+		return
+	}
+
+	refund, err := h.service.ApproveRefund(
+		r.Context(),
+		req.DisputeID,
+		farmer.ID,
+		req.ApprovedAmount,
+		req.ApprovalNote,
+	)
+
+	if err != nil {
+		switch {
+		case errors.Is(err, services.ErrRefundAdminOnly):
+			writeJSON(w, http.StatusForbidden, map[string]string{
+				"error": "Administrator access required",
+			})
+
+		case errors.Is(err, services.ErrInvalidDisputeInput):
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error": err.Error(),
+			})
+
+		case errors.Is(err, services.ErrRefundStoreUnavailable):
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+				"error": "Refund service is unavailable",
+			})
+
+		case errors.Is(err, repository.ErrDisputeNotFound):
+			writeJSON(w, http.StatusNotFound, map[string]string{
+				"error": "Dispute not found",
+			})
+
+		case errors.Is(err, repository.ErrRefundInvalidAmount):
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error": err.Error(),
+			})
+
+		case errors.Is(err, repository.ErrRefundVideoEvidenceRequired):
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]string{
+				"error": "Video evidence is required before approving a quality refund",
+			})
+
+		case errors.Is(err, repository.ErrRefundAlreadyExists):
+			writeJSON(w, http.StatusConflict, map[string]string{
+				"error": "A refund already exists for this dispute",
+			})
+
+		case errors.Is(err, repository.ErrRefundDisputeNotUnderReview):
+			writeJSON(w, http.StatusConflict, map[string]string{
+				"error": "Dispute must be under administrator review",
+			})
+
+		default:
+			log.Printf("approve refund for dispute %d: %v", req.DisputeID, err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{
+				"error": "Could not approve refund",
+			})
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"message": "Refund approved. Financial settlement is still pending.",
+		"refund": map[string]any{
+			"id":              refund.ID,
+			"dispute_id":      refund.DisputeID,
+			"order_id":        refund.OrderID,
+			"requested_amount": refund.RequestedAmount,
+			"approved_amount": refund.ApprovedAmount,
+			"currency":         refund.Currency,
+			"status":           refund.Status,
+			"reference":        refund.Reference,
+		},
+	})
+}
+

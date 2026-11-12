@@ -10,10 +10,12 @@ import (
 )
 
 var (
-	ErrDisputeAdminOnly      = errors.New("administrator access required")
-	ErrInvalidDisputeInput   = errors.New("invalid dispute details")
-	ErrInvalidDisputeReason  = errors.New("unsupported dispute reason")
-	ErrInvalidSellerResponse = errors.New("seller response is required")
+	ErrRefundAdminOnly        = errors.New("administrator access required")
+	ErrRefundStoreUnavailable = errors.New("refund repository unavailable")
+	ErrDisputeAdminOnly       = errors.New("administrator access required")
+	ErrInvalidDisputeInput    = errors.New("invalid dispute details")
+	ErrInvalidDisputeReason   = errors.New("unsupported dispute reason")
+	ErrInvalidSellerResponse  = errors.New("seller response is required")
 )
 
 type orderDisputeStore interface {
@@ -25,6 +27,25 @@ type orderDisputeStore interface {
 	ListEvents(context.Context, int64) ([]models.OrderDisputeEvent, error)
 	StartAdminReview(context.Context, int64, int) error
 	Reject(context.Context, int64, int, string) error
+}
+
+// orderRefundStore is implemented by the refund repository.
+// Keeping it separate avoids changing existing dispute-service test doubles.
+type orderRefundStore interface {
+	ApproveRefund(
+		context.Context,
+		int64,
+		int,
+		string,
+		string,
+	) (*models.Refund, error)
+
+	UpdateRefundStatus(
+		context.Context,
+		int64,
+		string,
+		string,
+	) error
 }
 
 type OrderDisputeService struct {
@@ -211,4 +232,61 @@ func (s *OrderDisputeService) Reject(
 	}
 
 	return s.repo.Reject(ctx, disputeID, adminID, reason)
+}
+
+// ApproveRefund authorizes a refund after checking administrator access.
+// It creates a refund record but does not move money.
+func (s *OrderDisputeService) ApproveRefund(
+	ctx context.Context,
+	disputeID int64,
+	adminID int,
+	approvedAmount string,
+	approvalNote string,
+) (*models.Refund, error) {
+	approvedAmount = strings.TrimSpace(approvedAmount)
+	approvalNote = strings.TrimSpace(approvalNote)
+
+	if disputeID <= 0 || adminID <= 0 ||
+		approvedAmount == "" ||
+		approvalNote == "" ||
+		len(approvalNote) > 3000 {
+		return nil, ErrInvalidDisputeInput
+	}
+
+	if s.admins == nil || !s.admins.IsAdmin(adminID) {
+		return nil, ErrRefundAdminOnly
+	}
+
+	store, ok := s.repo.(orderRefundStore)
+	if !ok {
+		return nil, ErrRefundStoreUnavailable
+	}
+
+	return store.ApproveRefund(
+		ctx,
+		disputeID,
+		adminID,
+		approvedAmount,
+		approvalNote,
+	)
+}
+
+// UpdateRefundStatus is an internal settlement hook.
+// It must only be called after a trusted wallet settlement result.
+func (s *OrderDisputeService) UpdateRefundStatus(
+	ctx context.Context,
+	refundID int64,
+	status string,
+	detail string,
+) error {
+	if refundID <= 0 {
+		return ErrInvalidDisputeInput
+	}
+
+	store, ok := s.repo.(orderRefundStore)
+	if !ok {
+		return ErrRefundStoreUnavailable
+	}
+
+	return store.UpdateRefundStatus(ctx, refundID, status, detail)
 }
