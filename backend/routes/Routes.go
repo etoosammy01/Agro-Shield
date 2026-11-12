@@ -144,6 +144,18 @@ func RegisterRoutes(
 	http.HandleFunc("/create-transaction-pin", middleware.OnlyPath("/create-transaction-pin",
 		middleware.RequireAuth(container.FarmerRepo, transactionPINHandler.Handler)))
 
+	phoneChangeHandler := handlers.NewPhoneChangeHandler(
+		container.Auth,
+		container.OTP,
+	)
+
+	http.HandleFunc("/phone-change/request", middleware.OnlyPath("/phone-change/request",
+		middleware.RequireAuth(container.FarmerRepo, phoneChangeHandler.RequestHandler)))
+	http.HandleFunc("/phone-change/verify", middleware.OnlyPath("/phone-change/verify",
+		middleware.RequireAuth(container.FarmerRepo, phoneChangeHandler.VerifyHandler)))
+	http.HandleFunc("/phone-change/cancel", middleware.OnlyPath("/phone-change/cancel",
+		middleware.RequireAuth(container.FarmerRepo, phoneChangeHandler.CancelHandler)))
+
 	http.HandleFunc(
 		"/complete-profile",
 		middleware.OnlyPath(

@@ -21,4 +21,8 @@ var (
 
 	// ErrDeliveryDisabled means external SMS delivery is currently unavailable.
 	ErrDeliveryDisabled = errors.New("SMS verification is unavailable right now. Please contact support")
+
+	// ErrPhoneChangeNotPending means the requested number is not staged as the
+	// farmer's pending phone change.
+	ErrPhoneChangeNotPending = errors.New("this phone number is not pending a change")
 )

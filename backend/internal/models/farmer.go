@@ -19,6 +19,7 @@ type Farmer struct {
 	UpdatedAt           time.Time
 	SelfieCapturedAt    sql.NullTime
 	PhoneVerifiedAt     sql.NullTime
+	PendingPhone        sql.NullString
 	HasTransactionPIN   bool
 
 	BankName      string
