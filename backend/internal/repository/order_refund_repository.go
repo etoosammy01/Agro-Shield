@@ -300,7 +300,7 @@ func (r *OrderDisputeRepository) ApproveRefund(
 		VALUES (
 			$1, $2, 'admin', 'refund_approved',
 			$3, $3, $4,
-			jsonb_build_object('refund_id', $5)
+			jsonb_build_object('refund_id', $5::bigint)
 		)
 	`,
 		disputeID,
@@ -464,7 +464,7 @@ func (r *OrderDisputeRepository) UpdateRefundStatus(
 			VALUES (
 				$1, 'wallet', 'refund_succeeded',
 				$2, $3, $4,
-				jsonb_build_object('refund_id', $5)
+				jsonb_build_object('refund_id', $5::bigint)
 			)
 		`,
 			disputeID,
@@ -486,7 +486,7 @@ func (r *OrderDisputeRepository) UpdateRefundStatus(
 			VALUES (
 				$1, 'wallet', $2,
 				$3, $3, $4,
-				jsonb_build_object('refund_id', $5)
+				jsonb_build_object('refund_id', $5::bigint)
 			)
 		`,
 			disputeID,
