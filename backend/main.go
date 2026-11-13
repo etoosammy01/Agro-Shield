@@ -375,6 +375,13 @@ func main() {
 }
 
 func newOTPProvider(cfg config.Config) (otp.Provider, error) {
+	case "termii":
+		return otp.NewTermiiProvider(otp.TermiiConfig{
+			APIKey:   cfg.TermiiAPIKey,
+			SenderID: cfg.TermiiSenderID,
+			BaseURL:  cfg.TermiiBaseURL,
+			Channel:  cfg.TermiiChannel,
+		})
 	switch cfg.SMSProvider {
 	case "log":
 		return otp.LogProvider{}, nil

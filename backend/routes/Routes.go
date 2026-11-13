@@ -41,6 +41,8 @@ func RegisterRoutes(
 	// authenticated route or private listing is exposed here.
 	http.HandleFunc("/robots.txt", middleware.OnlyGet(robotsHandler))
 	http.HandleFunc("/sitemap.xml", middleware.OnlyGet(sitemapHandler))
+	http.HandleFunc("/sw.js", middleware.OnlyGet(serviceWorkerHandler))
+	http.HandleFunc("/offline", middleware.OnlyGet(offlineHandler))
 
 	// ========================================================
 	// HOME
@@ -1173,4 +1175,16 @@ func publicBaseURL(r *http.Request) (string, bool) {
 		scheme = "https"
 	}
 	return scheme + "://" + host, true
+}
+
+func serviceWorkerHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+	w.Header().Set("Service-Worker-Allowed", "/")
+	w.Header().Set("Cache-Control", "no-cache")
+	http.ServeFile(w, r, "../frontend/sw.js")
+}
+
+func offlineHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = handlers.OfflineHandler(w, r)
 }

@@ -26,3 +26,7 @@ func IndexHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
+
+func OfflineHandler(w http.ResponseWriter, r *http.Request) error {
+	return render.RenderTemplates(w, "offline.html", nil)
+}

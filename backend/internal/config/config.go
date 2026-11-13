@@ -167,6 +167,11 @@ func Load() (Config, error) {
 				continue
 			}
 
+	// SMS delivery — Termii
+	TermiiAPIKey     string
+	TermiiSenderID   string
+	TermiiBaseURL    string
+	TermiiChannel    string
 			_, network, err := net.ParseCIDR(item)
 			if err != nil {
 				return Config{}, fmt.Errorf("TRUSTED_PROXY_CIDRS contains an invalid network %q: %w", item, err)
@@ -196,10 +201,18 @@ func Load() (Config, error) {
 		cfg.AppEnv = "development"
 	}
 
+	// SMS delivery — Termii
+	cfg.TermiiAPIKey = strings.TrimSpace(os.Getenv("TERMII_API_KEY"))
+	cfg.TermiiSenderID = strings.TrimSpace(os.Getenv("TERMII_SENDER_ID"))
+	cfg.TermiiBaseURL = strings.TrimSpace(os.Getenv("TERMII_BASE_URL"))
+	cfg.TermiiChannel = strings.TrimSpace(os.Getenv("TERMII_CHANNEL"))
+
 	// An API key enables OTP.dev automatically; development without a key uses logs.
 	cfg.SMSProvider = "log"
 	if cfg.OTPDevAPIKey != "" {
 		cfg.SMSProvider = "otpdev"
+	} else if cfg.TermiiAPIKey != "" {
+		cfg.SMSProvider = "termii"
 	}
 
 	// Wallet reporting threshold.
