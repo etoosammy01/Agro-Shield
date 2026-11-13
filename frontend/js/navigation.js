@@ -336,3 +336,39 @@ document.addEventListener("DOMContentLoaded", () => {
         sections.forEach(section => observer.observe(section));
     }
 });
+
+// ==========================================================
+// PWA & SERVICE WORKER REGISTRATION
+// ==========================================================
+if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/sw.js", { scope: "/" }).then(registration => {
+            console.log("Agro-Shield Service Worker registered:", registration.scope);
+        }).catch(error => {
+            console.warn("Agro-Shield Service Worker registration failed:", error);
+        });
+    });
+}
+
+// PWA Install Prompt Banner
+let deferredPrompt;
+window.addEventListener("beforeinstallprompt", event => {
+    event.preventDefault();
+    deferredPrompt = event;
+
+    // Show optional install button if container exists
+    const installBtn = document.getElementById("pwa-install-btn");
+    if (installBtn) {
+        installBtn.style.display = "inline-flex";
+        installBtn.addEventListener("click", () => {
+            installBtn.style.display = "none";
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then(choiceResult => {
+                if (choiceResult.outcome === "accepted") {
+                    console.log("User accepted Agro-Shield PWA installation");
+                }
+                deferredPrompt = null;
+            });
+        });
+    }
+});

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1f7a4d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/assets/favicon_io/favicon-32x32.png">
+    <link rel="manifest" href="/static/assets/favicon_io/site.webmanifest">
+    <title>You are Offline — Agro-Shield</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .offline-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 80vh;
+            text-align: center;
+            padding: 24px;
+        }
+        .offline-icon {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            color: var(--color-brand);
+        }
+        .offline-title {
+            font-size: 1.8rem;
+            margin-bottom: 12px;
+            color: var(--color-ink);
+        }
+        .offline-desc {
+            font-size: 1.05rem;
+            color: var(--color-muted);
+            max-width: 480px;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <header class="navbar">
+        <a class="logo" href="/" aria-label="Agro-Shield home">
+            <img src="/static/assets/logo/Agro-Shield_logo.png" alt="Agro-Shield" width="240" height="80">
+        </a>
+    </header>
+    <main class="offline-container">
+        <svg class="offline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="1" y1="1" x2="23" y2="23"></line>
+            <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path>
+            <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path>
+            <path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path>
+            <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path>
+            <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+            <line x1="12" y1="20" x2="12.01" y2="20"></line>
+        </svg>
+        <h1 class="offline-title">No Internet Connection</h1>
+        <p class="offline-desc">
+            It looks like you are currently offline. Check your mobile signal or Wi-Fi connection and tap below to try loading Agro-Shield again.
+        </p>
+        <button type="button" class="primary-btn" onclick="window.location.reload()">Retry Loading</button>
+    </main>
+</body>
+</html>
