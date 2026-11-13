@@ -406,19 +406,25 @@ func (r *OrderDisputeRepository) UpdateRefundStatus(
 	}
 
 	_, err = tx.ExecContext(ctx, `
-		UPDATE refunds
-		SET status = $1,
-		    failure_reason = CASE
-				WHEN $1 IN ('failed', 'requires_review') THEN NULLIF($2, '')
-				ELSE NULL
-		    END,
-		    processed_at = CASE
-				WHEN $1 IN ('succeeded', 'failed') THEN CURRENT_TIMESTAMP
-				ELSE NULL
-		    END,
-		    updated_at = CURRENT_TIMESTAMP
-		WHERE id = $3
-	`, newStatus, detail, refundID)
+    UPDATE refunds
+    SET status = $1::varchar(30),
+        failure_reason = CASE
+            WHEN $1::varchar(30) IN (
+                'failed'::varchar(30),
+                'requires_review'::varchar(30)
+            ) THEN NULLIF($2::text, '')
+            ELSE NULL
+        END,
+        processed_at = CASE
+            WHEN $1::varchar(30) IN (
+                'succeeded'::varchar(30),
+                'failed'::varchar(30)
+            ) THEN CURRENT_TIMESTAMP
+            ELSE NULL
+        END,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = $3
+`, newStatus, detail, refundID)
 
 	if err != nil {
 		return err
