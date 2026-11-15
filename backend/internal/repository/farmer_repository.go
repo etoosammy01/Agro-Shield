@@ -124,7 +124,7 @@ func (r *FarmerRepository) GetByPhone(phone string) (*models.Farmer, error) {
         COALESCE(photo_url, '') AS photo_url,
         COALESCE(bank_name, ''), COALESCE(bank_code, ''), COALESCE(account_name, ''), COALESCE(account_number, ''), COALESCE(wallet_number, ''),
         created_at,
-        updated_at, selfie_captured_at, phone_verified_at, pending_phone,
+        suspended_at, sessions_revoked_at, updated_at, selfie_captured_at, phone_verified_at, pending_phone,
         EXISTS (SELECT 1 FROM wallets w WHERE w.farmer_id = farmers.id AND COALESCE(w.transaction_pin_hash, '') <> '')
     FROM farmers
     WHERE phone = $1
@@ -143,7 +143,7 @@ func (r *FarmerRepository) GetByPhone(phone string) (*models.Farmer, error) {
 		&farmer.PhotoURL,
 		&farmer.BankName, &farmer.BankCode, &farmer.AccountName, &farmer.AccountNumber, &farmer.WalletNumber,
 		&farmer.CreatedAt,
-		&farmer.UpdatedAt, &farmer.SelfieCapturedAt, &farmer.PhoneVerifiedAt, &farmer.PendingPhone, &farmer.HasTransactionPIN,
+		&farmer.SuspendedAt, &farmer.SessionsRevokedAt, &farmer.UpdatedAt, &farmer.SelfieCapturedAt, &farmer.PhoneVerifiedAt, &farmer.PendingPhone, &farmer.HasTransactionPIN,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -168,7 +168,7 @@ func (r *FarmerRepository) GetByID(id int) (*models.Farmer, error) {
         COALESCE(photo_url, '') AS photo_url,
         COALESCE(bank_name, ''), COALESCE(bank_code, ''), COALESCE(account_name, ''), COALESCE(account_number, ''), COALESCE(wallet_number, ''),
         created_at,
-        updated_at, selfie_captured_at, phone_verified_at, pending_phone,
+        suspended_at, sessions_revoked_at, updated_at, selfie_captured_at, phone_verified_at, pending_phone,
         EXISTS (SELECT 1 FROM wallets w WHERE w.farmer_id = farmers.id AND COALESCE(w.transaction_pin_hash, '') <> '')
     FROM farmers
     WHERE id = $1
@@ -187,7 +187,7 @@ func (r *FarmerRepository) GetByID(id int) (*models.Farmer, error) {
 		&farmer.PhotoURL,
 		&farmer.BankName, &farmer.BankCode, &farmer.AccountName, &farmer.AccountNumber, &farmer.WalletNumber,
 		&farmer.CreatedAt,
-		&farmer.UpdatedAt, &farmer.SelfieCapturedAt, &farmer.PhoneVerifiedAt, &farmer.PendingPhone, &farmer.HasTransactionPIN,
+		&farmer.SuspendedAt, &farmer.SessionsRevokedAt, &farmer.UpdatedAt, &farmer.SelfieCapturedAt, &farmer.PhoneVerifiedAt, &farmer.PendingPhone, &farmer.HasTransactionPIN,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil

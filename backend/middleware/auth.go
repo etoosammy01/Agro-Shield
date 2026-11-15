@@ -24,14 +24,16 @@ const sessionCookieName = "agroshield_session"
 // Good enough for a single-server setup. If you later scale to multiple
 // server instances, swap this for a shared store (e.g. Redis).
 type sessionStore struct {
-	mu       sync.RWMutex
-	sessions map[string]int
-	lastSeen map[int]time.Time
+	mu           sync.RWMutex
+	sessions     map[string]int
+	lastSeen     map[int]time.Time
+	revocationAt map[string]time.Time
 }
 
 var store = &sessionStore{
-	sessions: make(map[string]int),
-	lastSeen: make(map[int]time.Time),
+	sessions:     make(map[string]int),
+	lastSeen:     make(map[int]time.Time),
+	revocationAt: make(map[string]time.Time),
 }
 
 const onlineWindow = 60 * time.Second
@@ -43,10 +45,17 @@ func newSessionID() string {
 }
 
 // CreateSession creates a new session for a farmer and returns the session ID.
-func CreateSession(farmerID int) string {
+func CreateSession(farmerID int, revokedAt ...time.Time) string {
 	id := newSessionID()
 	store.mu.Lock()
 	store.sessions[id] = farmerID
+	// Capture the account revision read during authentication. A login racing
+	// with suspension must not regain access when that account is reactivated.
+	var revision time.Time
+	if len(revokedAt) > 0 {
+		revision = revokedAt[0]
+	}
+	store.revocationAt[id] = revision
 	store.mu.Unlock()
 	return id
 }
@@ -56,6 +65,7 @@ func DeleteSession(sessionID string) {
 	store.mu.Lock()
 	farmerID, exists := store.sessions[sessionID]
 	delete(store.sessions, sessionID)
+	delete(store.revocationAt, sessionID)
 	if exists {
 		hasAnotherSession := false
 		for _, sessionFarmerID := range store.sessions {
@@ -79,6 +89,7 @@ func DeleteFarmerSessions(farmerID int) {
 	for sessionID, sessionFarmerID := range store.sessions {
 		if sessionFarmerID == farmerID {
 			delete(store.sessions, sessionID)
+			delete(store.revocationAt, sessionID)
 		}
 	}
 	delete(store.lastSeen, farmerID)
@@ -105,6 +116,12 @@ func getFarmerIDForSession(sessionID string) (int, bool) {
 	defer store.mu.RUnlock()
 	id, ok := store.sessions[sessionID]
 	return id, ok
+}
+
+func sessionRevocationChanged(sessionID string, cutoff time.Time) bool {
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+	return !store.revocationAt[sessionID].Equal(cutoff)
 }
 
 // SetSessionCookie writes the session cookie on login.
@@ -179,6 +196,13 @@ func RequireAuth(repo farmerReader, next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
+		if farmer.SuspendedAt.Valid || (farmer.SessionsRevokedAt.Valid && sessionRevocationChanged(sessionID, farmer.SessionsRevokedAt.Time)) {
+			DeleteSession(sessionID)
+			ClearSessionCookie(w, r)
+			http.Error(w, "Account access unavailable. Please sign in again or contact support.", http.StatusForbidden)
+			return
+		}
+
 		if r.URL.Path != "/complete-profile" && r.URL.Path != "/verify-phone" && r.URL.Path != "/create-transaction-pin" && !services.HasCompletedProfile(farmer) {
 			http.Redirect(w, r, services.OnboardingPath(farmer), http.StatusSeeOther)
 			return
@@ -241,6 +265,12 @@ func (a *Authenticator) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		// Preserve the existing onboarding restrictions.
+		if farmer.SuspendedAt.Valid {
+			ClearSessionCookie(w, r)
+			http.Error(w, "Account suspended. Contact support.", http.StatusForbidden)
+			return
+		}
+
 		if r.URL.Path != "/complete-profile" &&
 			r.URL.Path != "/verify-phone" &&
 			r.URL.Path != "/create-transaction-pin" &&

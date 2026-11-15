@@ -17,7 +17,13 @@ func NewOrderRepository(db *sql.DB) *OrderRepository {
 func (r *OrderRepository) Create(order *models.Order) error {
 	query := `
 		INSERT INTO orders (buyer_id, crop_id, quantity, total_price, status)
-		VALUES ($1, $2, $3, $4, $5)
+		SELECT $1, c.id, $3, $4, $5 FROM crops c
+		JOIN farmers seller ON seller.id=c.farmer_id
+		JOIN farmers buyer ON buyer.id=$1
+		WHERE c.id=$2 AND NOT c.moderation_blocked
+		AND seller.suspended_at IS NULL AND seller.deleted_at IS NULL
+		AND buyer.suspended_at IS NULL AND buyer.deleted_at IS NULL
+		FOR SHARE OF c, seller, buyer
 		RETURNING id, created_at
 	`
 	return r.db.QueryRow(

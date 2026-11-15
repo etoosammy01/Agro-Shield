@@ -1,5 +1,7 @@
 import unittest
-from check_db_tests import verify
+import pathlib
+import tempfile
+from check_db_tests import discover_required_tests, verify
 
 class EvidenceTests(unittest.TestCase):
     required = [{"package": "backend/repository", "test": "TestMoney"}]
@@ -21,6 +23,18 @@ class EvidenceTests(unittest.TestCase):
         self.assertTrue(verify(self.events()+self.events("skip", "TestMoney/child"), self.required)[1])
     def test_incomplete_package(self):
         self.assertTrue(verify(self.events()[:1], self.required)[1])
+    def test_discovers_database_tests_outside_internal_packages(self):
+        with tempfile.TemporaryDirectory() as root:
+            backend = pathlib.Path(root)
+            for package in ["internal/repository", "routes"]:
+                directory = backend / package
+                directory.mkdir(parents=True)
+                (directory / "admin_integration_test.go").write_text("func TestAdminAccess(t *testing.T) {}\n")
+                (directory / "admin_test.go").write_text("func TestUnitOnly(t *testing.T) {}\n")
+            self.assertEqual(discover_required_tests(backend), {
+                ("backend/internal/repository", "TestAdminAccess"),
+                ("backend/routes", "TestAdminAccess"),
+            })
 
 if __name__ == "__main__":
     unittest.main()

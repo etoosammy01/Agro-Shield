@@ -32,7 +32,14 @@ func NewPaymentRepository(db *sql.DB) *PaymentRepository {
 func (r *PaymentRepository) Create(ctx context.Context, orderID int64, reference, amount, currency, provider string) (*models.Payment, error) {
 	const q = `
 		INSERT INTO payments (order_id, reference, amount, currency, status, provider)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		SELECT o.id, $2, $3, $4, $5, $6 FROM orders o
+		JOIN crops c ON c.id=o.crop_id
+		JOIN farmers buyer ON buyer.id=o.buyer_id
+		JOIN farmers seller ON seller.id=c.farmer_id
+		WHERE o.id=$1 AND NOT c.moderation_blocked
+		AND buyer.suspended_at IS NULL AND buyer.deleted_at IS NULL
+		AND seller.suspended_at IS NULL AND seller.deleted_at IS NULL
+		FOR SHARE OF c, buyer, seller
 		RETURNING id, order_id, reference, transaction_id, amount, currency, status, provider, created_at, updated_at`
 
 	var p models.Payment

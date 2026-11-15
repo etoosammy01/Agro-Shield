@@ -27,16 +27,27 @@ func (r *SessionRepository) Create(
 	farmerID int,
 	expiresAt time.Time,
 ) error {
-	_, err := r.db.ExecContext(ctx, `
+	result, err := r.db.ExecContext(ctx, `
 		INSERT INTO sessions (
 			session_token_hash,
 			farmer_id,
 			expires_at
 		)
-		VALUES ($1, $2, $3)
+		SELECT $1, id, $3 FROM farmers
+		WHERE id=$2 AND suspended_at IS NULL AND deleted_at IS NULL
+		FOR SHARE
 	`, tokenHash, farmerID, expiresAt)
-
-	return err
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count != 1 {
+		return session.ErrNotFound
+	}
+	return nil
 }
 
 // FindValid retrieves a farmer ID for a valid session.
@@ -53,6 +64,8 @@ func (r *SessionRepository) FindValid(
 		WHERE session_token_hash = $1
 		  AND expires_at > CURRENT_TIMESTAMP
 		  AND revoked_at IS NULL
+		  AND EXISTS (SELECT 1 FROM farmers f WHERE f.id=sessions.farmer_id
+		    AND f.suspended_at IS NULL AND f.deleted_at IS NULL)
 		RETURNING farmer_id
 	`, tokenHash).Scan(&farmerID)
 

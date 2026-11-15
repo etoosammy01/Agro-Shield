@@ -164,7 +164,7 @@ func (s *AuthService) Login(phone, password string) (*models.Farmer, error) {
 	if err != nil {
 		return nil, err
 	}
-	if farmer == nil {
+	if farmer == nil || farmer.SuspendedAt.Valid {
 		return nil, errors.New("invalid phone number or password")
 	}
 

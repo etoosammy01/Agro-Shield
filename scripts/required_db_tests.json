@@ -238,5 +238,41 @@
   {
     "package": "backend/internal/repository",
     "test": "TestConsumeAndApplyPhoneChangeConcurrentPhoneClaim"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestAdminGovernancePermissionsAndProtectedAccounts"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestAdminSuspensionRevokesSessionsAndRequiresFreshLogin"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestAdminChangesRollBackWhenAuditCannotBeWritten"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestAdminAuditIsAppendOnlyAndMigrationIsRepeatable"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestAdminModerationAndSuspensionBlockPurchaseEntryPoints"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestAdminConcurrentDecisionsProduceOneChangeAndAudit"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestAdminWalletAuditTracksRequestsAndCommittedDecisions"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestAdminDirectoryPaginationAndSensitiveDataMinimization"
+  },
+  {
+    "package": "backend/routes",
+    "test": "TestAdminRoutesRejectUnprivilegedAndCrossSiteRequests"
   }
 ]

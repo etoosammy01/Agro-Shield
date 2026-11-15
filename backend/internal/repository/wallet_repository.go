@@ -925,7 +925,7 @@ func (r *WalletRepository) PayForOrder(ctx context.Context, buyerID, cropID int,
 	var available, unitPrice float64
 	var listed bool
 	err = tx.QueryRowContext(ctx, `
-		SELECT farmer_id, quantity, listed_for_sale, price_per_unit
+		SELECT farmer_id, quantity, (listed_for_sale AND NOT moderation_blocked), price_per_unit
 		FROM crops WHERE id = $1 FOR UPDATE`, cropID,
 	).Scan(&sellerID, &available, &listed, &unitPrice)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -936,6 +936,26 @@ func (r *WalletRepository) PayForOrder(ctx context.Context, buyerID, cropID int,
 	}
 	if !listed || quantity > available {
 		return 0, false, fmt.Errorf("this produce is not available in the requested quantity")
+	}
+	// Check and lock both accounts in a stable order so a suspension and a
+	// purchase have an unambiguous commit order without altering ledger policy.
+	accounts, err := tx.QueryContext(ctx, `SELECT id FROM farmers
+		WHERE id IN ($1,$2) AND suspended_at IS NULL AND deleted_at IS NULL
+		ORDER BY id FOR SHARE`, buyerID, sellerID)
+	if err != nil {
+		return 0, false, err
+	}
+	activeAccounts := 0
+	for accounts.Next() {
+		activeAccounts++
+	}
+	accountErr := accounts.Err()
+	accounts.Close()
+	if accountErr != nil {
+		return 0, false, accountErr
+	}
+	if buyerID != sellerID && activeAccounts != 2 {
+		return 0, false, fmt.Errorf("account unavailable for purchase")
 	}
 	if sellerID == buyerID {
 		return 0, false, fmt.Errorf("you can't buy your own produce")
@@ -1740,7 +1760,7 @@ func (r *WalletRepository) ListPendingTransfers(ctx context.Context) ([]models.T
 // restart; the service caches the answer and re-reads it before serving an
 // admin page or action.
 func (r *WalletRepository) ListAdminIDs(ctx context.Context) ([]int, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT id FROM farmers WHERE is_admin ORDER BY id`)
+	rows, err := r.db.QueryContext(ctx, `SELECT id FROM farmers WHERE is_admin AND suspended_at IS NULL AND deleted_at IS NULL ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -1763,7 +1783,7 @@ func (r *WalletRepository) ListAdminAccounts(ctx context.Context) ([]models.Admi
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT id, full_name, phone
 		FROM farmers
-		WHERE is_admin
+		WHERE is_admin AND suspended_at IS NULL AND deleted_at IS NULL
 		ORDER BY full_name ASC, id ASC`)
 	if err != nil {
 		return nil, err

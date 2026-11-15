@@ -1,0 +1,84 @@
+{
+  "date": "2026-11-15",
+  "branch": "feat/admin-governance",
+  "base_commit": "8bc0a90",
+  "scope": [
+    "AGRO-008",
+    "AGRO-019"
+  ],
+  "environment": {
+    "go": "1.25.0",
+    "postgresql": "16.15",
+    "previously_verified_postgresql": "18.6",
+    "data": "Disposable local database, isolated schemas, synthetic fixtures"
+  },
+  "go_test": {
+    "normal": {
+      "started_at": "2026-11-15T03:59:30.617182253Z",
+      "completed_at": "2026-11-15T04:04:02.073426462Z",
+      "passed_tests_and_subtests": 804,
+      "top_level_tests": 410,
+      "failed": 0,
+      "skipped": 0,
+      "required_database_tests": 69
+    },
+    "race": {
+      "started_at": "2026-11-15T04:05:53.913886637Z",
+      "completed_at": "2026-11-15T04:10:43.044678863Z",
+      "passed_tests_and_subtests": 804,
+      "top_level_tests": 410,
+      "failed": 0,
+      "skipped": 0,
+      "required_database_tests": 69
+    }
+  },
+  "go_vet": "passed",
+  "evidence_checker_unit_tests": {
+    "passed": 8
+  },
+  "browser": {
+    "passed": true,
+    "postgresql": "16.15",
+    "desktop_viewport": [
+      1440,
+      1040
+    ],
+    "mobile_viewport": [
+      390,
+      844
+    ],
+    "checks": [
+      "confirmation required",
+      "cancel and keyboard dismissal",
+      "suspend and reactivate",
+      "old sessions stay invalid",
+      "search",
+      "role assignment",
+      "listing block and restore",
+      "marketplace visibility",
+      "persistent audit",
+      "mobile overflow and dialogs",
+      "moderator permissions",
+      "visible text contrast",
+      "mobile account navigation",
+      "mobile touch targets and input sizing",
+      "dialog keyboard focus restoration"
+    ],
+    "javascript_errors": 0,
+    "additional_viewport_widths": [
+      320,
+      768,
+      1280
+    ]
+  },
+  "screenshots": [
+    "overview.png",
+    "users.png",
+    "mobile-review.png"
+  ],
+  "note": "Local standard and race suites passed on PostgreSQL 16.15 and previously on 18.6. Hosted CI and independent review remain required before merge.",
+  "targeted_template_tests": {
+    "passed": 2,
+    "note": "Run after the final interface refinements"
+  }
+}

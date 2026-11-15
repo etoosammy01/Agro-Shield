@@ -75,6 +75,8 @@ type WalletPageData struct {
 // test, and the copy silently stops matching the template the moment a field is
 // added — which is a compile-clean, render-time failure.
 type WalletAdminPageData struct {
+	CanManageRoles    bool
+	CanGovernance     bool
 	Withdrawals       []models.Withdrawal
 	Transfers         []models.Transfer
 	PendingDeposits   []models.PendingDeposit
@@ -832,64 +834,13 @@ func (h *WalletHandler) AdminPage(w http.ResponseWriter, r *http.Request) {
 		AdminID:   farmer.ID,
 		AdminName: farmer.FullName,
 	}
+	access, _ := r.Context().Value(adminAccessContextKey{}).(models.AdminAccess)
+	data.CanManageRoles = access.Can(models.AdminManageRoles)
+	data.CanGovernance = access.Can(models.AdminReadUsers)
 	if err := render.RenderTemplates(w, "wallet-admin.html", data); err != nil {
 		log.Printf("render wallet admin page for admin %d: %v", farmer.ID, err)
 		http.Error(w, "Could not render withdrawal requests", http.StatusInternalServerError)
 	}
-}
-
-// SetWalletAdmin grants or revokes the admin role from the approvals page. The
-// role is an account property, so this is the UI side of the change an operator
-// would otherwise make with SQL; the first admin still comes from configuration,
-// and after that the page manages who else can see it.
-func (h *WalletHandler) SetWalletAdmin(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	farmer, ok := middleware.FarmerFromContext(r)
-	h.refreshAdmins(r.Context())
-	if !ok || farmer == nil || !h.wallet.IsAdmin(farmer.ID) {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
-	}
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Invalid form", http.StatusBadRequest)
-		return
-	}
-
-	var changeErr error
-	success := ""
-	switch r.FormValue("action") {
-	case "remove":
-		id, err := strconv.Atoi(strings.TrimSpace(r.FormValue("farmer_id")))
-		if err != nil || id <= 0 {
-			changeErr = services.ErrAdminNotFound
-			break
-		}
-		changeErr = h.wallet.SetAdmin(r.Context(), farmer.ID, id, false)
-		success = "Admin access removed."
-	default:
-		changeErr = h.wallet.SetAdminByPhone(r.Context(), farmer.ID, r.FormValue("phone"), true)
-		success = "Admin access granted."
-	}
-
-	if changeErr != nil {
-		log.Printf("admin %d change wallet admins: %v", farmer.ID, changeErr)
-		failure := changeErr.Error()
-		switch {
-		case errors.Is(changeErr, services.ErrNotAdmin),
-			errors.Is(changeErr, services.ErrAdminNotFound),
-			errors.Is(changeErr, services.ErrAdminPhoneRequired),
-			errors.Is(changeErr, services.ErrAdminSelfRemoval),
-			errors.Is(changeErr, services.ErrAdminFromConfig):
-		default:
-			failure = "Could not change admin access. Check the server log and try again."
-		}
-		http.Redirect(w, r, adminWalletPath+"?error="+url.QueryEscape(failure), http.StatusSeeOther)
-		return
-	}
-	http.Redirect(w, r, adminWalletPath+"?success="+url.QueryEscape(success), http.StatusSeeOther)
 }
 
 // adminWalletPath is the shared approvals page. Withdrawals and transfers are

@@ -26,6 +26,7 @@
                 </a>
             </div>
             <nav class="admin-nav" aria-label="Admin sections">
+                {{if .CanGovernance}}<a class="admin-nav-link" href="/admin"><span aria-hidden="true">↗</span><span>Community console</span></a>{{end}}
                 <a class="admin-nav-link is-active" href="#overview">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
                     <span>Overview</span>
@@ -286,7 +287,7 @@
                 <div class="admin-section-head">
                     <div>
                         <h2>Wallet admins</h2>
-                        <p class="admin-section-note">Everyone listed here can open this page and approve requests. An admin needs one other admin to remove them, and a name marked “configured” comes from the server settings, so it can only be removed there.</p>
+                        <p class="admin-section-note">These accounts can review wallet requests. Administrators manage approval access in the user directory, where every change requires a reason and is recorded.</p>
                     </div>
                     <span class="admin-section-count">{{len .Admins}} accounts</span>
                 </div>
@@ -297,29 +298,17 @@
                         <div>
                             <strong>{{.FullName}}</strong>
                             <span class="wallet-name-check-detail">(#{{.FarmerID}})</span>
-                            {{if .Phone}}<br><span class="wallet-name-check-detail">{{.Phone}}</span>{{end}}
                         </div>
                         {{if .FromConfig}}
                         <span class="wallet-status">Configured</span>
                         {{else if eq .FarmerID $.AdminID}}
                         <span class="wallet-status">You</span>
-                        {{else}}
-                        <form method="POST" action="/admin/wallet-admins" data-confirm="Remove admin access for {{.FullName}}?">
-                            <input type="hidden" name="action" value="remove">
-                            <input type="hidden" name="farmer_id" value="{{.FarmerID}}">
-                            <button class="admin-btn admin-btn-danger" type="submit">Remove</button>
-                        </form>
                         {{end}}
                     </li>
                     {{end}}
                 </ul>
                 {{else}}<p class="wallet-empty">No admin accounts are listed.</p>{{end}}
-                <form method="POST" action="/admin/wallet-admins" class="wallet-admin-add">
-                    <input type="hidden" name="action" value="add">
-                    <label for="admin-phone">Phone number of the account to make an admin</label>
-                    <input id="admin-phone" type="tel" name="phone" inputmode="tel" autocomplete="off" placeholder="08012345678">
-                    <button class="admin-btn admin-btn-primary" type="submit">Make admin</button>
-                </form>
+                {{if .CanManageRoles}}<a class="admin-btn admin-btn-primary" href="/admin/users">Manage approval access</a>{{else}}<p class="admin-section-note">Contact an administrator to change approval access.</p>{{end}}
 
                 <div class="admin-settings">
                     <div class="admin-settings-block">

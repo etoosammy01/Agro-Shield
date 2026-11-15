@@ -211,6 +211,7 @@ func RegisterRoutes(
 		container.Order,
 		container.FarmerRepo,
 		container.Wallet,
+		container.Admin,
 	)
 
 	http.HandleFunc(
@@ -1003,58 +1004,7 @@ func RegisterRoutes(
 		"/wallet/lookup-account",
 		middleware.RequireAuth(container.FarmerRepo, walletHandler.LookupAccount),
 	))
-	http.HandleFunc("/admin/wallet-withdrawals", middleware.OnlyPath(
-		"/admin/wallet-withdrawals",
-		middleware.OnlyGet(middleware.RequireAuth(container.FarmerRepo, walletHandler.AdminPage)),
-	))
-	// Admins are managed from the approvals page itself, so granting the role no
-	// longer needs a database client or a restart.
-	http.HandleFunc("/admin/wallet-admins", middleware.OnlyPath(
-		"/admin/wallet-admins",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.SetWalletAdmin),
-	))
-	http.HandleFunc("/admin/wallet-withdrawals/approve", middleware.OnlyPath(
-		"/admin/wallet-withdrawals/approve",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.ApproveWithdrawal),
-	))
-	http.HandleFunc("/admin/wallet-withdrawals/reject", middleware.OnlyPath(
-		"/admin/wallet-withdrawals/reject",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.RejectWithdrawal),
-	))
-	http.HandleFunc("/admin/wallet-withdrawals/reconcile", middleware.OnlyPath(
-		"/admin/wallet-withdrawals/reconcile",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.ReconcileWithdrawal),
-	))
-	// The way back for a payout that never reached Flutterwave: the row is
-	// 'processing' with funds reserved and no way to release them, because
-	// Reject only matches 'pending'.
-	http.HandleFunc("/admin/wallet-withdrawals/return-to-queue", middleware.OnlyPath(
-		"/admin/wallet-withdrawals/return-to-queue",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.ReturnWithdrawalToQueue),
-	))
-	// For a payout that reached Flutterwave but never recorded its transfer id:
-	// the id is what settlement matches on, so without it neither the webhook nor
-	// reconcile can pay or refund the row.
-	http.HandleFunc("/admin/wallet-withdrawals/record-transfer", middleware.OnlyPath(
-		"/admin/wallet-withdrawals/record-transfer",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.RecordTransferID),
-	))
-	// Wallet-to-wallet transfers are reviewed on the same approvals page, so
-	// they need no listing route of their own.
-	http.HandleFunc("/admin/wallet-transfers/approve", middleware.OnlyPath(
-		"/admin/wallet-transfers/approve",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.ApproveTransfer),
-	))
-	http.HandleFunc("/admin/wallet-transfers/reject", middleware.OnlyPath(
-		"/admin/wallet-transfers/reject",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.RejectTransfer),
-	))
-	// Recreates a missing wallet for an existing account. It creates an empty
-	// NGN wallet and never moves money, so it is safe to repeat.
-	http.HandleFunc("/admin/wallets/repair", middleware.OnlyPath(
-		"/admin/wallets/repair",
-		middleware.RequireAuth(container.FarmerRepo, walletHandler.RepairWallet),
-	))
+	registerAdminRoutes(container, walletHandler)
 
 	// Initiate a payment for an order - requires the buyer to
 	// be logged in.

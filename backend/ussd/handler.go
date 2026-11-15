@@ -70,6 +70,9 @@ func (h *Handler) respond(ctx context.Context, phone, text string) string {
 	if farmer == nil {
 		return "END This number is not registered. Register online at Agro-Shield, then dial again."
 	}
+	if farmer.SuspendedAt.Valid {
+		return "END Your account is suspended. Contact Agro-Shield support."
+	}
 	parts := []string{}
 	if text != "" {
 		parts = strings.Split(text, "*")

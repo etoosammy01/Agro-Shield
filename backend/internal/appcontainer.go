@@ -27,6 +27,7 @@ import (
 // ============================================================
 
 type Container struct {
+	Admin          *repository.AdminRepository
 	OrderDispute   *services.OrderDisputeService
 	Auth           *services.AuthService
 	Crop           *services.CropService

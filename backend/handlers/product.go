@@ -68,7 +68,7 @@ func (h *ProductHandler) ProductDetailsHandler(
 		return
 	}
 
-	if crop == nil {
+	if crop == nil || !crop.ListedForSale {
 		http.Error(
 			w,
 			"Product not found",

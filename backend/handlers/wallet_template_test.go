@@ -582,12 +582,13 @@ func TestWalletAdminPageSummarisesWhatIsWaiting(t *testing.T) {
 	}
 }
 
-// Managing admins from the page is what removes the database client from the
-// path. The viewer and a configured admin must be shown without a remove
-// button, because neither removal would stick.
-func TestWalletAdminPageManagesAdminsFromThePage(t *testing.T) {
+// Wallet approval access must not let an approver grant privileges. Role
+// changes go through governance with a fresh version, reason, and audit record.
+func TestWalletAdminPageUsesGovernanceForAccessChanges(t *testing.T) {
 	data := WalletAdminPageData{
-		AdminID: 7,
+		AdminID:        7,
+		CanManageRoles: true,
+		CanGovernance:  true,
 		Admins: []models.AdminAccount{
 			{FarmerID: 7, FullName: "Bola Farms", Phone: "08010000001"},
 			{FarmerID: 9, FullName: "Ada Obi", Phone: "08020000002"},
@@ -603,20 +604,26 @@ func TestWalletAdminPageManagesAdminsFromThePage(t *testing.T) {
 
 	for _, want := range []string{
 		"Wallet admins", "Bola Farms", "Ada Obi", "Configured Admin",
-		`action="/admin/wallet-admins"`, "Make admin", "Configured", "You",
-		`name="farmer_id" value="9"`,
+		`href="/admin/users"`, "Manage approval access", "Configured", "You",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the admin section did not render %q", want)
 		}
 	}
 	for _, unwanted := range []string{
-		`name="farmer_id" value="7"`, // you cannot remove yourself
-		`name="farmer_id" value="2"`, // a configured admin cannot be removed here
+		`action="/admin/wallet-admins"`, "Make admin", "08010000001", "08020000002",
 	} {
 		if strings.Contains(body, unwanted) {
-			t.Errorf("a remove form was rendered for %s", unwanted)
+			t.Errorf("legacy privilege control or unnecessary private data was rendered: %s", unwanted)
 		}
+	}
+	data.CanManageRoles = false
+	recorder = httptest.NewRecorder()
+	if err := render.RenderTemplates(recorder, "wallet-admin.html", data); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(recorder.Body.String(), "Manage approval access") {
+		t.Fatal("wallet-only approver was offered staff management")
 	}
 }
 

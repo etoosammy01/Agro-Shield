@@ -296,6 +296,7 @@ func main() {
 	}
 	welcomeEmail := services.NewWelcomeEmailService(emailSender)
 
+	container.Admin = repository.NewAdminRepository(db, walletAdminIDs)
 	routes.RegisterRoutes(container, welcomeEmail)
 	// Health checks are deliberately outside the application router so they
 	// remain cheap and are not affected by page-level middleware decisions.
