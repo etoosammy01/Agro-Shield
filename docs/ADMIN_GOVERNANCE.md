@@ -10,6 +10,34 @@ Sign in with a fully onboarded staff account and open **Profile → Admin consol
 
 The console provides an overview, a searchable user directory, listing moderation, and an administrator-only audit history. It works on narrow screens and supports keyboard navigation. Management dialogs show the target, the effect of the selected change, a required reason, and an explicit review checkbox. Closing a dialog makes no change.
 
+### Temporary development access
+
+For local development without selfie capture or phone verification, set the
+following in `backend/.env` and restart the backend:
+
+```dotenv
+APP_ENV=development
+DEV_SKIP_ONBOARDING=true
+DEV_ONBOARDING_USER_IDS=14
+```
+
+The selected account signs in directly to `/dashboard`, and the selfie and
+phone-verification pages redirect there without issuing an OTP. The initial PIN
+setup prompt is also skipped. Password authentication, suspension, and admin
+permissions remain enforced. No selfie, phone-verification, or PIN evidence is
+created; existing wallet PIN and OTP checks still apply to financial operations.
+An empty `DEV_ONBOARDING_USER_IDS` enables this development skip for all accounts.
+Set `DEV_SKIP_ONBOARDING=false` and restart to restore normal onboarding.
+The option defaults to false and startup rejects it outside development.
+
+The temporary skip passed 427 top-level tests / 859 test and subtest results in
+both standard and race runs on Go 1.25.0 and PostgreSQL 16.15, including all 82
+required database tests, with no failures or skips. Static analysis and all eight
+evidence-checker tests passed. The added HTTP login regression checks dashboard
+access, correct passwords, administrator permissions, suspension, preserved
+verification state, and restoring onboarding. See the
+[development onboarding verification](test-evidence/admin-governance/development-onboarding.json).
+
 ## Permissions
 
 Staff roles are independent of the farmer/buyer account type and wallet approval access.

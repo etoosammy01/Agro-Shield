@@ -16,6 +16,51 @@ func setValidTestEnvironment(t *testing.T) {
 	t.Setenv("BREVO_FROM_NAME", "")
 	t.Setenv("TRUST_PROXY_HEADERS", "")
 	t.Setenv("TRUSTED_PROXY_CIDRS", "")
+	t.Setenv("DEV_SKIP_ONBOARDING", "")
+	t.Setenv("DEV_ONBOARDING_USER_IDS", "")
+}
+
+func TestDevelopmentOnboardingSkipIsExplicitAndScoped(t *testing.T) {
+	setValidTestEnvironment(t)
+	cfg, err := Load()
+	if err != nil || cfg.DevSkipOnboarding {
+		t.Fatal("onboarding must be enforced by default")
+	}
+	t.Setenv("DEV_SKIP_ONBOARDING", "true")
+	t.Setenv("DEV_ONBOARDING_USER_IDS", "14, 27")
+	cfg, err = Load()
+	if err != nil || !cfg.DevSkipOnboarding || len(cfg.DevOnboardingUserIDs) != 2 || cfg.DevOnboardingUserIDs[0] != 14 || cfg.DevOnboardingUserIDs[1] != 27 {
+		t.Fatalf("development skip configuration was not parsed: %v", err)
+	}
+	t.Setenv("DEV_SKIP_ONBOARDING", "false")
+	cfg, err = Load()
+	if err != nil || cfg.DevSkipOnboarding {
+		t.Fatal("onboarding could not be restored")
+	}
+}
+
+func TestDevelopmentOnboardingSkipRejectsProductionAndMalformedSettings(t *testing.T) {
+	setValidTestEnvironment(t)
+	t.Setenv("OTPDEV_API_KEY", "production-key")
+	t.Setenv("DEV_SKIP_ONBOARDING", "true")
+	for _, environment := range []string{"production", "Production", "staging"} {
+		t.Setenv("APP_ENV", environment)
+		if _, err := Load(); err == nil {
+			t.Fatalf("onboarding skip allowed outside development: %s", environment)
+		}
+	}
+	t.Setenv("APP_ENV", "development")
+	t.Setenv("DEV_SKIP_ONBOARDING", "invalid")
+	if _, err := Load(); err == nil {
+		t.Fatal("invalid skip flag was accepted")
+	}
+	t.Setenv("DEV_SKIP_ONBOARDING", "true")
+	for _, ids := range []string{"0", "-1", "14,", "14,invalid"} {
+		t.Setenv("DEV_ONBOARDING_USER_IDS", ids)
+		if _, err := Load(); err == nil {
+			t.Fatalf("malformed skip user IDs were accepted: %s", ids)
+		}
+	}
 }
 
 func TestLoadDefaultsSMSProviderToLog(t *testing.T) {

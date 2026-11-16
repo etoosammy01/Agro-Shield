@@ -1534,6 +1534,34 @@
     line-height: 1.55;
 }
 
+.wallet-repair-help {
+    margin-bottom: 1rem;
+}
+
+.wallet-repair-help a {
+    color: var(--admin-gold);
+    text-underline-offset: 3px;
+}
+
+.wallet-repair-form {
+    display: grid;
+    gap: 0.45rem;
+    max-width: 480px;
+}
+
+.wallet-repair-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.wallet-admin-body .wallet-repair-controls input {
+    flex: 1 1 180px;
+    width: auto;
+    min-width: 0;
+}
+
 .admin-section-count {
     padding: 0.34rem 0.65rem;
     border: 1px solid var(--admin-line-strong);

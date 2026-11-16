@@ -90,6 +90,7 @@ type WalletAdminPageData struct {
 	CommissionLabel   string
 	Error             string
 	Success           string
+	RepairUserID      int
 
 	// AdminID is the viewer's own farmer id. The page uses it to withhold the
 	// approve button on requests they made themselves, which the service would
@@ -768,6 +769,15 @@ func (h *WalletHandler) AdminPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
+	var repairUserID int
+	if raw := r.URL.Query().Get("user_id"); raw != "" {
+		var err error
+		repairUserID, err = strconv.Atoi(raw)
+		if err != nil || repairUserID < 1 {
+			http.Error(w, "Enter a valid account ID for wallet repair.", http.StatusBadRequest)
+			return
+		}
+	}
 	withdrawals, err := h.wallet.AdminWithdrawals(r.Context())
 	if err != nil {
 		log.Printf("load wallet withdrawals for admin %d: %v", farmer.ID, err)
@@ -831,8 +841,9 @@ func (h *WalletHandler) AdminPage(w http.ResponseWriter, r *http.Request) {
 		RevenueTotal: revenueTotal, RevenueCount: revenueCount,
 		CommissionEnabled: h.wallet.CommissionEnabled(), CommissionLabel: h.wallet.CommissionLabel(),
 		Error: r.URL.Query().Get("error"), Success: r.URL.Query().Get("success"),
-		AdminID:   farmer.ID,
-		AdminName: farmer.FullName,
+		RepairUserID: repairUserID,
+		AdminID:      farmer.ID,
+		AdminName:    farmer.FullName,
 	}
 	access, _ := r.Context().Value(adminAccessContextKey{}).(models.AdminAccess)
 	data.CanManageRoles = access.Can(models.AdminManageRoles)
@@ -1017,8 +1028,8 @@ func (h *WalletHandler) RepairWallet(w http.ResponseWriter, r *http.Request) {
 	h.runAdminWalletAction(w, r, adminWalletAction{
 		idField:      "user_id",
 		redirectPath: adminWalletPath,
-		failure:      "Could not repair that wallet. Check the user id and whether the account exists; no balance was changed.",
-		success:      "Wallet repair completed. The account now has an empty NGN wallet.",
+		failure:      "Could not repair that wallet. Check the account ID and whether the account exists; no balance was changed.",
+		success:      "Wallet repair completed. The account has an NGN wallet; any existing balance was preserved.",
 		run: func(ctx context.Context, id int64, adminID int) error {
 			_, err := h.wallet.RepairWallet(ctx, int(id), adminID)
 			return err

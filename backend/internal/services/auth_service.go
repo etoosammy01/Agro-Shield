@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"backend/internal/models"
+	"backend/internal/onboarding"
 	"backend/internal/otp"
 	"backend/internal/repository"
 
@@ -126,14 +127,18 @@ func (s *AuthService) Register(firstName, lastName, phone, email, password, comm
 	return farmer, nil
 }
 
-// HasCompletedProfile requires all persisted onboarding steps. An existing
-// uploaded profile picture alone does not prove a selfie was captured.
+// HasCompletedProfile applies the configured onboarding requirement. The
+// development skip grants access without changing persisted verification state.
 func HasCompletedProfile(farmer *models.Farmer) bool {
-	return farmer != nil && farmer.SelfieCapturedAt.Valid && farmer.PhoneVerifiedAt.Valid && farmer.HasTransactionPIN
+	return farmer != nil && (onboarding.CanSkip(farmer.ID) ||
+		(farmer.SelfieCapturedAt.Valid && farmer.PhoneVerifiedAt.Valid && farmer.HasTransactionPIN))
 }
 
 // OnboardingPath returns the next required step, or the dashboard when done.
 func OnboardingPath(farmer *models.Farmer) string {
+	if farmer != nil && onboarding.CanSkip(farmer.ID) {
+		return "/dashboard"
+	}
 	if farmer == nil || !farmer.SelfieCapturedAt.Valid {
 		return "/complete-profile"
 	}

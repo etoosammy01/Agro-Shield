@@ -280,6 +280,10 @@
     "test": "TestAdminRoutesRejectUnprivilegedAndCrossSiteRequests"
   },
   {
+    "package": "backend/routes",
+    "test": "TestDevelopmentOnboardingLoginReachesDashboardAndKeepsAdminPermissions"
+  },
+  {
     "package": "backend/internal/testdb",
     "test": "TestSchemaSelectionAppliesToEveryPooledConnection"
   },

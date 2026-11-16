@@ -153,27 +153,37 @@ func TestAdminWalletWritesIntentBeforeOperationAndRecordsOutcome(t *testing.T) {
 
 func TestAdminConsoleRendersRolesAndEscapesMemberContent(t *testing.T) {
 	for _, role := range []string{"administrator", "moderator"} {
-		s := &fakeAdminStore{access: models.AdminAccess{Role: role}, users: []models.AdminUser{{ID: 12, FullName: `<img src=x onerror=alert(1)>`, Role: "farmer", PhoneHint: "••••1234", CreatedAt: time.Now()}}, listings: []models.AdminListing{{ID: 6, Name: "Maize", SellerID: 12, Price: "1000.00", Quantity: 2, Listed: true}}}
-		for _, section := range []string{"overview", "users", "listings", "audit"} {
-			w := adminRequest(t, NewAdminHandler(s).Page(section), "GET", "/admin/"+section, "", "")
-			if section == "audit" && role == "moderator" {
-				if w.Code != 403 {
-					t.Fatal("moderator accessed audit")
+		for _, wallet := range []bool{false, true} {
+			s := &fakeAdminStore{access: models.AdminAccess{Role: role, Wallet: wallet}, users: []models.AdminUser{{ID: 12, FullName: `<img src=x onerror=alert(1)>`, Role: "farmer", PhoneHint: "••••1234", CreatedAt: time.Now()}}, listings: []models.AdminListing{{ID: 6, Name: "Maize", SellerID: 12, Price: "1000.00", Quantity: 2, Listed: true}}}
+			for _, section := range []string{"overview", "users", "listings", "audit"} {
+				w := adminRequest(t, NewAdminHandler(s).Page(section), "GET", "/admin/"+section, "", "")
+				if section == "audit" && role == "moderator" {
+					if w.Code != 403 {
+						t.Fatal("moderator accessed audit")
+					}
+					continue
 				}
-				continue
-			}
-			if w.Code != 200 {
-				t.Fatalf("render %s/%s: %d %s", role, section, w.Code, w.Body.String())
-			}
-			body := w.Body.String()
-			if strings.Contains(body, `<img src=x onerror=`) {
-				t.Fatal("unescaped member HTML")
-			}
-			if role == "moderator" && (strings.Contains(body, `href="/admin/audit"`) || strings.Contains(body, `name="action" value="suspend"`) || strings.Contains(body, `value="role_administrator"`)) {
-				t.Fatal("moderator UI exposed administrator controls")
-			}
-			if w.Header().Get("Cache-Control") != "no-store" {
-				t.Fatal("admin response can be cached")
+				if w.Code != 200 {
+					t.Fatalf("render %s/%s: %d %s", role, section, w.Code, w.Body.String())
+				}
+				body := w.Body.String()
+				if strings.Contains(body, `<img src=x onerror=`) {
+					t.Fatal("unescaped member HTML")
+				}
+				if section == "users" {
+					if !strings.Contains(body, "Account ID #12") {
+						t.Fatal("member account ID is not labeled")
+					}
+					if strings.Contains(body, `href="/admin/wallet-withdrawals?user_id=12#wallet-repair"`) != wallet {
+						t.Fatal("wallet repair selection did not respect wallet access")
+					}
+				}
+				if role == "moderator" && (strings.Contains(body, `href="/admin/audit"`) || strings.Contains(body, `name="action" value="suspend"`) || strings.Contains(body, `value="role_administrator"`)) {
+					t.Fatal("moderator UI exposed administrator controls")
+				}
+				if w.Header().Get("Cache-Control") != "no-store" {
+					t.Fatal("admin response can be cached")
+				}
 			}
 		}
 	}

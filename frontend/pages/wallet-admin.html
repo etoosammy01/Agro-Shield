@@ -7,7 +7,7 @@
     <meta name="color-scheme" content="dark">
     <title>Wallet Approvals — Agro-Shield</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/wallet.css">
+    <link rel="stylesheet" href="/static/css/wallet.css?v=20261116-repair-account">
 </head>
 <body class="wallet-admin-body">
     <a class="admin-skip" href="#admin-main">Skip to content</a>
@@ -54,6 +54,10 @@
                 <a class="admin-nav-link" href="#revenue">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg>
                     <span>Revenue</span>
+                </a>
+                <a class="admin-nav-link" href="#wallet-repair">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18v13H3z"/><path d="M3 7V4h15v3"/><path d="M16 12h5v4h-5z"/></svg>
+                    <span>Wallet repair</span>
                 </a>
             </nav>
             <div class="admin-account">
@@ -365,14 +369,22 @@
                             Recreates a missing wallet for an existing account, for example an
                             account that predates the wallets table. It creates an empty NGN wallet
                             and never changes a balance, so it is safe to repeat. It cannot be used
-                            for a user id that does not exist.
+                            for an account ID that does not exist.
                         </p>
                     </div>
+                    {{if .CanGovernance}}<a class="admin-btn admin-btn-ghost" href="/admin/users">Find account ID <span aria-hidden="true">↗</span></a>{{end}}
                 </div>
-                <form method="POST" action="/admin/wallets/repair">
-                    <label for="repair-user-id">User ID</label>
-                    <input id="repair-user-id" type="number" name="user_id" min="1" required>
-                    <button type="submit">Repair wallet</button>
+                <p id="repair-user-help" class="admin-section-note wallet-repair-help">
+                    {{if .RepairUserID}}Account ID #{{.RepairUserID}} selected.{{end}}
+                    {{if .CanGovernance}}Search the user directory by name or full phone number. Each member’s account ID is shown below their name; choose “Select for wallet repair” to fill this form.{{else}}Ask a community administrator for the member’s account ID before repairing their wallet.{{end}}
+                    {{if and .CanGovernance .RepairUserID}}<a href="/admin/users?q={{.RepairUserID}}">Review selected account</a>{{end}}
+                </p>
+                <form class="wallet-repair-form" method="POST" action="/admin/wallets/repair">
+                    <label class="admin-field-label" for="repair-user-id">Account ID</label>
+                    <div class="wallet-repair-controls">
+                        <input class="admin-input" id="repair-user-id" type="number" name="user_id" min="1" step="1" placeholder="Enter account ID" {{if .RepairUserID}}value="{{.RepairUserID}}"{{end}} aria-describedby="repair-user-help" required>
+                        <button class="admin-btn admin-btn-primary" type="submit">Repair wallet</button>
+                    </div>
                 </form>
             </section>
         </main>

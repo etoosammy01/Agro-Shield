@@ -1129,6 +1129,14 @@ button:disabled {
   text-align: right;
 }
 
+.member-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
 .produce-icon {
   display: grid;
   place-items: center;

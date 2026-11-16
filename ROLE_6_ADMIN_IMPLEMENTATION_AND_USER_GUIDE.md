@@ -96,6 +96,11 @@ If startup fails with `market history migration: column "crop_id" does not exist
 
 ### Normal staff access
 
+For temporary local access that skips selfie capture, phone verification, and the
+initial PIN prompt, see [temporary development access](docs/ADMIN_GOVERNANCE.md#temporary-development-access).
+That optional configuration sends login directly to the dashboard while retaining
+password and permission checks; it does not create verification evidence.
+
 1. Open the running Agro-Shield application.
 2. Sign in using the staff member's existing Agro-Shield account.
 3. Complete the application's onboarding requirements: captured selfie, verified phone, and transaction PIN. An incomplete account is redirected to its next onboarding step.

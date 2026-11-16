@@ -4,16 +4,104 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
 	"backend/handlers"
 	app "backend/internal"
 	"backend/internal/models"
+	"backend/internal/onboarding"
 	"backend/internal/repository"
+	"backend/internal/services"
 	"backend/internal/testdb"
 	"backend/middleware"
+
+	"golang.org/x/crypto/bcrypt"
 )
+
+func TestDevelopmentOnboardingLoginReachesDashboardAndKeepsAdminPermissions(t *testing.T) {
+	db := testdb.Open(t)
+	farmers := repository.NewFarmerRepository(db)
+	hash, err := bcrypt.GenerateFromPassword([]byte("synthetic-password"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	create := func(name, phone string) *models.Farmer {
+		t.Helper()
+		f := &models.Farmer{FullName: name, Phone: phone, Role: "farmer", Location: "Kano", State: "Kano", Country: "Nigeria", PasswordHash: string(hash), PhotoURL: "/fixture.jpg"}
+		if err := farmers.Create(f); err != nil {
+			t.Fatal(err)
+		}
+		return f
+	}
+	admin := create("Development administrator", "2348000000102")
+	member := create("Development member", "2348000000103")
+	onboarding.Configure(true, []int{admin.ID, member.ID})
+	t.Cleanup(func() { onboarding.Configure(false, nil) })
+	login := handlers.NewLoginHandler(services.NewAuthService(farmers))
+	signIn := func(f *models.Farmer, password string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest("POST", "/login", strings.NewReader((url.Values{"phone": {f.Phone}, "password": {password}}).Encode()))
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		w := httptest.NewRecorder()
+		login.LoginHandler(w, r)
+		return w
+	}
+	adminLogin := signIn(admin, "synthetic-password")
+	if adminLogin.Code != 303 || adminLogin.Header().Get("Location") != "/dashboard" {
+		t.Fatal("login did not go directly to dashboard")
+	}
+	cookies := adminLogin.Result().Cookies()
+	if len(cookies) != 1 {
+		t.Fatal("login did not create a session")
+	}
+	t.Cleanup(func() { middleware.DeleteSession(cookies[0].Value) })
+	old := http.DefaultServeMux
+	http.DefaultServeMux = http.NewServeMux()
+	t.Cleanup(func() { http.DefaultServeMux = old })
+	registerAdminRoutes(&app.Container{FarmerRepo: farmers, Admin: repository.NewAdminRepository(db, []int{admin.ID})}, handlers.NewWalletHandler(nil, nil, nil))
+	request := func(path string, cookie *http.Cookie) *httptest.ResponseRecorder {
+		r := httptest.NewRequest("GET", path, nil)
+		r.AddCookie(cookie)
+		w := httptest.NewRecorder()
+		if path == "/dashboard" {
+			middleware.RequireAuth(farmers, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) })(w, r)
+		} else {
+			http.DefaultServeMux.ServeHTTP(w, r)
+		}
+		return w
+	}
+	if request("/dashboard", cookies[0]).Code != 204 || request("/api/admin/users", cookies[0]).Code != 200 {
+		t.Fatal("authenticated development administrator was blocked")
+	}
+	memberLogin := signIn(member, "synthetic-password")
+	memberCookies := memberLogin.Result().Cookies()
+	if memberLogin.Header().Get("Location") != "/dashboard" || len(memberCookies) != 1 {
+		t.Fatal("selected development member could not log in")
+	}
+	t.Cleanup(func() { middleware.DeleteSession(memberCookies[0].Value) })
+	if request("/api/admin/users", memberCookies[0]).Code != 403 {
+		t.Fatal("onboarding skip granted administrative permissions")
+	}
+	if wrong := signIn(admin, "wrong-password"); wrong.Header().Get("Location") == "/dashboard" || len(wrong.Result().Cookies()) != 0 {
+		t.Fatal("onboarding skip bypassed password verification")
+	}
+	stored, err := farmers.GetByID(admin.ID)
+	if err != nil || stored.SelfieCapturedAt.Valid || stored.PhoneVerifiedAt.Valid || stored.HasTransactionPIN {
+		t.Fatal("login skip fabricated onboarding evidence")
+	}
+	onboarding.Configure(false, nil)
+	if request("/dashboard", cookies[0]).Header().Get("Location") != "/complete-profile" {
+		t.Fatal("normal onboarding could not be restored")
+	}
+	onboarding.Configure(true, []int{admin.ID})
+	if _, err := db.Exec(`UPDATE farmers SET suspended_at=CURRENT_TIMESTAMP WHERE id=$1`, admin.ID); err != nil {
+		t.Fatal(err)
+	}
+	if suspended := signIn(admin, "synthetic-password"); suspended.Header().Get("Location") == "/dashboard" || len(suspended.Result().Cookies()) != 0 {
+		t.Fatal("onboarding skip allowed a suspended account to log in")
+	}
+}
 
 func TestAdminRoutesRejectUnprivilegedAndCrossSiteRequests(t *testing.T) {
 	db := testdb.Open(t)

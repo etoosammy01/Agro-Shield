@@ -67,12 +67,18 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         [["/cart", "Cart", icons.cart], ["/notifications", "Notifications", icons.notifications]].forEach(([href, label, icon]) => {
-            if (!nav.querySelector(`a[href="${href}"]`)) return;
+            const source = nav.querySelector(`a[href="${href}"]`);
+            if (!source) return;
             const link = document.createElement("a");
             link.href = href;
-            link.setAttribute("aria-label", label);
+            link.setAttribute("aria-label", source.getAttribute("aria-label") || label);
             link.title = label;
             link.innerHTML = icon;
+            if (source.classList.contains("notification-icon")) {
+                link.classList.add("notification-nav-link", "notification-icon");
+                const badge = source.querySelector(".notification-nav-badge");
+                if (badge) link.appendChild(badge.cloneNode(true));
+            }
             quickActions.appendChild(link);
         });
 

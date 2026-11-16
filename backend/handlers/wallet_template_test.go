@@ -625,6 +625,17 @@ func TestWalletAdminPageUsesGovernanceForAccessChanges(t *testing.T) {
 	if strings.Contains(recorder.Body.String(), "Manage approval access") {
 		t.Fatal("wallet-only approver was offered staff management")
 	}
+	data.CanGovernance = false
+	recorder = httptest.NewRecorder()
+	if err := render.RenderTemplates(recorder, "wallet-admin.html", data); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(recorder.Body.String(), `href="/admin/users`) {
+		t.Fatal("wallet-only approver was offered the protected user directory")
+	}
+	if !strings.Contains(recorder.Body.String(), "Ask a community administrator") {
+		t.Fatal("wallet-only approver has no guidance for finding an account ID")
+	}
 }
 
 // The exception list exists so a deposit stuck at the provider is visible to a

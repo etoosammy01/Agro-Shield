@@ -14,6 +14,7 @@ import (
 	app "backend/internal"
 	"backend/internal/config"
 	"backend/internal/database"
+	"backend/internal/onboarding"
 	"backend/internal/otp"
 	"backend/internal/repository"
 	"backend/internal/services"
@@ -30,6 +31,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	onboarding.Configure(cfg.DevSkipOnboarding, cfg.DevOnboardingUserIDs)
 
 	// ============================================================
 	// 1. CONNECT TO DATABASE
