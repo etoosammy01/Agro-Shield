@@ -77,7 +77,7 @@
     "users.png",
     "mobile-review.png"
   ],
-  "note": "Complete standard and race suites passed with all 81 required database tests; final formatted-phone admin search passed focused race checks. The confirmed test duplicates were closed atomically with audit and phone standardization. Real browser sign-in to the retained admin passed four phone formats and reached its remaining profile setup. Core implementation commit: 1aba44c; continuation changes remain uncommitted. Hosted CI and independent review remain required before merge.",
+  "note": "Complete standard and race suites passed with all 81 required database tests; final formatted-phone admin search passed focused race checks. The confirmed test duplicates were closed atomically with audit and phone standardization. Real browser sign-in to the retained admin passed four phone formats and reached its remaining profile setup. Core implementation commit: 1aba44c; continuation changes committed in db94ab1. Hosted push and PR CI passed for db94ab1. Cross-branch authentication/dispute integration, migration coordination, and independent review remain required before release; see docs/ROLE_6_DEPENDENCY_REVIEW.md.",
   "targeted_template_tests": {
     "passed": 2,
     "note": "Run after the final interface refinements",

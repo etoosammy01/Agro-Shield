@@ -6,7 +6,7 @@
 **Implementation branch:** `feat/admin-governance`  
 **Implementation commit:** `1aba44c` — `feat(admin): implement governance and persistent audit`  
 **Baseline commit:** `8bc0a90`  
-**Delivery status:** Role 6 implementation completed and locally verified. Core implementation committed locally; the final listing-review fix, explicit legacy import, connection correction, canonical phone handling, confirmed test-duplicate cleanup, and expanded guide are working-tree changes. Hosted CI, independent review, and merge remain outstanding.
+**Delivery status:** Role 6 implementation is committed through `db94ab1` and locally verified. [PR #9](https://github.com/etoosammy01/Agro-Shield/pull/9) is open, and hosted push/PR CI passed for that commit. Authentication and dispute integration, migration coordination, independent review, and merge remain outstanding. See the [dependency and requirement review](docs/ROLE_6_DEPENDENCY_REVIEW.md).
 
 This document records what was delivered, why the implementation was designed this way, how every admin screen works, and how the work was verified. It describes the core implementation at the commit above and the subsequent listing-review fix and explicitly requested legacy-data migration. The screenshots contain synthetic demonstration accounts and figures.
 
@@ -737,8 +737,10 @@ session cookie.
 | Privilege escalation, audit completeness, and data minimization | Direct API/legacy routes, malformed input, escaping, masked contacts, omitted credentials/bank details, and audit event checks passed. |
 | Requested migration supports Role 6 without new financial policies | Imported-record credentials, wallet-only legacy access, moderation/session controls, immutable audit, exact financial copying, conversion collisions, rollback/retry, and simultaneous imports passed. |
 
-Hosted CI, independent review, and merge remain outstanding. These local results
-establish implementation evidence, not completion of those release gates.
+Hosted CI subsequently passed for commit `db94ab1`, as recorded in the
+[dependency review](docs/ROLE_6_DEPENDENCY_REVIEW.md). Cross-branch integration,
+independent review, and merge remain outstanding. The local results establish
+implementation evidence, not completion of those release gates.
 
 ### Browser checks
 
@@ -785,7 +787,7 @@ Local browser-preview and Playwright helper scripts were temporary tools under `
 
 ### Before merging or deploying
 
-The implementation is a local feature-branch commit. Hosted CI and independent review have not been recorded as completed. The remediation plan requires those gates before merge.
+The implementation is pushed through `db94ab1` in [PR #9](https://github.com/etoosammy01/Agro-Shield/pull/9). Hosted push/PR CI passed for that commit; no submitted PR reviews were found on November 16. Complete the integration and independent review gates described in the [dependency review](docs/ROLE_6_DEPENDENCY_REVIEW.md) before treating this as a combined release.
 
 Coordinate the supporting session changes with Member 2, the additive migration and deployment ownership with Member 8, and future use of `disputes.review` with Member 5. This coordination does not transfer ownership of their business logic to Role 6.
 
