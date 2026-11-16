@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"log"
 	"net/http"
 	"os"
@@ -22,6 +23,8 @@ import (
 )
 
 func main() {
+	checkDatabase := flag.Bool("check-database", false, "verify startup migrations and exit before providers or background jobs start")
+	flag.Parse()
 	// Load application configuration once at startup.
 	cfg, err := config.Load()
 	if err != nil {
@@ -47,6 +50,10 @@ func main() {
 	}
 	if err := database.RunSessionMigration(db); err != nil {
 		log.Fatal(err)
+	}
+	if *checkDatabase {
+		log.Println("Database startup migrations verified; check mode complete")
+		return
 	}
 
 	// ============================================================

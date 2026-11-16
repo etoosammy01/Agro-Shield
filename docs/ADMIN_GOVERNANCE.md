@@ -2,6 +2,8 @@
 
 Member 6 implementation for **AGRO-008** (persistent administrative audit) and **AGRO-019** (user management and listing moderation).
 
+For the full work record, reasons behind the implementation, changed-file inventory, and screen-by-screen navigation instructions, see the [Role 6 implementation and admin user guide](../ROLE_6_ADMIN_IMPLEMENTATION_AND_USER_GUIDE.md).
+
 ## Opening the console
 
 Sign in with a fully onboarded staff account and open **Profile → Admin console**, or visit `/admin`. Moderators and administrators enter the community overview. Accounts with only wallet approval access go to the existing wallet approvals page.
@@ -41,6 +43,8 @@ Suspension disables login and authenticated browser/USSD access, hides the selle
 ### Review a listing
 
 Search **Listings** by produce, seller, or listing ID. Select **Review**, choose a reason, confirm, and apply the decision. A block is separate from the seller's listing flag, so relisting the crop cannot remove moderation. A restored listing appears only if the seller is active, it is listed for sale, and stock is available.
+
+Changes to the produce name, ownership, location, quantity, unit, price, sale status, or moderation state invalidate an open review, including stock changes from checkout. Submitting an outdated review returns 409 without changing moderation or adding a committed audit event. Reload **Listings**, reopen **Review**, and check the current details before submitting again. Unchanged saves and timestamp-only updates preserve the review version. The additive migration installs this check for existing crops without resetting their versions.
 
 Marketplace search, direct product visibility, wallet checkout, legacy order creation, and initiation of an external payment respect moderation and suspension. Financial provider callbacks still settle already-started payments; a moderation decision does not silently discard a payment or invent a refund.
 
@@ -93,6 +97,38 @@ Triggers reject audit UPDATE, DELETE, and TRUNCATE, and request-stage uniqueness
 
 Deploy the application and schema changes together using the project's existing migration procedure. For a code rollback, keep the additive schema and audit data: the previous code ignores the new columns, but also stops enforcing the new restrictions. Do not drop audit records as part of rollback. Review rollback with the release owner and Member 8 before production use.
 
+### Importing the observed legacy schema
+
+If startup fails on `crop_id` against an older `users`/`products` database, use the
+[explicit legacy import](DATABASE_SCHEMA_SETUP.md). It preserves source records,
+account IDs and credentials, listing ownership, wallet balances, and supported
+financial references in a separate schema. Legacy `is_admin` flags remain wallet
+access only. It never creates governance privileges, onboarding evidence, or
+active sessions. Its completion audit and identity mappings commit with the
+verified import; audit failure rolls back records. Wallet-number conversions
+preserve original values privately and reject collisions. Use the direct endpoint
+and `go run . --check-database` to verify startup without provider activity.
+
+### Repairing confirmed test duplicates
+
+`cmd/cleanup-test-duplicates` is an operator command for duplicate accounts whose
+attached funding history the owner has explicitly confirmed is test data. It
+requires a retained administrator ID, exact duplicate IDs, and `--test-records`.
+The default runs the complete transaction and rolls it back. `--apply` commits
+account anonymization, test funding removal, session revocation, canonical phone
+migration and attributable audit events together. The command refuses archived
+`public`, administrator targets, mismatched phone ownership, nonzero balances,
+and accounts involved in orders, deliveries, withdrawals or transfers. It exposes
+no HTTP deletion endpoint and does not weaken normal account-closure protections.
+
+All valid signup and phone-change contacts are stored as `234` followed by ten
+Nigerian mobile subscriber digits. Login and recovery accept ordinary formatting
+and resolve the same account. A normalized uniqueness index protects concurrent
+registrations and verified phone changes. The migration refuses ambiguous legacy
+ownership, preserves invalid legacy contacts for correction, and records its
+valid-contact backfill without disclosing numbers. Password matching stays exact.
+
+
 ## Verification
 
 Use only the disposable PostgreSQL environment described in [Database testing and migration conventions](DATABASE_TESTING_AND_MIGRATION_GUIDE.md). New tests are included in `scripts/required_db_tests.json` so CI rejects missing or skipped execution.
@@ -108,11 +144,19 @@ python3 ../scripts/check_db_tests.py /tmp/agro-admin-race.json
 
 Set `TEST_DATABASE_URL`, `REQUIRE_DB_TESTS=1`, and `TZ=UTC` as documented before running database checks. Tests cover the permission matrix, direct API and legacy-route access, CSRF, privacy and pagination, session invalidation, stale/concurrent decisions, audit failure rollback, append-only protections, repeated migration, wallet attribution, and purchase restrictions. Browser review should also exercise account and listing dialogs, cancellation, required confirmation, keyboard navigation, narrow screens, and role-specific navigation with synthetic accounts.
 
-### Local verification, November 15, 2026
+### Local verification, November 16, 2026
 
-Both the standard and race runs passed **410 top-level Go tests / 804 test and subtest results**, including **all 69 required database tests**, with no failures or skipped tests. The latest runs used Go 1.25.0 and PostgreSQL **16.15**, matching CI's PostgreSQL major version. Earlier standard and race runs also passed on PostgreSQL 18.6. `go vet ./...`, JavaScript syntax validation, and all eight evidence-checker tests passed. Hosted CI has not yet run for this feature branch.
+Both the standard and race runs passed **422 top-level Go tests / 852 test and subtest results**, including **all 81 required database tests**, with no failed or skipped tests. The latest runs cover Role 6, the listing-review correction and supported upgrade, explicit legacy import, wallet conversion, rollback/retry, simultaneous imports, physical connection schema selection, canonical phones, and atomic test duplicate cleanup, using Go 1.25.0 and PostgreSQL **16.15**, matching CI's PostgreSQL major version. Earlier standard and race runs also passed on PostgreSQL 18.6. `go vet ./...`, JavaScript syntax validation, all eight evidence-checker tests, and local links in both admin guides passed. Hosted CI has not yet run for this feature branch.
 
-Chrome checks passed at widths of 320, 390, 768, 1280, and 1440 pixels, including required confirmation, cancellation and keyboard dismissal, suspension/reactivation without restoring old sessions, user search, role assignment, listing block/restore with marketplace visibility, persistent audit history, and moderator restrictions. The final interface review also checked visible text contrast, mobile account navigation, touch targets, input sizing, and keyboard focus restoration after closing a dialog. Two targeted template regressions passed after the interface refinements. Browser fixtures used synthetic accounts in isolated PostgreSQL 16.15 schemas.
+The November 15 Chrome checks passed at widths of 320, 390, 768, 1280, and 1440 pixels, including required confirmation, cancellation and keyboard dismissal, suspension/reactivation without restoring old sessions, user search, role assignment, listing block/restore with marketplace visibility, persistent audit history, and moderator restrictions. The final interface review also checked visible text contrast, mobile account navigation, touch targets, input sizing, and keyboard focus restoration after closing a dialog. Two targeted template regressions passed after the interface refinements. Browser fixtures used synthetic accounts in isolated PostgreSQL 16.15 schemas. The listing-review correction changes server behavior and was verified by the November 16 backend suites.
+
+The final formatted-phone admin-search change passed two focused race tests.
+On November 16 the owner-confirmed test duplicates 1 and 4 were closed and
+anonymized, retaining configured administrator 14. Four test deposits and one
+test ledger row were removed; two attributable audit events persist. The backend
+was restarted and Chrome verified 16 validation cases and four real sign-ins to
+the retained account, reaching its remaining profile setup. Passwords stayed
+exact, test sessions were logged out, and no JavaScript errors occurred.
 
 Before merging, complete hosted CI and independent code review as required by the remediation plan. Coordinate the session changes with Member 2, migration and deployment ownership with Member 8, and the reserved dispute-review permission with Member 5.
 

@@ -29,7 +29,7 @@ func negotiationTestUser(t *testing.T, db *sql.DB, role string) *models.Farmer {
 
 	farmer := &models.Farmer{
 		FullName:     "Negotiation Test " + role,
-		Phone:        fmt.Sprintf("234%09d%04d", rand.Intn(1_000_000_000), rand.Intn(10_000)),
+		Phone:        fmt.Sprintf("23480%08d", rand.Intn(100_000_000)),
 		Location:     "Kano",
 		State:        "Kano",
 		Country:      "Nigeria",

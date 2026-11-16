@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"backend/internal/models"
+	phoneformat "backend/internal/phone"
 
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -23,6 +24,8 @@ const defaultPhotoURL = "/static/assets/images/un.jpeg"
 // race past the pre-check in AuthService.Register. Callers match it with
 // errors.Is rather than comparing error strings.
 var ErrPhoneExists = errors.New("phone number already registered")
+var ErrInvalidPhone = errors.New("invalid Nigerian mobile number")
+var ErrAmbiguousPhone = errors.New("phone number belongs to multiple accounts; administrator cleanup required")
 
 // Account-closure refusals. A closed account keeps its order, sale, and wallet
 // ledger history for record-keeping, so deletion must not be possible while
@@ -55,6 +58,10 @@ func NewFarmerRepository(db *sql.DB) *FarmerRepository {
 }
 
 func (r *FarmerRepository) Create(farmer *models.Farmer) error {
+	farmer.Phone = phoneformat.Normalize(farmer.Phone)
+	if farmer.Phone == "" {
+		return ErrInvalidPhone
+	}
 	tx, err := r.db.Begin()
 	if err != nil {
 		return err
@@ -111,47 +118,43 @@ func (r *FarmerRepository) Create(farmer *models.Farmer) error {
 }
 
 func (r *FarmerRepository) GetByPhone(phone string) (*models.Farmer, error) {
-	query := `
-    SELECT
-        id,
-        full_name,
-        phone,
-        COALESCE(email, '') AS email,
-        password_hash,
-        location,
-        COALESCE(lga, location), COALESCE(state, ''), COALESCE(country, ''),
-        role,
-        COALESCE(photo_url, '') AS photo_url,
-        COALESCE(bank_name, ''), COALESCE(bank_code, ''), COALESCE(account_name, ''), COALESCE(account_number, ''), COALESCE(wallet_number, ''),
-        created_at,
-        suspended_at, sessions_revoked_at, updated_at, selfie_captured_at, phone_verified_at, pending_phone,
-        EXISTS (SELECT 1 FROM wallets w WHERE w.farmer_id = farmers.id AND COALESCE(w.transaction_pin_hash, '') <> '')
-    FROM farmers
-    WHERE phone = $1
-    AND deleted_at IS NULL
-    `
-	var farmer models.Farmer
-	err := r.db.QueryRow(query, phone).Scan(
-		&farmer.ID,
-		&farmer.FullName,
-		&farmer.Phone,
-		&farmer.Email,
-		&farmer.PasswordHash,
-		&farmer.Location,
-		&farmer.LGA, &farmer.State, &farmer.Country,
-		&farmer.Role,
-		&farmer.PhotoURL,
-		&farmer.BankName, &farmer.BankCode, &farmer.AccountName, &farmer.AccountNumber, &farmer.WalletNumber,
-		&farmer.CreatedAt,
-		&farmer.SuspendedAt, &farmer.SessionsRevokedAt, &farmer.UpdatedAt, &farmer.SelfieCapturedAt, &farmer.PhoneVerifiedAt, &farmer.PendingPhone, &farmer.HasTransactionPIN,
-	)
-	if err == sql.ErrNoRows {
+	phone = phoneformat.Normalize(phone)
+	if phone == "" {
 		return nil, nil
 	}
+	var ids []int
+	rows, err := r.db.Query(`SELECT id FROM farmers WHERE normalized_nigerian_phone(phone)=$1 AND deleted_at IS NULL LIMIT 2`, phone)
 	if err != nil {
 		return nil, err
 	}
-	return &farmer, nil
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	if len(ids) > 1 {
+		return nil, ErrAmbiguousPhone
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	farmer, err := r.GetByID(ids[0])
+	if err != nil || farmer == nil {
+		return farmer, err
+	}
+	// A verified phone change can occur between lookup and profile loading.
+	if phoneformat.Normalize(farmer.Phone) != phone {
+		return nil, nil
+	}
+	return farmer, nil
 }
 
 func (r *FarmerRepository) GetByID(id int) (*models.Farmer, error) {
@@ -360,6 +363,10 @@ func (r *FarmerRepository) UpdateProfileDetails(id int, fullName, email, communi
 // challenges intact. The verified phone is never changed here;
 // ConsumeAndApplyPhoneChange performs the replacement later.
 func (r *FarmerRepository) StagePhoneChange(ctx context.Context, farmerID int, phone string) error {
+	phone = phoneformat.Normalize(phone)
+	if phone == "" {
+		return ErrInvalidPhone
+	}
 	if farmerID <= 0 {
 		return ErrAccountNotFound
 	}
@@ -378,7 +385,7 @@ func (r *FarmerRepository) StagePhoneChange(ctx context.Context, farmerID int, p
 		return err
 	}
 	var ownerID int64
-	if err := tx.QueryRowContext(ctx, `SELECT id FROM farmers WHERE phone = $1 AND id <> $2 AND deleted_at IS NULL LIMIT 1`, phone, farmerID).Scan(&ownerID); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT id FROM farmers WHERE normalized_nigerian_phone(phone) = $1 AND id <> $2 AND deleted_at IS NULL LIMIT 1`, phone, farmerID).Scan(&ownerID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			ownerID = 0
 		} else {
@@ -388,7 +395,7 @@ func (r *FarmerRepository) StagePhoneChange(ctx context.Context, farmerID int, p
 	if ownerID != 0 && ownerID != int64(farmerID) {
 		return ErrPhoneExists
 	}
-	if phone == currentPhone {
+	if phone == phoneformat.Normalize(currentPhone) {
 		return ErrPhoneAlreadyCurrent
 	}
 	if pendingPhone.Valid && pendingPhone.String == phone {
@@ -508,8 +515,15 @@ func (r *FarmerRepository) DeleteAccount(ctx context.Context, farmerID int) erro
 	}
 	defer tx.Rollback()
 
+	if err := closeAccountTx(ctx, tx, farmerID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func closeAccountTx(ctx context.Context, tx *sql.Tx, farmerID int) error {
 	var id int
-	err = tx.QueryRowContext(ctx,
+	err := tx.QueryRowContext(ctx,
 		`SELECT id FROM farmers WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`, farmerID,
 	).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -578,31 +592,7 @@ func (r *FarmerRepository) DeleteAccount(ctx context.Context, farmerID int) erro
 		`DELETE FROM feedback WHERE user_id = $1`,
 		`DELETE FROM diagnoses WHERE farmer_id = $1`,
 		`DELETE FROM otp_codes WHERE farmer_id = $1`,
-		`UPDATE market_events SET user_id = NULL WHERE user_id = $1`,
-		`UPDATE marketplace_searches SET user_id = NULL WHERE user_id = $1`,
-	} {
-		if _, err := tx.ExecContext(ctx, stmt, farmerID); err != nil {
-			return err
-		}
-	}
-
-	// Personal data with no record-keeping value is removed outright. Cart rows
-	// are transient; negotiations are the conversation around an offer, and the
-	// order itself keeps the agreed price and quantity.
-	for _, stmt := range []string{
-		`DELETE FROM cart_items WHERE buyer_id = $1`,
-		`DELETE FROM negotiations WHERE buyer_id = $1 OR farmer_id = $1`,
-		`DELETE FROM negotiation_messages WHERE sender_id = $1`,
-		// Other buyers may still hold this seller's produce in a cart. The
-		// listing cannot stay purchasable once the account closes, and the
-		// cart row would block removing it.
-		`DELETE FROM cart_items WHERE crop_id IN (SELECT id FROM crops WHERE farmer_id = $1)`,
-		`DELETE FROM chat_messages WHERE sender_id = $1`,
-		`DELETE FROM conversation_members WHERE user_id = $1`,
-		`DELETE FROM notifications WHERE user_id = $1`,
-		`DELETE FROM feedback WHERE user_id = $1`,
-		`DELETE FROM diagnoses WHERE farmer_id = $1`,
-		`DELETE FROM otp_codes WHERE farmer_id = $1`,
+		`DELETE FROM sessions WHERE farmer_id = $1`,
 		`UPDATE market_events SET user_id = NULL WHERE user_id = $1`,
 		`UPDATE marketplace_searches SET user_id = NULL WHERE user_id = $1`,
 	} {
@@ -652,6 +642,12 @@ func (r *FarmerRepository) DeleteAccount(ctx context.Context, farmerID int) erro
             account_name = NULL,
             account_number = NULL,
             is_admin = FALSE,
+            admin_role = '',
+            pending_phone = NULL,
+            selfie_captured_at = NULL,
+            phone_verified_at = NULL,
+            sessions_revoked_at = CURRENT_TIMESTAMP,
+            admin_version = admin_version + 1,
             deleted_at = CURRENT_TIMESTAMP,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = $1 AND deleted_at IS NULL`,
@@ -659,33 +655,5 @@ func (r *FarmerRepository) DeleteAccount(ctx context.Context, farmerID int) erro
 	); err != nil {
 		return err
 	}
-	// The phone number is freed for a future registration. The placeholder is
-	// unique because it includes the id, and it can never pass the Nigerian
-	// phone rules used by login and OTP.
-	placeholderPhone = fmt.Sprintf("deleted-%d", farmerID)
-	if _, err := tx.ExecContext(ctx, `
-		UPDATE farmers
-		SET full_name = 'Deleted account',
-			phone = $2,
-			email = NULL,
-			password_hash = 'deleted',
-			location = 'Deleted account',
-			lga = NULL,
-			state = NULL,
-			country = 'Nigeria',
-			photo_url = $3,
-			bank_name = NULL,
-			bank_code = NULL,
-			account_name = NULL,
-			account_number = NULL,
-			is_admin = FALSE,
-			deleted_at = CURRENT_TIMESTAMP,
-			updated_at = CURRENT_TIMESTAMP
-		WHERE id = $1 AND deleted_at IS NULL`,
-		farmerID, placeholderPhone, defaultPhotoURL,
-	); err != nil {
-		return err
-	}
-
-	return tx.Commit()
+	return nil
 }

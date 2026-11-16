@@ -265,6 +265,10 @@
   },
   {
     "package": "backend/internal/repository",
+    "test": "TestAdminListingReviewRejectsChangedDetails"
+  },
+  {
+    "package": "backend/internal/repository",
     "test": "TestAdminWalletAuditTracksRequestsAndCommittedDecisions"
   },
   {
@@ -274,5 +278,49 @@
   {
     "package": "backend/routes",
     "test": "TestAdminRoutesRejectUnprivilegedAndCrossSiteRequests"
+  },
+  {
+    "package": "backend/internal/testdb",
+    "test": "TestSchemaSelectionAppliesToEveryPooledConnection"
+  },
+  {
+    "package": "backend/internal/legacymigration",
+    "test": "TestLegacyMigrationPreservesRecordsAndRole6Boundaries"
+  },
+  {
+    "package": "backend/internal/legacymigration",
+    "test": "TestLegacyMigrationRollsBackAndCanRetry"
+  },
+  {
+    "package": "backend/internal/legacymigration",
+    "test": "TestLegacyMigrationRejectsAmbiguityAndSnapshotChanges"
+  },
+  {
+    "package": "backend/internal/legacymigration",
+    "test": "TestLegacyWalletNumberConversionPreservesOwnership"
+  },
+  {
+    "package": "backend/internal/legacymigration",
+    "test": "TestLegacyMigrationSerializesConcurrentImports"
+  },
+  {
+    "package": "backend/internal/services",
+    "test": "TestAuthPhoneFormatsShareOneAccountWithoutChangingPassword"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestTestDuplicateCleanupPreservesAdminAndClosesOnlyDuplicates"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestTestDuplicateCleanupRollsBackAndProtectsAccounts"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestPhoneStandardMigrationRefusesAmbiguityAndMatchesNormalizer"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestCanonicalPhoneConcurrentRegistrationAndLegacyUniqueness"
   }
 ]

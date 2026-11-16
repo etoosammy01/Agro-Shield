@@ -311,6 +311,126 @@ func TestAdminConcurrentDecisionsProduceOneChangeAndAudit(t *testing.T) {
 	}
 }
 
+func TestAdminListingReviewRejectsChangedDetails(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	root := adminFixtureUser(t, db, "Admin")
+	seller := adminFixtureUser(t, db, "Seller")
+	r := NewAdminRepository(db, []int{root.ID})
+	crops := NewCropRepository(db)
+	for _, tc := range []struct {
+		name   string
+		change func(*models.Crop) error
+	}{
+		{"seller edits produce", func(c *models.Crop) error { c.Name = "Updated maize"; return crops.Update(c) }},
+		{"seller changes price", func(c *models.Crop) error { c.PricePerUnit = 1500; return crops.Update(c) }},
+		{"seller changes location", func(c *models.Crop) error { c.Location = "Abuja"; return crops.Update(c) }},
+		{"seller changes unit", func(c *models.Crop) error { c.Unit = "bag"; return crops.Update(c) }},
+		{"seller unlists", func(c *models.Crop) error { return crops.Unlist(c.ID, seller.ID) }},
+		{"seller changes stock", func(c *models.Crop) error { c.Quantity = 20; return crops.Update(c) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			crop := adminFixtureCrop(t, db, seller.ID)
+			original := *crop
+			for _, action := range []string{"block", "restore"} {
+				// Read the same version a moderator receives in the directory.
+				listings, err := r.Listings(ctx, root.ID, fmt.Sprint(crop.ID), 0)
+				if err != nil || len(listings) != 1 {
+					t.Fatalf("listing review: %+v %v", listings, err)
+				}
+				change := models.AdminChange{TargetID: crop.ID, Version: listings[0].Version, Action: action, Reason: "incorrect_listing"}
+				if err := tc.change(crop); err != nil {
+					t.Fatal(err)
+				}
+				before := adminAuditCount(t, db)
+				if err := r.ChangeListing(ctx, root.ID, change); !errors.Is(err, ErrAdminConflict) {
+					t.Fatalf("outdated %s review accepted: %v", action, err)
+				}
+				if adminAuditCount(t, db) != before {
+					t.Fatal("outdated review created an audit decision")
+				}
+				var blocked bool
+				if err := db.QueryRow(`SELECT moderation_blocked,moderation_version FROM crops WHERE id=$1`, crop.ID).Scan(&blocked, &change.Version); err != nil {
+					t.Fatal(err)
+				}
+				if blocked != (action == "restore") {
+					t.Fatal("outdated review changed moderation state")
+				}
+				if err := r.ChangeListing(ctx, root.ID, change); err != nil {
+					t.Fatalf("fresh %s review failed: %v", action, err)
+				}
+				// Reset seller details for another real change before restoration.
+				if err := crops.Update(&original); err != nil {
+					t.Fatal(err)
+				}
+			}
+		})
+	}
+	t.Run("checkout changes stock", func(t *testing.T) {
+		crop := adminFixtureCrop(t, db, seller.ID)
+		buyer := adminFixtureUser(t, db, "Buyer")
+		fundWallet(t, db, buyer.ID, "5000.00")
+		listings, err := r.Listings(ctx, root.ID, fmt.Sprint(crop.ID), 0)
+		if err != nil || len(listings) != 1 {
+			t.Fatalf("listing review: %+v %v", listings, err)
+		}
+		if _, _, err := NewWalletRepository(db).PayForOrder(ctx, buyer.ID, crop.ID, 1, uniqueRef("REVIEW"), 0); err != nil {
+			t.Fatal(err)
+		}
+		change := models.AdminChange{TargetID: crop.ID, Version: listings[0].Version, Action: "block", Reason: "incorrect_listing"}
+		before := adminAuditCount(t, db)
+		if err := r.ChangeListing(ctx, root.ID, change); !errors.Is(err, ErrAdminConflict) {
+			t.Fatalf("review predating checkout accepted: %v", err)
+		}
+		if adminAuditCount(t, db) != before || walletBalanceOf(t, db, buyer.ID) != "4000.00" {
+			t.Fatal("outdated review changed audit or completed payment")
+		}
+	})
+	t.Run("unchanged seller save", func(t *testing.T) {
+		crop := adminFixtureCrop(t, db, seller.ID)
+		if err := crops.Update(crop); err != nil {
+			t.Fatal(err)
+		}
+		if err := r.ChangeListing(ctx, root.ID, models.AdminChange{TargetID: crop.ID, Action: "block", Reason: "incorrect_listing"}); err != nil {
+			t.Fatalf("unchanged listing invalidated review: %v", err)
+		}
+	})
+	t.Run("upgrade preserves existing review versions", func(t *testing.T) {
+		crop := adminFixtureCrop(t, db, seller.ID)
+		// Model the preceding admin schema, which advanced the version only
+		// inside moderation decisions and had no listing-review trigger.
+		adminExec(t, db, `DROP TRIGGER listing_review_version ON crops`)
+		adminExec(t, db, `DROP FUNCTION advance_listing_review_version()`)
+		adminExec(t, db, `UPDATE crops SET moderation_version=7 WHERE id=$1`, crop.ID)
+		for range 2 {
+			if err := database.RunAdminMigration(db); err != nil {
+				t.Fatal(err)
+			}
+		}
+		listings, err := r.Listings(ctx, root.ID, fmt.Sprint(crop.ID), 0)
+		if err != nil || len(listings) != 1 || listings[0].Version != 7 {
+			t.Fatalf("migration reset existing review version: %+v %v", listings, err)
+		}
+		crop.PricePerUnit = 1500
+		if err := crops.Update(crop); err != nil {
+			t.Fatal(err)
+		}
+		change := models.AdminChange{TargetID: crop.ID, Version: listings[0].Version, Action: "block", Reason: "incorrect_listing"}
+		if err := r.ChangeListing(ctx, root.ID, change); !errors.Is(err, ErrAdminConflict) {
+			t.Fatalf("upgraded listing accepted an outdated review: %v", err)
+		}
+		change.Version++
+		before := adminAuditCount(t, db)
+		if err := r.ChangeListing(ctx, root.ID, change); err != nil {
+			t.Fatalf("fresh review after upgrade failed: %v", err)
+		}
+		listings, err = r.Listings(ctx, root.ID, fmt.Sprint(crop.ID), 0)
+		if err != nil || len(listings) != 1 || !listings[0].Blocked || listings[0].Version != 9 || adminAuditCount(t, db) != before+1 {
+			t.Fatalf("upgraded decision did not advance once with one audit: %+v %v", listings, err)
+		}
+	})
+}
+
 func TestAdminWalletAuditTracksRequestsAndCommittedDecisions(t *testing.T) {
 	db := testDB(t)
 	ctx := context.Background()

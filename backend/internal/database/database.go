@@ -10,7 +10,8 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
 )
 
 const (
@@ -28,11 +29,23 @@ func ConnectDB(databaseURL string) (*sql.DB, error) {
 		return nil, fmt.Errorf("database URL must not be empty")
 	}
 
-	// Open the PostgreSQL connection.
-	db, err := sql.Open("pgx", databaseURL)
+	// Select the requested schema on every physical connection. Some hosted
+	// endpoints discard search_path in the PostgreSQL startup message, so
+	// relying on the URL parameter alone can resolve unrelated legacy tables.
+	connectionConfig, err := pgx.ParseConfig(databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("open PostgreSQL: %w", err)
 	}
+	searchPath := connectionConfig.RuntimeParams["search_path"]
+	var options []stdlib.OptionOpenDB
+	if searchPath != "" {
+		delete(connectionConfig.RuntimeParams, "search_path")
+		options = append(options, stdlib.OptionAfterConnect(func(ctx context.Context, conn *pgx.Conn) error {
+			_, err := conn.Exec(ctx, `SELECT set_config('search_path',$1,false)`, searchPath)
+			return err
+		}))
+	}
+	db := stdlib.OpenDB(*connectionConfig, options...)
 
 	// Bound the pool so one process cannot exhaust a shared PostgreSQL or
 	// Neon connection limit. These are configurable for deployment sizing.
@@ -1230,6 +1243,9 @@ CREATE INDEX IF NOT EXISTS idx_deliveries_crop_status ON deliveries(crop_id, sta
 	}
 
 	if err := RunAdminMigration(db); err != nil {
+		return err
+	}
+	if err := RunPhoneMigration(db); err != nil {
 		return err
 	}
 	log.Println("✅ Agro-Shield fresh PostgreSQL schema created successfully")

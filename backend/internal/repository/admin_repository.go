@@ -103,7 +103,7 @@ func (r *AdminRepository) Users(ctx context.Context, actorID int, query string, 
 	rows, err := r.db.QueryContext(ctx, `SELECT id, full_name, '••••' || RIGHT(phone,4), role,
  admin_role, is_admin, suspended_at IS NOT NULL, admin_version, created_at
  FROM farmers WHERE deleted_at IS NULL AND ($2::bigint = 0 OR id < $2)
- AND ($1 = '' OR full_name ILIKE '%' || $1 || '%' OR phone = $1 OR id::text = $1)
+ AND ($1 = '' OR full_name ILIKE '%' || $1 || '%' OR normalized_nigerian_phone(phone) = normalized_nigerian_phone($1) OR id::text = $1)
  ORDER BY id DESC LIMIT 25`, query, before)
 	if err != nil {
 		return nil, err
@@ -372,7 +372,7 @@ func (r *AdminRepository) ChangeListing(ctx context.Context, actorID int, c mode
 	if c.Version != version || blocked == (c.Action == "block") {
 		return ErrAdminConflict
 	}
-	_, err = tx.ExecContext(ctx, `UPDATE crops SET moderation_blocked=$1,moderation_version=moderation_version+1,updated_at=CURRENT_TIMESTAMP WHERE id=$2`, c.Action == "block", c.TargetID)
+	_, err = tx.ExecContext(ctx, `UPDATE crops SET moderation_blocked=$1,updated_at=CURRENT_TIMESTAMP WHERE id=$2`, c.Action == "block", c.TargetID)
 	if err != nil {
 		return err
 	}

@@ -21,6 +21,23 @@ ALTER TABLE farmers ADD COLUMN IF NOT EXISTS admin_version BIGINT NOT NULL DEFAU
 ALTER TABLE crops ADD COLUMN IF NOT EXISTS moderation_blocked BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE crops ADD COLUMN IF NOT EXISTS moderation_version BIGINT NOT NULL DEFAULT 0;
 
+-- Invalidate an open review when any displayed listing detail changes, including
+-- seller edits and stock changes made by checkout. Timestamps alone do not make
+-- a review stale. Keep this in the database so every write path participates.
+CREATE OR REPLACE FUNCTION advance_listing_review_version() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF ROW(OLD.farmer_id, OLD.name, OLD.location, OLD.quantity, OLD.unit,
+        OLD.price_per_unit, OLD.listed_for_sale, OLD.moderation_blocked)
+    IS DISTINCT FROM
+    ROW(NEW.farmer_id, NEW.name, NEW.location, NEW.quantity, NEW.unit,
+        NEW.price_per_unit, NEW.listed_for_sale, NEW.moderation_blocked) THEN
+  NEW.moderation_version := OLD.moderation_version + 1;
+ END IF;
+ RETURN NEW;
+END $$;
+CREATE OR REPLACE TRIGGER listing_review_version BEFORE UPDATE ON crops
+ FOR EACH ROW EXECUTE FUNCTION advance_listing_review_version();
+
 CREATE TABLE IF NOT EXISTS admin_audit_events (
  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
  actor_id INTEGER,

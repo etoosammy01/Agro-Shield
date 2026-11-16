@@ -65,7 +65,8 @@ func (s *AuthService) Register(firstName, lastName, phone, email, password, comm
 	if phone == "" {
 		return nil, errors.New("phone is required")
 	}
-	if NormalizeNigerianPhone(phone) == "" {
+	phone = NormalizeNigerianPhone(phone)
+	if phone == "" {
 		return nil, otp.ErrUnusablePhone
 	}
 	if password == "" {
@@ -184,7 +185,7 @@ func (s *AuthService) GetFarmerByID(id int) (*models.Farmer, error) {
 // account exists. The password-reset flow uses this to decide where to send a
 // one-time passcode, and deliberately does not tell the caller which case it got.
 func (s *AuthService) FindByPhone(phone string) (*models.Farmer, error) {
-	return s.repo.GetByPhone(strings.TrimSpace(phone))
+	return s.repo.GetByPhone(phone)
 }
 
 // RequestPhoneChange stages a phone replacement for verification. It does not

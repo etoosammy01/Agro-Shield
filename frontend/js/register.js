@@ -98,6 +98,16 @@ registerForm.addEventListener("submit", function (event) {
     return;
   }
 
+  const canonicalPhone = window.normalizeNigerianPhone(phone.value);
+  if (!canonicalPhone) {
+    event.preventDefault();
+    message.textContent = "Please enter a valid Nigerian mobile number.";
+    message.style.color = "red";
+    phone.focus();
+    return;
+  }
+  phone.value = canonicalPhone;
+
   // Validation passed — let the form submit for real to POST /register.
   button.disabled = true;
   button.textContent = "Creating Account...";
@@ -171,12 +181,10 @@ email.addEventListener("blur", () => {
 
 // ---------- Better Phone Validation ----------
 phone.addEventListener("blur", () => {
-    const phonePattern = /^\+?[0-9]{10,15}$/;
-    if (phone.value.trim() && !phonePattern.test(phone.value.trim())) {
-        message.textContent = "Please enter a valid phone number (10-15 digits, optional +).";
-        message.style.color = "red";
-        phone.focus();
-    }
+  if (phone.value.trim() && !window.normalizeNigerianPhone(phone.value)) {
+    message.textContent = "Please enter a valid Nigerian mobile number.";
+    message.style.color = "red";
+  }
 });
 
 // ---------- Better Name Validation ----------
