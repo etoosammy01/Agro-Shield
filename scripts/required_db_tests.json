@@ -418,5 +418,25 @@
   {
     "package": "backend/routes",
     "test": "TestDisputeRoutesEnforcePermissionsAndVersionedSettlement"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestStartupMigrationPreservesAmbiguousPhoneAccounts"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestStartupPhoneReservationsProtectOwnershipAndReleaseUnusedPhones"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestStartupPhoneReservationsSerializeConcurrentClaims"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestStartupPhoneReservationsUpgradeToUniqueIndexAfterResolution"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestStartupPhoneMigrationStillFailsOnDatabaseErrors"
   }
 ]
