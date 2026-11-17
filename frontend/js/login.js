@@ -48,6 +48,16 @@ loginForm.addEventListener("submit", function (event) {
     return;
   }
 
+  const canonicalPhone = window.normalizeNigerianPhone(phone.value);
+  if (!canonicalPhone) {
+    event.preventDefault();
+    message.textContent = "Please enter a valid Nigerian mobile number.";
+    message.style.color = "red";
+    phone.focus();
+    return;
+  }
+  phone.value = canonicalPhone;
+
   // Validation passed — let the form submit for real to POST /login.
   // The server checks the password and creates the session.
   button.disabled = true;
@@ -82,12 +92,10 @@ setInterval(changeBackground, 4000);
 
 // ---------- Better Phone Validation ----------
 phone.addEventListener("blur", () => {
-    const phonePattern = /^\+?[0-9]{10,15}$/;
-    if (phone.value.trim() && !phonePattern.test(phone.value.trim())) {
-        message.textContent = "Please enter a valid phone number.";
-        message.style.color = "red";
-        phone.focus();
-    }
+  if (phone.value.trim() && !window.normalizeNigerianPhone(phone.value)) {
+    message.textContent = "Please enter a valid Nigerian mobile number.";
+    message.style.color = "red";
+  }
 });
 
 // ---------- Password Length Check on Blur ----------

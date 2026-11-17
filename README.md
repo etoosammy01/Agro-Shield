@@ -676,6 +676,8 @@ Agro-Shield uses **PostgreSQL** as its database.
 
 The database layer is separated from application business logic through repositories.
 
+This backend initializes tables around `farmers` and `crops`. If your database contains the older `users`/`products` model and startup reports a missing `crop_id`, follow [Database schema setup and explicit legacy import](docs/DATABASE_SCHEMA_SETUP.md). The import command provides a read-only preflight and a verified, transactional copy into a separate application schema while retaining the source.
+
 Major data areas include:
 
 * Farmers/users
@@ -779,7 +781,7 @@ Depending on the enabled features, Agro-Shield may require environment variables
 | `FLUTTERWAVE_SECRET_KEY`  | Flutterwave API authentication |
 | `FLUTTERWAVE_SECRET_HASH` | Webhook verification           |
 | `PAYMENT_REDIRECT_URL`    | Flutterwave checkout callback  |
-| `WALLET_ADMIN_USER_IDS`   | Comma-separated user IDs allowed to review wallet withdrawals |
+| `WALLET_ADMIN_USER_IDS`   | Comma-separated user IDs with protected administrator and wallet approval access |
 | `OTPDEV_API_KEY`         | OTP.dev API authentication; enables SMS automatically |
 | `GEMINI_API_KEY`          | AI crop-diagnosis service      |
 | `GROQ_API_KEY`            | Primary learning AI provider   |
@@ -793,7 +795,11 @@ Depending on the enabled features, Agro-Shield may require environment variables
 
 Forwarded client-IP and protocol headers are ignored by default. If the application runs behind a reverse proxy, set `TRUST_PROXY_HEADERS=true` **and** list the proxy networks in `TRUSTED_PROXY_CIDRS`; startup fails if either side is configured without the other. The immediate network peer must match one of those CIDRs before `X-Forwarded-For` or `X-Forwarded-Proto` is honored. The in-memory rate limiter tracks each proxy/client IP separately but is per process; deployments with multiple application instances need a shared or edge limiter.
 
-Wallets use NGN in the first release. Wallet balances are created for new accounts and backfilled for existing accounts. Configure `WALLET_ADMIN_USER_IDS` with trusted account IDs (find IDs in the `farmers` table); leaving it empty disables in-app withdrawal approval. Configure the Flutterwave webhook at `/webhooks/flutterwave` for payment and transfer events, and ensure the Flutterwave account has transfers enabled. A transfer request that times out after being sent stays reserved and must be reconciled against its unique reference in Flutterwave before retrying or refunding.
+Wallets use NGN in the first release. Wallet balances are created for new accounts and backfilled for existing accounts. Configure the Flutterwave webhook at `/webhooks/flutterwave` for payment and transfer events, and ensure the Flutterwave account has transfers enabled. A transfer request that times out after being sent stays reserved and must be reconciled against its unique reference in Flutterwave before retrying or refunding.
+
+Configure `WALLET_ADMIN_USER_IDS` with trusted account IDs to bootstrap protected administrators with governance and wallet approval access. Existing `farmers.is_admin` flags grant wallet approval access only; leaving the configuration empty does not revoke stored permissions. Authorized staff can open **Profile → Admin console** to review users and listings. See [Administration and accountability](docs/ADMIN_GOVERNANCE.md) for the permission matrix, staff assignments, audit history, and upgrade guidance.
+
+For the complete implementation record, design decisions, changed-file inventory, and a walkthrough of every admin screen, read the [Role 6 implementation and admin user guide](ROLE_6_ADMIN_IMPLEMENTATION_AND_USER_GUIDE.md).
 
 Phone verification, order payments, transfers, withdrawals, and password resets use OTP.dev when `OTPDEV_API_KEY` is configured. The sender, template ID, and API URL are built in. Production requires real SMS delivery. See [OTP.dev setup](docs/otp-dev.md) for the verification flow and development behavior.
 

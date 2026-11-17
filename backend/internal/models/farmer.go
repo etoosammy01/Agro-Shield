@@ -21,6 +21,8 @@ type Farmer struct {
 	PhoneVerifiedAt     sql.NullTime
 	PendingPhone        sql.NullString
 	HasTransactionPIN   bool
+	SuspendedAt         sql.NullTime
+	SessionsRevokedAt   sql.NullTime
 
 	BankName      string
 	BankCode      string

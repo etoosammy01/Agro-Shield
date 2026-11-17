@@ -4,6 +4,7 @@
 
 # User-uploaded files
 uploads/
+private/
 
 # LibreOffice lock files
 .~lock.*#

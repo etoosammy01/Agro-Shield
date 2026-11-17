@@ -37,7 +37,7 @@
             <a href="/orders">Orders</a>
             <a href="/deliveries">Deliveries</a>
             <a href="/wallet">Wallet</a>
-            {{if .IsWalletAdmin}}<a href="/admin/wallet-withdrawals">Withdrawal approvals</a>{{end}}
+            {{if .CanAdmin}}<a href="/admin">Admin console</a>{{else if .IsWalletAdmin}}<a href="/admin/wallet-withdrawals">Withdrawal approvals</a>{{end}}
             <a href="/notifications">Notifications</a>
             <a href="/profile" aria-current="page">Profile</a>
             <a href="/logout">Logout</a>

@@ -1,0 +1,308 @@
+{
+  "date": "2026-11-16",
+  "branch": "feat/admin-governance",
+  "base_commit": "8bc0a90",
+  "scope": [
+    "AGRO-008",
+    "AGRO-019"
+  ],
+  "environment": {
+    "go": "1.25.0",
+    "postgresql": "16.15",
+    "previously_verified_postgresql": "18.6",
+    "data": "Disposable local database, isolated schemas, synthetic fixtures"
+  },
+  "go_test": {
+    "normal": {
+      "started_at": "2026-11-16T16:02:07.141766075Z",
+      "completed_at": "2026-11-16T16:05:13.011410769Z",
+      "passed_tests_and_subtests": 852,
+      "top_level_tests": 422,
+      "failed": 0,
+      "skipped": 0,
+      "required_database_tests": 81
+    },
+    "race": {
+      "started_at": "2026-11-16T16:06:37.23868664Z",
+      "completed_at": "2026-11-16T16:11:28.770152683Z",
+      "passed_tests_and_subtests": 852,
+      "top_level_tests": 422,
+      "failed": 0,
+      "skipped": 0,
+      "required_database_tests": 81
+    }
+  },
+  "go_vet": "passed",
+  "evidence_checker_unit_tests": {
+    "passed": 8
+  },
+  "browser": {
+    "passed": true,
+    "postgresql": "16.15",
+    "desktop_viewport": [
+      1440,
+      1040
+    ],
+    "mobile_viewport": [
+      390,
+      844
+    ],
+    "checks": [
+      "confirmation required",
+      "cancel and keyboard dismissal",
+      "suspend and reactivate",
+      "old sessions stay invalid",
+      "search",
+      "role assignment",
+      "listing block and restore",
+      "marketplace visibility",
+      "persistent audit",
+      "mobile overflow and dialogs",
+      "moderator permissions",
+      "visible text contrast",
+      "mobile account navigation",
+      "mobile touch targets and input sizing",
+      "dialog keyboard focus restoration"
+    ],
+    "javascript_errors": 0,
+    "additional_viewport_widths": [
+      320,
+      768,
+      1280
+    ],
+    "verified_on": "2026-11-15"
+  },
+  "screenshots": [
+    "overview.png",
+    "users.png",
+    "mobile-review.png"
+  ],
+  "note": "Complete standard and race suites passed with all 81 required database tests; final formatted-phone admin search passed focused race checks. The confirmed test duplicates were closed atomically with audit and phone standardization. Real browser sign-in to the retained admin passed four phone formats and reached its remaining profile setup. Core implementation commit: 1aba44c; continuation changes committed in db94ab1. Hosted push and PR CI passed for db94ab1. Cross-branch authentication/dispute integration, migration coordination, and independent review remain required before release; see docs/ROLE_6_DEPENDENCY_REVIEW.md.",
+  "targeted_template_tests": {
+    "passed": 2,
+    "note": "Run after the final interface refinements",
+    "verified_on": "2026-11-15"
+  },
+  "previous_go_test": {
+    "date": "2026-11-15",
+    "environment": {
+      "go": "1.25.0",
+      "postgresql": "16.15",
+      "previously_verified_postgresql": "18.6",
+      "data": "Disposable local database, isolated schemas, synthetic fixtures"
+    },
+    "runs": {
+      "normal": {
+        "started_at": "2026-11-15T03:59:30.617182253Z",
+        "completed_at": "2026-11-15T04:04:02.073426462Z",
+        "passed_tests_and_subtests": 804,
+        "top_level_tests": 410,
+        "failed": 0,
+        "skipped": 0,
+        "required_database_tests": 69
+      },
+      "race": {
+        "started_at": "2026-11-15T04:05:53.913886637Z",
+        "completed_at": "2026-11-15T04:10:43.044678863Z",
+        "passed_tests_and_subtests": 804,
+        "top_level_tests": 410,
+        "failed": 0,
+        "skipped": 0,
+        "required_database_tests": 69
+      }
+    }
+  },
+  "javascript_syntax": "passed",
+  "documentation_links": "passed",
+  "listing_review_regression": {
+    "test": "TestAdminListingReviewRejectsChangedDetails",
+    "passed_in": [
+      "normal",
+      "race"
+    ],
+    "checks": [
+      "seller edits invalidate block and restore reviews",
+      "checkout stock changes invalidate reviews",
+      "unchanged saves preserve reviews",
+      "repeatable upgrade preserves existing versions",
+      "fresh decisions increment once and create one audit record"
+    ]
+  },
+  "listing_review_only_go_test": {
+    "normal": {
+      "started_at": "2026-11-16T12:12:08.880248819Z",
+      "completed_at": "2026-11-16T12:15:10.258778232Z",
+      "passed_tests_and_subtests": 814,
+      "top_level_tests": 411,
+      "failed": 0,
+      "skipped": 0,
+      "required_database_tests": 70
+    },
+    "race": {
+      "started_at": "2026-11-16T12:16:16.123895381Z",
+      "completed_at": "2026-11-16T12:19:59.373213565Z",
+      "passed_tests_and_subtests": 814,
+      "top_level_tests": 411,
+      "failed": 0,
+      "skipped": 0,
+      "required_database_tests": 70
+    }
+  },
+  "legacy_migration": {
+    "implemented": true,
+    "verified_with_synthetic_fixtures": true,
+    "source_schema": "public",
+    "target_schema": "agro_shield_app",
+    "applied": true,
+    "application_status": "applied and verified",
+    "provider_calls_during_migration": 0,
+    "wallet_number_policy": "Preserve ten-digit numbers; generate canonical numbers for incompatible identifiers; retain exact originals and ownership privately; reject collisions.",
+    "version": "normalized-users-products-v1",
+    "source_fingerprint": "551c54e6a07c396bb18345e65d70a7aa1f226210a07d82a37b256e50e9f19888",
+    "source_preserved": true,
+    "wallet_number_mapping": {
+      "generated": 16,
+      "preserved": 0
+    },
+    "copied": {
+      "cart_items": 0,
+      "chat_messages": 2,
+      "conversation_members": 5,
+      "conversations": 3,
+      "crop_images": 8,
+      "crops": 6,
+      "deliveries": 0,
+      "diagnoses": 8,
+      "diagnosis_media": 0,
+      "external_market_prices": 0,
+      "farmers": 16,
+      "inventory_history": 0,
+      "lga_neighbors": 0,
+      "market_events": 76,
+      "marketplace_searches": 0,
+      "negotiation_messages": 3,
+      "negotiations": 1,
+      "notifications": 14,
+      "orders": 0,
+      "platform_revenue": 0,
+      "produce_price_history": 8,
+      "wallet_deposits": 11,
+      "wallet_transactions": 3,
+      "wallet_transfers": 0,
+      "wallet_virtual_accounts": 2,
+      "wallet_withdrawals": 0,
+      "wallets": 16,
+      "webhook_events": 0
+    },
+    "all_import_verification_checks_passed": true,
+    "import_verification_checks": 14,
+    "post_import_checks": {
+      "deposit_references_and_states": true,
+      "ledger_references": true,
+      "no_invented_staff_or_onboarding": true,
+      "no_restored_sessions_or_pins": true,
+      "one_completion_audit": true,
+      "original_wallet_identifiers": true,
+      "wallet_balances_and_owners": true
+    },
+    "source_wallet_balance_total": "0.00",
+    "target_wallet_balance_total": "0.00",
+    "startup_check": "go run . --check-database passed before providers and background jobs initialize",
+    "repeat_apply_noop": true,
+    "source_only_product_status_history_rows": 6
+  },
+  "role_6_requirements": {
+    "server_authorization": "Permission matrix, fresh database access checks, and direct/legacy route denial tested.",
+    "append_only_audit": "Governance transactions, wallet intent/results, actual status transitions, failure rollback, and UPDATE/DELETE/TRUNCATE rejection tested.",
+    "user_and_listing_management": "Search, pagination, staff assignment, suspension/reactivation, session revocation, marketplace restrictions, and stale/concurrent reviews tested.",
+    "admin_screens_and_confirmation": "Responsive role-aware screens, required review confirmation, cancellation, keyboard behavior, and mobile checks passed November 15.",
+    "privilege_and_privacy_regressions": "Ordinary users and wallet-only approvers cannot escalate; contact details and credentials are omitted; CSRF, malformed inputs, and stored HTML escaping tested.",
+    "imported_record_boundaries": "Existing credentials, wallet-only permissions, listing moderation, audit protection, inactive old sessions, and exact per-record financial copy checked in migration regressions."
+  },
+  "login_validation_followup": {
+    "date": "2026-11-16",
+    "account_found": true,
+    "migrated_credentials_preserved": true,
+    "change": "Accept common phone separators during browser validation while preserving the exact submitted account identifier.",
+    "valid_format_cases_accepted": 3,
+    "invalid_phone_cases_rejected": 3,
+    "browser_login_status": 303,
+    "redirect": "/verify-phone",
+    "javascript_errors": 0,
+    "diagnostic_browser_session_revoked": true,
+    "credential_data_in_saved_evidence": false,
+    "superseded_by": "canonical_phone_browser_followup"
+  },
+  "pre_cleanup_go_test": {
+    "normal": {
+      "started_at": "2026-11-16T13:54:00.161952398Z",
+      "completed_at": "2026-11-16T13:57:38.90975627Z",
+      "passed_tests_and_subtests": 836,
+      "top_level_tests": 417,
+      "failed": 0,
+      "skipped": 0,
+      "required_database_tests": 76
+    },
+    "race": {
+      "started_at": "2026-11-16T13:57:53.60665666Z",
+      "completed_at": "2026-11-16T14:01:16.630989518Z",
+      "passed_tests_and_subtests": 836,
+      "top_level_tests": 417,
+      "failed": 0,
+      "skipped": 0,
+      "required_database_tests": 76
+    }
+  },
+  "canonical_phone_directory_followup": {
+    "started_at": "2026-11-16T16:22:35.852765981Z",
+    "completed_at": "2026-11-16T16:22:45.531685535Z",
+    "passed_tests_and_subtests": 2,
+    "top_level_tests": 2,
+    "failed": 0,
+    "skipped": 0,
+    "race_enabled": true,
+    "note": "Focused checks after the final SQL change to canonical admin phone search: directory privacy/pagination and keeper lookup in all four phone formats."
+  },
+  "test_duplicate_cleanup": {
+    "verified_on": "2026-11-16",
+    "status": "applied and verified",
+    "keeper_id": 14,
+    "configured_administrator_preserved": true,
+    "closed_anonymized_ids": [
+      1,
+      4
+    ],
+    "test_deposits_removed": 4,
+    "test_ledger_rows_removed": 1,
+    "funding_accounts_removed": 0,
+    "cleanup_and_phone_migration_atomic": true,
+    "post_apply": {
+      "archived_accounts": 16,
+      "attributed_cleanup_audits": 2,
+      "closed_anonymized_duplicates": 2,
+      "duplicate_sessions_remaining": 0,
+      "duplicate_test_deposits_remaining": 0,
+      "duplicate_test_ledger_remaining": 0,
+      "keeper_deposits": 7,
+      "keeper_ledger": 2,
+      "keeper_listings": 2
+    },
+    "remaining_active_accounts": 14,
+    "duplicate_number_groups": 0,
+    "noncanonical_valid_contacts": 0,
+    "invalid_legacy_contacts_preserved": 3,
+    "existing_password_preserved": true,
+    "source_archive_untouched": true
+  },
+  "canonical_phone_browser_followup": {
+    "verified_on": "2026-11-16",
+    "validation_cases": 16,
+    "login_formats_succeeded": 4,
+    "canonical_submission": true,
+    "password_unchanged": true,
+    "redirect": "/complete-profile",
+    "javascript_errors": 0,
+    "diagnostic_sessions_logged_out": true,
+    "note": "Real retained-account sign-in; registration validation uses synthetic values and dispatches validation events without creating accounts. No credentials or session cookies are saved in evidence."
+  }
+}

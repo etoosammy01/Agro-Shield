@@ -7,6 +7,14 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent
 
+def discover_required_tests(backend):
+    discovered = set()
+    for path in backend.rglob("*integration_test.go"):
+        package = "backend/" + str(path.parent.relative_to(backend))
+        for name in re.findall(r"^func (Test\w+)\(t \*testing.T\)", path.read_text(), re.MULTILINE):
+            discovered.add((package, name))
+    return discovered
+
 def verify(events, required):
     terminals = {}
     packages = {}
@@ -38,11 +46,7 @@ def verify(events, required):
 
 if __name__ == "__main__":
     required = json.loads((ROOT / "required_db_tests.json").read_text())
-    discovered = set()
-    for path in (ROOT.parent / "backend" / "internal").rglob("*integration_test.go"):
-        package = "backend/" + str(path.parent.relative_to(ROOT.parent / "backend"))
-        for name in re.findall(r"^func (Test\w+)\(t \*testing.T\)", path.read_text(), re.MULTILINE):
-            discovered.add((package, name))
+    discovered = discover_required_tests(ROOT.parent / "backend")
     listed = {(item["package"], item["test"]) for item in required}
     if not listed or listed != discovered or len(listed) != len(required):
         sys.exit("required database test manifest is empty, duplicated, or differs from integration test sources")

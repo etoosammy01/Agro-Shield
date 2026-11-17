@@ -101,7 +101,7 @@ func TestPhoneVerificationAtomicConsumptionAndPhoneChange(t *testing.T) {
 	if !stored.PhoneVerifiedAt.Valid {
 		t.Fatal("unchanged phone lost verification")
 	}
-	newPhone := f.Phone + "1"
+	newPhone := "2348100000001"
 	if err := farmers.StagePhoneChange(ctx, f.ID, newPhone); err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +177,7 @@ func TestPhoneVerificationRejectsExpiredExhaustedAndMismatchedChallenges(t *test
 	}{
 		{"expired", time.Now().Add(-time.Minute), 0, f.Phone},
 		{"exhausted", time.Now().Add(time.Minute), 5, f.Phone},
-		{"different phone", time.Now().Add(time.Minute), 0, f.Phone + "1"},
+		{"different phone", time.Now().Add(time.Minute), 0, "2348100000001"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var id int64

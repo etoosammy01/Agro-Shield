@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"backend/internal/models"
+	"backend/internal/onboarding"
 	"backend/internal/otp"
 	"backend/middleware"
 )
@@ -57,6 +58,35 @@ func TestPhoneVerificationCannotSkipSelfie(t *testing.T) {
 	w, _ := onboardingRequest(t, &models.Farmer{ID: 10}, NewVerifyPhoneHandler(o).Handler, "POST", "/verify-phone", url.Values{"action": {"send_code"}})
 	if w.Header().Get("Location") != "/complete-profile" || o.issues != 0 {
 		t.Fatal("phone verification allowed before selfie")
+	}
+}
+
+func TestDevelopmentOnboardingPagesRedirectWithoutSelfieOrSMS(t *testing.T) {
+	onboarding.Configure(true, []int{14})
+	t.Cleanup(func() { onboarding.Configure(false, nil) })
+	farmer := &models.Farmer{ID: 14}
+	otp := &onboardingOTP{}
+	for _, method := range []string{"GET", "POST"} {
+		for _, page := range []struct {
+			path    string
+			handler http.HandlerFunc
+		}{
+			{"/complete-profile", NewCompleteProfileHandler(nil).Handler},
+			{"/verify-phone", NewVerifyPhoneHandler(otp).Handler},
+		} {
+			w, _ := onboardingRequest(t, farmer, page.handler, method, page.path, url.Values{"action": {"send_code"}})
+			if w.Code != 303 || w.Header().Get("Location") != "/dashboard" {
+				t.Fatalf("%s %s still required onboarding: %d", method, page.path, w.Code)
+			}
+		}
+	}
+	if otp.issues != 0 || otp.verifications != 0 || farmer.SelfieCapturedAt.Valid || farmer.PhoneVerifiedAt.Valid {
+		t.Fatal("skipped pages issued an OTP or fabricated verification")
+	}
+	onboarding.Configure(false, nil)
+	w, _ := onboardingRequest(t, farmer, NewCompleteProfileHandler(nil).Handler, "GET", "/complete-profile", nil)
+	if w.Code != 200 {
+		t.Fatal("selfie page could not be restored")
 	}
 }
 

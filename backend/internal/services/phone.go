@@ -1,6 +1,6 @@
 package services
 
-import "backend/internal/otp"
+import phoneformat "backend/internal/phone"
 
 // Nigerian phone numbers are written several ways in the wild — "08012345678",
 // "+2348012345678", "234 801 234 5678" — but SMS gateways and wallet recipient
@@ -11,5 +11,5 @@ import "backend/internal/otp"
 // treat an empty result as "not a valid number" rather than sending a bad
 // request downstream.
 func NormalizeNigerianPhone(phone string) string {
-	return otp.NormalizePhone(phone)
+	return phoneformat.Normalize(phone)
 }

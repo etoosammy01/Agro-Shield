@@ -28,6 +28,10 @@ type Config struct {
 	// Application
 	Port   string
 	AppEnv string
+	// Temporary local onboarding skip. User IDs narrow it to selected accounts;
+	// an empty list covers every development account. Production rejects it.
+	DevSkipOnboarding    bool
+	DevOnboardingUserIDs []int
 
 	// TrustProxyHeaders must only be enabled when a trusted reverse proxy
 	// overwrites X-Forwarded-For. TrustedProxyCIDRs are the networks from which
@@ -194,6 +198,25 @@ func Load() (Config, error) {
 
 	if cfg.AppEnv == "" {
 		cfg.AppEnv = "development"
+	}
+	if raw := strings.TrimSpace(os.Getenv("DEV_SKIP_ONBOARDING")); raw != "" {
+		enabled, err := strconv.ParseBool(raw)
+		if err != nil {
+			return Config{}, fmt.Errorf("DEV_SKIP_ONBOARDING must be true or false")
+		}
+		cfg.DevSkipOnboarding = enabled
+	}
+	if cfg.DevSkipOnboarding && !strings.EqualFold(cfg.AppEnv, "development") {
+		return Config{}, fmt.Errorf("DEV_SKIP_ONBOARDING requires APP_ENV=development")
+	}
+	if raw := strings.TrimSpace(os.Getenv("DEV_ONBOARDING_USER_IDS")); raw != "" {
+		for _, item := range strings.Split(raw, ",") {
+			id, err := strconv.Atoi(strings.TrimSpace(item))
+			if err != nil || id <= 0 {
+				return Config{}, fmt.Errorf("DEV_ONBOARDING_USER_IDS must contain positive user IDs")
+			}
+			cfg.DevOnboardingUserIDs = append(cfg.DevOnboardingUserIDs, id)
+		}
 	}
 
 	// An API key enables OTP.dev automatically; development without a key uses logs.

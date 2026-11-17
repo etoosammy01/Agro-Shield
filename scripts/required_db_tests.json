@@ -238,5 +238,185 @@
   {
     "package": "backend/internal/repository",
     "test": "TestConsumeAndApplyPhoneChangeConcurrentPhoneClaim"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestAdminGovernancePermissionsAndProtectedAccounts"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestAdminSuspensionRevokesSessionsAndRequiresFreshLogin"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestAdminChangesRollBackWhenAuditCannotBeWritten"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestAdminAuditIsAppendOnlyAndMigrationIsRepeatable"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestAdminModerationAndSuspensionBlockPurchaseEntryPoints"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestAdminConcurrentDecisionsProduceOneChangeAndAudit"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestAdminListingReviewRejectsChangedDetails"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestAdminWalletAuditTracksRequestsAndCommittedDecisions"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestAdminDirectoryPaginationAndSensitiveDataMinimization"
+  },
+  {
+    "package": "backend/routes",
+    "test": "TestAdminRoutesRejectUnprivilegedAndCrossSiteRequests"
+  },
+  {
+    "package": "backend/routes",
+    "test": "TestDevelopmentOnboardingLoginReachesDashboardAndKeepsAdminPermissions"
+  },
+  {
+    "package": "backend/internal/testdb",
+    "test": "TestSchemaSelectionAppliesToEveryPooledConnection"
+  },
+  {
+    "package": "backend/internal/legacymigration",
+    "test": "TestLegacyMigrationPreservesRecordsAndRole6Boundaries"
+  },
+  {
+    "package": "backend/internal/legacymigration",
+    "test": "TestLegacyMigrationRollsBackAndCanRetry"
+  },
+  {
+    "package": "backend/internal/legacymigration",
+    "test": "TestLegacyMigrationRejectsAmbiguityAndSnapshotChanges"
+  },
+  {
+    "package": "backend/internal/legacymigration",
+    "test": "TestLegacyWalletNumberConversionPreservesOwnership"
+  },
+  {
+    "package": "backend/internal/legacymigration",
+    "test": "TestLegacyMigrationSerializesConcurrentImports"
+  },
+  {
+    "package": "backend/internal/services",
+    "test": "TestAuthPhoneFormatsShareOneAccountWithoutChangingPassword"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestTestDuplicateCleanupPreservesAdminAndClosesOnlyDuplicates"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestTestDuplicateCleanupRollsBackAndProtectsAccounts"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestPhoneStandardMigrationRefusesAmbiguityAndMatchesNormalizer"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestCanonicalPhoneConcurrentRegistrationAndLegacyUniqueness"
+  },
+  {
+    "package": "backend/routes",
+    "test": "TestAdminPersistentLoginAcrossInstancesAndRevocation"
+  },
+  {
+    "package": "backend/routes",
+    "test": "TestWalletRepairSelectionIsReadOnlyAndRequiresWalletAccess"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestAdminDisputeReviewAccessAndConcurrentRevocation"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestAdminDisputeAuditBridgeIsAtomicAndAppendOnly"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestSessionLoginRevisionAndTimezoneIndependentExpiry"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestPasswordResetAtomicallyRevokesSessions"
+  },
+  {
+    "package": "backend/routes",
+    "test": "TestAdminPasswordResetRevokesLoginsAcrossInstances"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestApproveQualityRefundRequiresBuyerVideoEvidence"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestApproveRefundValidatesAmountAndPreventsDuplicate"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestConcurrentDisputeSubmissionsCreateOnlyOneActiveDispute"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestCreateOrderDisputeAndPreventDuplicateActive"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestDisputeDecisionsRejectStaleSelfAndRevokedReviewers"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestEscrowRefundConservesFundsAndConcurrentRetries"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestEscrowSequentialRefundsRespectRemainingValue"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestOrderDisputeEnforcesBuyerAndPaymentOwnership"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestOrderDisputeSellerResponseAndAdminRejection"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestRefundMigrationPreservesLegacyRecordsAndRejectsAmbiguity"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestRefundSettlementRollsBackWithAuditAndCanRetry"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestSuccessfulRefundSettlementResolvesDispute"
+  },
+  {
+    "package": "backend/internal/repository",
+    "test": "TestUnfundedRefundRemainsReviewableAndRetryIsDeduplicated"
+  },
+  {
+    "package": "backend/routes",
+    "test": "TestDisputeEvidenceIsPrivateValidatedAndTamperChecked"
+  },
+  {
+    "package": "backend/routes",
+    "test": "TestDisputeFormsSupportWithdrawalAndReceiptConfirmation"
+  },
+  {
+    "package": "backend/routes",
+    "test": "TestDisputeRoutesEnforcePermissionsAndVersionedSettlement"
   }
 ]

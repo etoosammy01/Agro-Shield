@@ -7,7 +7,7 @@
     <meta name="color-scheme" content="dark">
     <title>Wallet Approvals — Agro-Shield</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/wallet.css">
+    <link rel="stylesheet" href="/static/css/wallet.css?v=20261116-repair-account">
 </head>
 <body class="wallet-admin-body">
     <a class="admin-skip" href="#admin-main">Skip to content</a>
@@ -26,6 +26,7 @@
                 </a>
             </div>
             <nav class="admin-nav" aria-label="Admin sections">
+                {{if .CanGovernance}}<a class="admin-nav-link" href="/admin"><span aria-hidden="true">↗</span><span>Community console</span></a>{{end}}
                 <a class="admin-nav-link is-active" href="#overview">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
                     <span>Overview</span>
@@ -53,6 +54,10 @@
                 <a class="admin-nav-link" href="#revenue">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg>
                     <span>Revenue</span>
+                </a>
+                <a class="admin-nav-link" href="#wallet-repair">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18v13H3z"/><path d="M3 7V4h15v3"/><path d="M16 12h5v4h-5z"/></svg>
+                    <span>Wallet repair</span>
                 </a>
             </nav>
             <div class="admin-account">
@@ -286,7 +291,7 @@
                 <div class="admin-section-head">
                     <div>
                         <h2>Wallet admins</h2>
-                        <p class="admin-section-note">Everyone listed here can open this page and approve requests. An admin needs one other admin to remove them, and a name marked “configured” comes from the server settings, so it can only be removed there.</p>
+                        <p class="admin-section-note">These accounts can review wallet requests. Administrators manage approval access in the user directory, where every change requires a reason and is recorded.</p>
                     </div>
                     <span class="admin-section-count">{{len .Admins}} accounts</span>
                 </div>
@@ -297,29 +302,17 @@
                         <div>
                             <strong>{{.FullName}}</strong>
                             <span class="wallet-name-check-detail">(#{{.FarmerID}})</span>
-                            {{if .Phone}}<br><span class="wallet-name-check-detail">{{.Phone}}</span>{{end}}
                         </div>
                         {{if .FromConfig}}
                         <span class="wallet-status">Configured</span>
                         {{else if eq .FarmerID $.AdminID}}
                         <span class="wallet-status">You</span>
-                        {{else}}
-                        <form method="POST" action="/admin/wallet-admins" data-confirm="Remove admin access for {{.FullName}}?">
-                            <input type="hidden" name="action" value="remove">
-                            <input type="hidden" name="farmer_id" value="{{.FarmerID}}">
-                            <button class="admin-btn admin-btn-danger" type="submit">Remove</button>
-                        </form>
                         {{end}}
                     </li>
                     {{end}}
                 </ul>
                 {{else}}<p class="wallet-empty">No admin accounts are listed.</p>{{end}}
-                <form method="POST" action="/admin/wallet-admins" class="wallet-admin-add">
-                    <input type="hidden" name="action" value="add">
-                    <label for="admin-phone">Phone number of the account to make an admin</label>
-                    <input id="admin-phone" type="tel" name="phone" inputmode="tel" autocomplete="off" placeholder="08012345678">
-                    <button class="admin-btn admin-btn-primary" type="submit">Make admin</button>
-                </form>
+                {{if .CanManageRoles}}<a class="admin-btn admin-btn-primary" href="/admin/users">Manage approval access</a>{{else}}<p class="admin-section-note">Contact an administrator to change approval access.</p>{{end}}
 
                 <div class="admin-settings">
                     <div class="admin-settings-block">
@@ -376,14 +369,22 @@
                             Recreates a missing wallet for an existing account, for example an
                             account that predates the wallets table. It creates an empty NGN wallet
                             and never changes a balance, so it is safe to repeat. It cannot be used
-                            for a user id that does not exist.
+                            for an account ID that does not exist.
                         </p>
                     </div>
+                    {{if .CanGovernance}}<a class="admin-btn admin-btn-ghost" href="/admin/users">Find account ID <span aria-hidden="true">↗</span></a>{{end}}
                 </div>
-                <form method="POST" action="/admin/wallets/repair">
-                    <label for="repair-user-id">User ID</label>
-                    <input id="repair-user-id" type="number" name="user_id" min="1" required>
-                    <button type="submit">Repair wallet</button>
+                <p id="repair-user-help" class="admin-section-note wallet-repair-help">
+                    {{if .RepairUserID}}Account ID #{{.RepairUserID}} selected.{{end}}
+                    {{if .CanGovernance}}Search the user directory by name or full phone number. Each member’s account ID is shown below their name; choose “Select for wallet repair” to fill this form.{{else}}Ask a community administrator for the member’s account ID before repairing their wallet.{{end}}
+                    {{if and .CanGovernance .RepairUserID}}<a href="/admin/users?q={{.RepairUserID}}">Review selected account</a>{{end}}
+                </p>
+                <form class="wallet-repair-form" method="POST" action="/admin/wallets/repair">
+                    <label class="admin-field-label" for="repair-user-id">Account ID</label>
+                    <div class="wallet-repair-controls">
+                        <input class="admin-input" id="repair-user-id" type="number" name="user_id" min="1" step="1" placeholder="Enter account ID" {{if .RepairUserID}}value="{{.RepairUserID}}"{{end}} aria-describedby="repair-user-help" required>
+                        <button class="admin-btn admin-btn-primary" type="submit">Repair wallet</button>
+                    </div>
                 </form>
             </section>
         </main>

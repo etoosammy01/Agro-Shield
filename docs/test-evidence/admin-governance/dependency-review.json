@@ -1,0 +1,94 @@
+{
+  "commit": "db94ab10cf291442485b220110513b39129f2a3f",
+  "postgresql": "16.15",
+  "go": "1.25.0",
+  "encoding": "UTF8",
+  "timezone": "UTC",
+  "checks": {
+    "focused": {
+      "exit_code": 0,
+      "seconds": 317.33
+    },
+    "vet": {
+      "exit_code": 0,
+      "seconds": 92.45
+    },
+    "evidence_checker_tests": {
+      "exit_code": 0,
+      "seconds": 0.87
+    },
+    "javascript_admin": {
+      "exit_code": 0,
+      "seconds": 0.24
+    },
+    "javascript_phone": {
+      "exit_code": 0,
+      "seconds": 0.29
+    },
+    "javascript_login": {
+      "exit_code": 0,
+      "seconds": 0.27
+    },
+    "javascript_register": {
+      "exit_code": 0,
+      "seconds": 0.11
+    }
+  },
+  "focused_summary": {
+    "top_level_tests": 30,
+    "test_and_subtest_results": 46,
+    "passed": 46,
+    "failed": 0,
+    "skipped": 0
+  },
+  "date": "2026-11-16",
+  "scope": "Focused admin/session component and route regressions; current implementation branch only",
+  "race_enabled": false,
+  "initial_full_local_attempt": {
+    "exit_code": 143,
+    "stage": "Compilation",
+    "completed_test_results": 0
+  },
+  "evidence_checker_unit_tests": 8,
+  "hosted_ci": [
+    {
+      "event": "push",
+      "conclusion": "success",
+      "url": "https://github.com/etoosammy01/Agro-Shield/actions/runs/43908644458"
+    },
+    {
+      "event": "pull_request",
+      "conclusion": "success",
+      "url": "https://github.com/etoosammy01/Agro-Shield/actions/runs/43908933001"
+    }
+  ],
+  "pull_request": {
+    "number": 9,
+    "state": "open",
+    "submitted_reviews": 0,
+    "checked_on": "2026-11-16",
+    "url": "https://github.com/etoosammy01/Agro-Shield/pull/9"
+  },
+  "dependencies": {
+    "member_2": {
+      "persistent_session_branch": "b4757b2c21bf6f033d5fa0187af0329eef655e5b",
+      "merged": false,
+      "active_http_sessions": "process-local",
+      "integration": "outstanding"
+    },
+    "member_5": {
+      "branch": "ffa244173f82e8b818132250b68c3fe929c623cd",
+      "merged": false,
+      "authorization": "wallet IsAdmin rather than disputes.review",
+      "governance_audit_integration": "outstanding"
+    },
+    "member_8": {
+      "branch": "aae4def3924b8e14c6e19096f871c12dc46a8c28",
+      "merged": true,
+      "test_infrastructure": "available",
+      "schema_owner_review": "unrecorded",
+      "historical_timestamp_conversion": "gated"
+    }
+  },
+  "documentation_links": "passed"
+}

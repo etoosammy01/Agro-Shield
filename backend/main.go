@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"log"
 	"net/http"
 	"os"
@@ -13,6 +14,7 @@ import (
 	app "backend/internal"
 	"backend/internal/config"
 	"backend/internal/database"
+	"backend/internal/onboarding"
 	"backend/internal/otp"
 	"backend/internal/repository"
 	"backend/internal/services"
@@ -22,11 +24,14 @@ import (
 )
 
 func main() {
+	checkDatabase := flag.Bool("check-database", false, "verify startup migrations and exit before providers or background jobs start")
+	flag.Parse()
 	// Load application configuration once at startup.
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal(err)
 	}
+	onboarding.Configure(cfg.DevSkipOnboarding, cfg.DevOnboardingUserIDs)
 
 	// ============================================================
 	// 1. CONNECT TO DATABASE
@@ -47,6 +52,10 @@ func main() {
 	}
 	if err := database.RunSessionMigration(db); err != nil {
 		log.Fatal(err)
+	}
+	if *checkDatabase {
+		log.Println("Database startup migrations verified; check mode complete")
+		return
 	}
 
 	// ============================================================
@@ -296,6 +305,7 @@ func main() {
 	}
 	welcomeEmail := services.NewWelcomeEmailService(emailSender)
 
+	container.Admin = repository.NewAdminRepository(db, walletAdminIDs)
 	routes.RegisterRoutes(container, welcomeEmail)
 	// Health checks are deliberately outside the application router so they
 	// remain cheap and are not affected by page-level middleware decisions.
@@ -336,6 +346,7 @@ func main() {
 	reconcileCtx, stopReconciliation := context.WithCancel(context.Background())
 	defer stopReconciliation()
 	go container.Wallet.RunReconciliation(reconcileCtx, services.DefaultReconciliationInterval)
+	go container.Sessions.RunCleanup(reconcileCtx, time.Hour)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,

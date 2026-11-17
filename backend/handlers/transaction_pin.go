@@ -73,10 +73,10 @@ func (h *TransactionPINSetup) Handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TransactionPINSetup) finish(w http.ResponseWriter, r *http.Request) {
-	if sessionID, ok := middleware.SessionIDFromRequest(r); ok {
-		middleware.DeleteSession(sessionID)
+	if err := middleware.EndSession(w, r); err != nil {
+		http.Error(w, "PIN saved, but unable to sign out. Please try again.", http.StatusServiceUnavailable)
+		return
 	}
-	middleware.ClearSessionCookie(w, r)
 	http.Redirect(w, r, "/login?onboarded=1", http.StatusSeeOther)
 }
 

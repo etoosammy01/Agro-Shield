@@ -24,7 +24,7 @@
     </header>
 
     <main class="wallet-page"
-        data-wallet-balance="{{.Wallet.Balance}}"
+        data-wallet-balance="{{.Wallet.AvailableBalance}}"
         data-wallet-currency="{{.Wallet.Currency}}"
         data-latest-transaction-id="{{.LatestTransactionID}}"
         data-latest-deposit-id="{{.LatestDepositID}}"
@@ -35,8 +35,8 @@
                 <h1>Your wallet</h1>
                 <p>One simple place to add funds, pay for produce, and manage payouts.</p>
                 <div class="wallet-balance">
-                    <span>Available balance</span>
-                    <strong><span class="wallet-currency">₦</span>{{money .Wallet.Balance}}</strong>
+                    <span>Available balance</span><small>Held for orders: ₦{{money .Wallet.HeldBalance}}</small>
+                    <strong><span class="wallet-currency">₦</span>{{money .Wallet.AvailableBalance}}</strong>
                     <small>{{.Wallet.Currency}} · ready to use</small>
                 </div>
                 {{if .WalletNumber}}
@@ -62,7 +62,7 @@
             <div class="wallet-hero-art" aria-hidden="true">
                 <span class="wallet-art-sparkle">✦</span>
                 <span class="wallet-art-leaf">✿</span>
-                <div class="wallet-art-card"><span>AGRO-SHIELD</span><strong>₦ {{money .Wallet.Balance}}</strong><small>WALLET · {{.Wallet.Currency}}</small></div>
+                <div class="wallet-art-card"><span>AGRO-SHIELD</span><strong>₦ {{money .Wallet.AvailableBalance}}</strong><small>WALLET · {{.Wallet.Currency}}</small></div>
                 <span class="wallet-art-dot"></span>
             </div>
         </section>

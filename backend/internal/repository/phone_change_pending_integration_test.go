@@ -16,7 +16,7 @@ func TestStagePhoneChangeStagesPendingNumber(t *testing.T) {
 	repo := NewFarmerRepository(db)
 	otpRepo := NewOTPRepository(db)
 	ctx := context.Background()
-	newPhone := farmer.Phone + "1"
+	newPhone := "2348100000001"
 
 	if err := repo.StagePhoneChange(ctx, farmer.ID, newPhone); err != nil {
 		t.Fatalf("stage phone change: %v", err)
@@ -45,7 +45,7 @@ func TestStagePhoneChangeRejectsOwnedNumber(t *testing.T) {
 	owner := createTestUser(t, db)
 	repo := NewFarmerRepository(db)
 	ctx := context.Background()
-	newPhone := farmer.Phone + "1"
+	newPhone := "2348100000001"
 
 	if err := repo.StagePhoneChange(ctx, farmer.ID, newPhone); err != nil {
 		t.Fatalf("stage phone change: %v", err)
@@ -71,8 +71,8 @@ func TestStagePhoneChangeReplacesPendingNumberAndInvalidatesOtp(t *testing.T) {
 	repo := NewFarmerRepository(db)
 	otpRepo := NewOTPRepository(db)
 	ctx := context.Background()
-	firstPhone := farmer.Phone + "1"
-	secondPhone := farmer.Phone + "2"
+	firstPhone := "2348100000001"
+	secondPhone := "2348100000002"
 
 	if err := repo.StagePhoneChange(ctx, farmer.ID, firstPhone); err != nil {
 		t.Fatalf("stage first phone change: %v", err)
@@ -112,7 +112,7 @@ func TestStagePhoneChangeRestagesSameNumberKeepsOtpActive(t *testing.T) {
 	repo := NewFarmerRepository(db)
 	otpRepo := NewOTPRepository(db)
 	ctx := context.Background()
-	newPhone := farmer.Phone + "1"
+	newPhone := "2348100000001"
 
 	if err := repo.StagePhoneChange(ctx, farmer.ID, newPhone); err != nil {
 		t.Fatalf("stage phone change: %v", err)
@@ -149,7 +149,7 @@ func TestCancelPhoneChangeClearsPendingAndInvalidatesOtp(t *testing.T) {
 	repo := NewFarmerRepository(db)
 	otpRepo := NewOTPRepository(db)
 	ctx := context.Background()
-	newPhone := farmer.Phone + "1"
+	newPhone := "2348100000001"
 
 	if err := repo.StagePhoneChange(ctx, farmer.ID, newPhone); err != nil {
 		t.Fatalf("stage phone change: %v", err)

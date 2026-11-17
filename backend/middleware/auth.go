@@ -20,18 +20,48 @@ const farmerContextKey contextKey = "farmer"
 
 const sessionCookieName = "agroshield_session"
 
+type sessionRevoker interface {
+	Revoke(context.Context, string) error
+}
+
+type sessionBackendContextKey struct{}
+
+// EndSession uses the backend that authenticated this request. The legacy
+// path remains for existing component tests; live routes use Authenticator.
+func EndSession(w http.ResponseWriter, r *http.Request) error {
+	if token, ok := SessionIDFromRequest(r); ok {
+		if backend, ok := r.Context().Value(sessionBackendContextKey{}).(sessionRevoker); ok {
+			if err := backend.Revoke(r.Context(), token); err != nil {
+				return err
+			}
+		} else {
+			DeleteSession(token)
+		}
+	}
+	ClearSessionCookie(w, r)
+	return nil
+}
+
+func ForgetFarmerPresence(farmerID int) {
+	store.mu.Lock()
+	delete(store.lastSeen, farmerID)
+	store.mu.Unlock()
+}
+
 // In-memory session store: sessionID -> farmerID.
 // Good enough for a single-server setup. If you later scale to multiple
 // server instances, swap this for a shared store (e.g. Redis).
 type sessionStore struct {
-	mu       sync.RWMutex
-	sessions map[string]int
-	lastSeen map[int]time.Time
+	mu           sync.RWMutex
+	sessions     map[string]int
+	lastSeen     map[int]time.Time
+	revocationAt map[string]time.Time
 }
 
 var store = &sessionStore{
-	sessions: make(map[string]int),
-	lastSeen: make(map[int]time.Time),
+	sessions:     make(map[string]int),
+	lastSeen:     make(map[int]time.Time),
+	revocationAt: make(map[string]time.Time),
 }
 
 const onlineWindow = 60 * time.Second
@@ -43,10 +73,17 @@ func newSessionID() string {
 }
 
 // CreateSession creates a new session for a farmer and returns the session ID.
-func CreateSession(farmerID int) string {
+func CreateSession(farmerID int, revokedAt ...time.Time) string {
 	id := newSessionID()
 	store.mu.Lock()
 	store.sessions[id] = farmerID
+	// Capture the account revision read during authentication. A login racing
+	// with suspension must not regain access when that account is reactivated.
+	var revision time.Time
+	if len(revokedAt) > 0 {
+		revision = revokedAt[0]
+	}
+	store.revocationAt[id] = revision
 	store.mu.Unlock()
 	return id
 }
@@ -56,6 +93,7 @@ func DeleteSession(sessionID string) {
 	store.mu.Lock()
 	farmerID, exists := store.sessions[sessionID]
 	delete(store.sessions, sessionID)
+	delete(store.revocationAt, sessionID)
 	if exists {
 		hasAnotherSession := false
 		for _, sessionFarmerID := range store.sessions {
@@ -79,6 +117,7 @@ func DeleteFarmerSessions(farmerID int) {
 	for sessionID, sessionFarmerID := range store.sessions {
 		if sessionFarmerID == farmerID {
 			delete(store.sessions, sessionID)
+			delete(store.revocationAt, sessionID)
 		}
 	}
 	delete(store.lastSeen, farmerID)
@@ -105,6 +144,12 @@ func getFarmerIDForSession(sessionID string) (int, bool) {
 	defer store.mu.RUnlock()
 	id, ok := store.sessions[sessionID]
 	return id, ok
+}
+
+func sessionRevocationChanged(sessionID string, cutoff time.Time) bool {
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+	return !store.revocationAt[sessionID].Equal(cutoff)
 }
 
 // SetSessionCookie writes the session cookie on login.
@@ -179,6 +224,13 @@ func RequireAuth(repo farmerReader, next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
+		if farmer.SuspendedAt.Valid || (farmer.SessionsRevokedAt.Valid && sessionRevocationChanged(sessionID, farmer.SessionsRevokedAt.Time)) {
+			DeleteSession(sessionID)
+			ClearSessionCookie(w, r)
+			http.Error(w, "Account access unavailable. Please sign in again or contact support.", http.StatusForbidden)
+			return
+		}
+
 		if r.URL.Path != "/complete-profile" && r.URL.Path != "/verify-phone" && r.URL.Path != "/create-transaction-pin" && !services.HasCompletedProfile(farmer) {
 			http.Redirect(w, r, services.OnboardingPath(farmer), http.StatusSeeOther)
 			return
@@ -220,6 +272,10 @@ func (a *Authenticator) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		// Validate checks the hashed token against persistent session storage.
+		if a.sessions == nil {
+			http.Error(w, "Unable to verify session", http.StatusServiceUnavailable)
+			return
+		}
 		farmerID, err := a.sessions.Validate(r.Context(), token)
 
 		if errors.Is(err, session.ErrNotFound) {
@@ -229,7 +285,7 @@ func (a *Authenticator) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 		}
 		// A database failure is different from an invalid session.
 		if err != nil {
-			http.Error(w, "Unable to verify session", http.StatusInternalServerError)
+			http.Error(w, "Unable to verify session", http.StatusServiceUnavailable)
 			return
 		}
 
@@ -241,6 +297,26 @@ func (a *Authenticator) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		// Preserve the existing onboarding restrictions.
+		if farmer.SuspendedAt.Valid {
+			ClearSessionCookie(w, r)
+			http.Error(w, "Account suspended. Contact support.", http.StatusForbidden)
+			return
+		}
+		// A suspension/reactivation may have committed between token validation
+		// and account lookup. Recheck the stored revision before allowing access.
+		if farmer.SessionsRevokedAt.Valid {
+			id, err := a.sessions.Validate(r.Context(), token)
+			if errors.Is(err, session.ErrNotFound) || (err == nil && id != farmer.ID) {
+				ClearSessionCookie(w, r)
+				http.Redirect(w, r, "/login", http.StatusSeeOther)
+				return
+			}
+			if err != nil {
+				http.Error(w, "Unable to verify session", http.StatusServiceUnavailable)
+				return
+			}
+		}
+
 		if r.URL.Path != "/complete-profile" &&
 			r.URL.Path != "/verify-phone" &&
 			r.URL.Path != "/create-transaction-pin" &&
@@ -253,6 +329,7 @@ func (a *Authenticator) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 
 		// Make the authenticated farmer available to the next handler.
 		ctx := context.WithValue(r.Context(), farmerContextKey, farmer)
+		ctx = context.WithValue(ctx, sessionBackendContextKey{}, a.sessions)
 		next(w, r.WithContext(ctx))
 	}
 }

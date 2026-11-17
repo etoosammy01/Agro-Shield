@@ -17,10 +17,15 @@ type Profile struct {
 	order   *services.OrderService
 	farmers *repository.FarmerRepository
 	wallet  *services.WalletService
+	admin   *repository.AdminRepository
 }
 
-func NewProfileHandler(crop *services.CropService, order *services.OrderService, farmers *repository.FarmerRepository, wallet *services.WalletService) *Profile {
-	return &Profile{crop: crop, order: order, farmers: farmers, wallet: wallet}
+func NewProfileHandler(crop *services.CropService, order *services.OrderService, farmers *repository.FarmerRepository, wallet *services.WalletService, admin ...*repository.AdminRepository) *Profile {
+	h := &Profile{crop: crop, order: order, farmers: farmers, wallet: wallet}
+	if len(admin) > 0 {
+		h.admin = admin[0]
+	}
+	return h
 }
 
 // ProfilePageData embeds the farmer/buyer so the template can use .FullName,
@@ -29,6 +34,7 @@ type ProfilePageData struct {
 	*models.Farmer
 	IsOwner       bool
 	IsWalletAdmin bool
+	CanAdmin      bool
 	Error         string
 	Success       string
 	Crops         []models.Crop
@@ -44,6 +50,7 @@ func (h *Profile) ProfileHandler(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
+	viewerID := farmer.ID
 	if idValue := r.URL.Query().Get("id"); idValue != "" {
 		id, err := strconv.Atoi(idValue)
 		if err != nil || id <= 0 {
@@ -67,7 +74,14 @@ func (h *Profile) ProfileHandler(w http.ResponseWriter, r *http.Request) {
 	if err := h.wallet.RefreshAdminIDs(r.Context()); err != nil {
 		log.Printf("refresh wallet admins: %v", err)
 	}
-	data.IsWalletAdmin = h.wallet.IsAdmin(farmer.ID)
+	data.IsWalletAdmin = h.wallet.IsAdmin(viewerID)
+	if h.admin != nil {
+		access, err := h.admin.Access(r.Context(), viewerID)
+		if err == nil {
+			data.CanAdmin = access.Can(models.AdminEnter)
+			data.IsWalletAdmin = access.Can(models.AdminManageWallet)
+		}
+	}
 
 	if !data.IsOwner {
 		// Public profile: contact details only.

@@ -27,16 +27,40 @@ func (r *SessionRepository) Create(
 	farmerID int,
 	expiresAt time.Time,
 ) error {
-	_, err := r.db.ExecContext(ctx, `
+	return r.create(ctx, tokenHash, farmerID, expiresAt, nil, false)
+}
+
+func (r *SessionRepository) CreateForRevision(ctx context.Context, tokenHash string, farmerID int, expiresAt, revision time.Time) error {
+	var observed any
+	if !revision.IsZero() {
+		observed = revision.UTC()
+	}
+	return r.create(ctx, tokenHash, farmerID, expiresAt, observed, true)
+}
+
+func (r *SessionRepository) create(ctx context.Context, tokenHash string, farmerID int, expiresAt time.Time, revision any, checkRevision bool) error {
+	result, err := r.db.ExecContext(ctx, `
 		INSERT INTO sessions (
 			session_token_hash,
 			farmer_id,
-			expires_at
+			expires_at, expires_at_utc, authentication_revision
 		)
-		VALUES ($1, $2, $3)
-	`, tokenHash, farmerID, expiresAt)
-
-	return err
+		SELECT $1, id, $3::timestamptz AT TIME ZONE 'UTC', $3::timestamptz, sessions_revoked_at FROM farmers
+		WHERE id=$2 AND suspended_at IS NULL AND deleted_at IS NULL
+		  AND (NOT $5::boolean OR sessions_revoked_at IS NOT DISTINCT FROM $4::timestamptz)
+		FOR SHARE
+	`, tokenHash, farmerID, expiresAt.UTC(), revision, checkRevision)
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count != 1 {
+		return session.ErrNotFound
+	}
+	return nil
 }
 
 // FindValid retrieves a farmer ID for a valid session.
@@ -51,8 +75,11 @@ func (r *SessionRepository) FindValid(
 		UPDATE sessions
 		SET last_seen_at = CURRENT_TIMESTAMP
 		WHERE session_token_hash = $1
-		  AND expires_at > CURRENT_TIMESTAMP
+		  AND expires_at_utc > CURRENT_TIMESTAMP
 		  AND revoked_at IS NULL
+		  AND EXISTS (SELECT 1 FROM farmers f WHERE f.id=sessions.farmer_id
+		    AND f.suspended_at IS NULL AND f.deleted_at IS NULL
+		    AND f.sessions_revoked_at IS NOT DISTINCT FROM sessions.authentication_revision)
 		RETURNING farmer_id
 	`, tokenHash).Scan(&farmerID)
 
@@ -103,7 +130,7 @@ func (r *SessionRepository) DeleteExpired(
 ) (int64, error) {
 	result, err := r.db.ExecContext(ctx, `
 		DELETE FROM sessions
-		WHERE expires_at <= CURRENT_TIMESTAMP
+		WHERE expires_at_utc IS NULL OR expires_at_utc <= CURRENT_TIMESTAMP
 		   OR revoked_at IS NOT NULL
 	`)
 

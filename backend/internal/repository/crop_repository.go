@@ -220,6 +220,8 @@ func (r *CropRepository) ListByFarmer(
 func (r *CropRepository) ListAvailable() ([]models.Crop, error) {
 	return r.listAvailable(`
 		WHERE crops.listed_for_sale = TRUE
+		AND NOT crops.moderation_blocked
+		AND farmers.suspended_at IS NULL AND farmers.deleted_at IS NULL
 		AND crops.quantity > 0
 	`)
 }
@@ -232,6 +234,8 @@ func (r *CropRepository) SearchAvailable(term string) ([]models.Crop, error) {
 	pattern := "%" + term + "%"
 	return r.listAvailable(`
 		WHERE crops.listed_for_sale = TRUE
+		AND NOT crops.moderation_blocked
+		AND farmers.suspended_at IS NULL AND farmers.deleted_at IS NULL
 		AND crops.quantity > 0
 		AND (
 			crops.name ILIKE $1
@@ -332,7 +336,7 @@ func (r *CropRepository) GetByID(
 			COALESCE(longitude, 0),
 			COALESCE(location_accuracy, 0),
 			price_per_unit,
-			listed_for_sale,
+			(listed_for_sale AND NOT moderation_blocked AND EXISTS (SELECT 1 FROM farmers f WHERE f.id=crops.farmer_id AND f.suspended_at IS NULL AND f.deleted_at IS NULL)),
 			image_url,
 			COALESCE(initial_listed_quantity, 0),
 			first_listed_at,

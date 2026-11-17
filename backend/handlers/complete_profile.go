@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 
+	"backend/internal/onboarding"
 	"backend/internal/services"
 	"backend/middleware"
 	"backend/render"
@@ -35,6 +36,10 @@ func (h *CompleteProfile) Handler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodPost {
 		w.Header().Set("Allow", "GET, POST")
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if onboarding.CanSkip(farmer.ID) {
+		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 		return
 	}
 	if farmer.SelfieCapturedAt.Valid {

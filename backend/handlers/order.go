@@ -13,6 +13,12 @@ import (
 type OrderHandler struct {
 	orderService *services.OrderService
 	checkout     *Checkout
+	wallet       *services.WalletService
+	disputes     *services.OrderDisputeService
+}
+
+func (h *OrderHandler) ConfigureDisputes(wallet *services.WalletService, disputes *services.OrderDisputeService) {
+	h.wallet, h.disputes = wallet, disputes
 }
 
 func NewOrderHandler(orderService *services.OrderService, checkout *Checkout) *OrderHandler {
@@ -88,11 +94,27 @@ func (h *OrderHandler) Detail(w http.ResponseWriter, r *http.Request) {
 
 	data := map[string]any{
 		"Farmer":  farmer,
-		"IsBuyer": farmer.IsBuyer(),
+		"IsBuyer": order.BuyerID == farmer.ID,
 		"Order":   order,
 		// A rejected delivery request comes back here as a short code, so the
 		// message sits on the form itself instead of on a plain-text error page.
 		"DeliveryError": deliveryErrorMessage(r.URL.Query().Get("delivery_error")),
+	}
+	if h.wallet != nil && h.disputes != nil && h.disputes.Workflows() != nil {
+		hold, err := h.wallet.EscrowForOrder(r.Context(), int64(order.ID))
+		if err != nil {
+			http.Error(w, "Could not load order funds", 503)
+			return
+		}
+		dispute, err := h.disputes.Workflows().LatestForOrder(r.Context(), int64(order.ID), farmer.ID)
+		if err != nil {
+			http.Error(w, "Could not load order support", 503)
+			return
+		}
+		data["Escrow"], data["Dispute"], data["SupportEnabled"] = hold, dispute, true
+		active := dispute != nil && (dispute.Status == models.DisputeSubmitted || dispute.Status == models.DisputeSellerResponded || dispute.Status == models.DisputeUnderReview)
+		data["CanConfirmReceipt"] = order.BuyerID == farmer.ID && hold != nil && hold.Status == "held" && !active
+		data["CanReportIssue"] = order.BuyerID == farmer.ID && !active && (hold == nil || hold.Status != "closed")
 	}
 
 	if err := render.RenderTemplates(w, "order.html", data); err != nil {

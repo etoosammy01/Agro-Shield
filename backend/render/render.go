@@ -138,7 +138,7 @@ func Since(t time.Time) string {
 // derive from this one mapping.
 func receiptDirection(transactionType string) string {
 	switch transactionType {
-	case "deposit", "sale_credit", "withdrawal_refund", "transfer_in", "transfer_refund":
+	case "deposit", "sale_credit", "withdrawal_refund", "transfer_in", "transfer_refund", "order_refund":
 		return "in"
 	default:
 		return "out"
@@ -155,7 +155,7 @@ func receiptArrow(transactionType string) string {
 
 func loadTemplates() *template.Template {
 	funcs := template.FuncMap{
-		"money":            Money,
+		"money": Money,
 		// money0 predates the single-format rule. It is kept registered so the
 		// templates that still call it keep working, and renders identically to
 		// money — including kobo.
@@ -181,7 +181,6 @@ var TMPL = loadTemplates()
 func RenderTemplates(w http.ResponseWriter, name string, data any) error {
 	return TMPL.ExecuteTemplate(w, name, data)
 }
-
 
 // JSON writes v as a JSON response with the given status code.
 func JSON(w http.ResponseWriter, status int, v interface{}) {

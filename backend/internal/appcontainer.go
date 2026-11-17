@@ -27,6 +27,7 @@ import (
 // ============================================================
 
 type Container struct {
+	Admin          *repository.AdminRepository
 	OrderDispute   *services.OrderDisputeService
 	Auth           *services.AuthService
 	Crop           *services.CropService
@@ -158,6 +159,7 @@ func NewContainer(
 
 	walletService := services.NewWalletService(walletRepo, farmerRepo, bankLookupRepo, flutterwaveClient, walletAdminIDs, commissionBasisPoints, notificationService)
 	walletService.SetStaleDepositAfter(staleDepositAfter)
+	orderDisputeService.SetSettler(walletRepo)
 
 	paymentService := services.NewPaymentService(paymentRepo, orderRepo, farmerRepo, flutterwaveClient, walletService)
 

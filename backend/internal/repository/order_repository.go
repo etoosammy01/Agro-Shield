@@ -16,8 +16,14 @@ func NewOrderRepository(db *sql.DB) *OrderRepository {
 
 func (r *OrderRepository) Create(order *models.Order) error {
 	query := `
-		INSERT INTO orders (buyer_id, crop_id, quantity, total_price, status)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO orders (buyer_id, crop_id, quantity, total_price, status,seller_id_snapshot)
+		SELECT $1, c.id, $3, $4, $5,c.farmer_id FROM crops c
+		JOIN farmers seller ON seller.id=c.farmer_id
+		JOIN farmers buyer ON buyer.id=$1
+		WHERE c.id=$2 AND NOT c.moderation_blocked
+		AND seller.suspended_at IS NULL AND seller.deleted_at IS NULL
+		AND buyer.suspended_at IS NULL AND buyer.deleted_at IS NULL
+		FOR SHARE OF c, seller, buyer
 		RETURNING id, created_at
 	`
 	return r.db.QueryRow(
@@ -36,11 +42,11 @@ func (r *OrderRepository) GetByID(id int) (*models.Order, error) {
 		SELECT
 			orders.id, orders.buyer_id, orders.crop_id,
 			orders.quantity, orders.total_price, orders.status, orders.created_at,
-			crops.name, crops.unit, crops.image_url, crops.farmer_id,
+			crops.name, crops.unit, crops.image_url, COALESCE(orders.seller_id_snapshot,crops.farmer_id),
 			seller.full_name, buyer.full_name
 		FROM orders
 		JOIN crops   ON crops.id = orders.crop_id
-		JOIN farmers seller ON seller.id = crops.farmer_id
+		JOIN farmers seller ON seller.id = COALESCE(orders.seller_id_snapshot,crops.farmer_id)
 		JOIN farmers buyer  ON buyer.id  = orders.buyer_id
 		WHERE orders.id = $1
 	`
@@ -86,11 +92,11 @@ func (r *OrderRepository) ListByBuyer(buyerID int) ([]models.Order, error) {
 		SELECT
 			orders.id, orders.buyer_id, orders.crop_id,
 			orders.quantity, orders.total_price, orders.status, orders.created_at,
-			crops.name, crops.unit, crops.image_url, crops.farmer_id,
+			crops.name, crops.unit, crops.image_url, COALESCE(orders.seller_id_snapshot,crops.farmer_id),
 			seller.full_name, buyer.full_name
 		FROM orders
 		JOIN crops   ON crops.id = orders.crop_id
-		JOIN farmers seller ON seller.id = crops.farmer_id
+		JOIN farmers seller ON seller.id = COALESCE(orders.seller_id_snapshot,crops.farmer_id)
 		JOIN farmers buyer  ON buyer.id  = orders.buyer_id
 		WHERE orders.buyer_id = $1
 		ORDER BY orders.created_at DESC
@@ -104,13 +110,13 @@ func (r *OrderRepository) ListSalesByFarmer(farmerID int) ([]models.Order, error
 		SELECT
 			orders.id, orders.buyer_id, orders.crop_id,
 			orders.quantity, orders.total_price, orders.status, orders.created_at,
-			crops.name, crops.unit, crops.image_url, crops.farmer_id,
+			crops.name, crops.unit, crops.image_url, COALESCE(orders.seller_id_snapshot,crops.farmer_id),
 			seller.full_name, buyer.full_name
 		FROM orders
 		JOIN crops   ON crops.id = orders.crop_id
-		JOIN farmers seller ON seller.id = crops.farmer_id
+		JOIN farmers seller ON seller.id = COALESCE(orders.seller_id_snapshot,crops.farmer_id)
 		JOIN farmers buyer  ON buyer.id  = orders.buyer_id
-		WHERE crops.farmer_id = $1
+		WHERE COALESCE(orders.seller_id_snapshot,crops.farmer_id) = $1
 		ORDER BY orders.created_at DESC
 	`
 	return r.queryOrders(query, farmerID)

@@ -1,10 +1,12 @@
 package services
 
 import (
+	"backend/internal/session"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"log"
 	"time"
 )
 
@@ -39,6 +41,19 @@ func (s *SessionService) Create(
 	ctx context.Context,
 	farmerID int,
 ) (string, time.Time, error) {
+	return s.create(ctx, farmerID, nil)
+}
+
+// CreateForLogin preserves the account revision checked with the password.
+// A password reset or suspension/reactivation must not revive a stale login.
+func (s *SessionService) CreateForLogin(ctx context.Context, farmerID int, revision time.Time) (string, time.Time, error) {
+	return s.create(ctx, farmerID, &revision)
+}
+
+func (s *SessionService) create(ctx context.Context, farmerID int, revision *time.Time) (string, time.Time, error) {
+	if s == nil || s.repo == nil {
+		return "", time.Time{}, session.ErrUnavailable
+	}
 
 	// Generate 32 cryptographically secure random bytes.
 	randomBytes := make([]byte, 32)
@@ -56,7 +71,19 @@ func (s *SessionService) Create(
 	// Set the server-side expiry to 24 hours from now.
 	expiresAt := time.Now().UTC().Add(sessionLifetime)
 
-	if err := s.repo.Create(ctx, tokenHash, farmerID, expiresAt); err != nil {
+	var err error
+	if revision != nil {
+		repo, ok := s.repo.(interface {
+			CreateForRevision(context.Context, string, int, time.Time, time.Time) error
+		})
+		if !ok {
+			return "", time.Time{}, session.ErrUnavailable
+		}
+		err = repo.CreateForRevision(ctx, tokenHash, farmerID, expiresAt, *revision)
+	} else {
+		err = s.repo.Create(ctx, tokenHash, farmerID, expiresAt)
+	}
+	if err != nil {
 		return "", time.Time{}, err
 	}
 
@@ -68,6 +95,9 @@ func (s *SessionService) Validate(
 	ctx context.Context,
 	token string,
 ) (int, error) {
+	if s == nil || s.repo == nil {
+		return 0, session.ErrUnavailable
+	}
 	tokenHash := hashSessionToken(token)
 
 	return s.repo.FindValid(ctx, tokenHash)
@@ -78,6 +108,9 @@ func (s *SessionService) Revoke(
 	ctx context.Context,
 	token string,
 ) error {
+	if s == nil || s.repo == nil {
+		return session.ErrUnavailable
+	}
 	tokenHash := hashSessionToken(token)
 
 	return s.repo.Revoke(ctx, tokenHash)
@@ -96,6 +129,32 @@ func (s *SessionService) CleanupExpired(
 	ctx context.Context,
 ) (int64, error) {
 	return s.repo.DeleteExpired(ctx)
+}
+
+// RunCleanup removes expired/revoked sessions at startup and periodically.
+// Authentication enforces expiry even when a cleanup pass fails.
+func (s *SessionService) RunCleanup(ctx context.Context, interval time.Duration) {
+	if interval <= 0 {
+		interval = time.Hour
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		pass, cancel := context.WithTimeout(ctx, 10*time.Second)
+		_, err := s.CleanupExpired(pass)
+		cancel()
+		if err != nil && ctx.Err() == nil {
+			log.Print("session cleanup unavailable; expiry remains enforced on requests")
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }
 
 // hashSessionToken converts a raw token into its SHA-256 hexadecimal hash.

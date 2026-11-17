@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"backend/internal/models"
+	"backend/internal/onboarding"
 	"backend/middleware"
 	"backend/render"
 )
@@ -40,6 +41,10 @@ func (h *VerifyPhone) Handler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodPost {
 		w.Header().Set("Allow", "GET, POST")
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if onboarding.CanSkip(farmer.ID) {
+		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 		return
 	}
 	if !farmer.SelfieCapturedAt.Valid {
@@ -97,10 +102,10 @@ func (h *VerifyPhone) finish(w http.ResponseWriter, r *http.Request, farmer *mod
 		http.Redirect(w, r, "/create-transaction-pin", http.StatusSeeOther)
 		return
 	}
-	if sessionID, ok := middleware.SessionIDFromRequest(r); ok {
-		middleware.DeleteSession(sessionID)
+	if err := middleware.EndSession(w, r); err != nil {
+		http.Error(w, "Phone verified, but unable to sign out. Please try again.", http.StatusServiceUnavailable)
+		return
 	}
-	middleware.ClearSessionCookie(w, r)
 	http.Redirect(w, r, "/login?verified=1", http.StatusSeeOther)
 }
 
