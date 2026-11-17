@@ -652,10 +652,6 @@ backend/
 │   ├── onlyget.go
 │   └── onlypath.go
 │
-├── migrations/
-│
-├── payments/
-│
 ├── render/
 │   └── render.go
 │
@@ -713,7 +709,8 @@ Repositories
 PostgreSQL
 ```
 
-Database schema changes are managed through migration files.
+The application creates and updates its PostgreSQL schema at startup through
+the database initialization code in `backend/internal/database/database.go`.
 
 ---
 
@@ -732,36 +729,29 @@ cd Agro-Shield
 cd backend
 ```
 
-## 3. Install dependencies
+## 3. Download dependencies
 
 ```bash
 go mod download
 ```
 
-or:
-
-```bash
-go mod tidy
-```
-
 ## 4. Configure environment variables
 
-Create a `.env` file containing the required database, authentication, AI, payment, and application configuration.
+Copy the provided environment template, then set the required database, AI,
+payment callback, and other credentials for your environment:
 
-Example:
-
-```env
-DATABASE_URL=your_postgresql_connection_string
-
-FLUTTERWAVE_SECRET_KEY=your_flutterwave_secret_key
-FLUTTERWAVE_SECRET_HASH=your_flutterwave_secret_hash
-PAYMENT_REDIRECT_URL=http://localhost:8080/payments/callback
-WALLET_ADMIN_USER_IDS=1,2
-
-GEMINI_API_KEY=your_gemini_api_key
-
-APP_URL=http://localhost:8080
+```bash
+cp .env.example .env
 ```
+
+At minimum, configure `DATABASE_URL`, `GEMINI_API_KEY`, one of
+`GROQ_API_KEY` or `OPENROUTER_API_KEY`, and `PAYMENT_REDIRECT_URL`. For local
+development, the callback can be `http://localhost:8080/payments/callback`.
+Payment credentials and `OTPDEV_API_KEY` are needed to exercise their
+respective integrations; production requires OTP.dev delivery.
+
+The template is in `backend/.env.example` and includes comments for each
+setting.
 
 > Never commit real API keys, passwords, database credentials, or other secrets to GitHub.
 
@@ -791,8 +781,9 @@ Depending on the enabled features, Agro-Shield may require environment variables
 | `PAYMENT_REDIRECT_URL`    | Flutterwave checkout callback  |
 | `WALLET_ADMIN_USER_IDS`   | Comma-separated user IDs allowed to review wallet withdrawals |
 | `OTPDEV_API_KEY`         | OTP.dev API authentication; enables SMS automatically |
-| `GEMINI_API_KEY`          | AI services                    |
-| `APP_URL`                 | Application/base URL           |
+| `GEMINI_API_KEY`          | AI crop-diagnosis service      |
+| `GROQ_API_KEY`            | Primary learning AI provider   |
+| `OPENROUTER_API_KEY`      | Backup learning AI provider   |
 | `TRUST_PROXY_HEADERS`     | Set `true` only behind a trusted reverse proxy |
 | `TRUSTED_PROXY_CIDRS`     | Comma-separated proxy networks; required when proxy trust is enabled |
 | `DB_MAX_OPEN_CONNS`       | Optional PostgreSQL open-connection cap (default 20) |
@@ -1010,7 +1001,7 @@ LICENSE
 and:
 
 ```text
-TEAM_AGREEMENT.md
+docs/TEAM_AGREEMENT.md
 ```
 
 for the applicable ownership, usage, contribution, and intellectual-property terms.

@@ -5,6 +5,9 @@
 # User-uploaded files
 uploads/
 
+# LibreOffice lock files
+.~lock.*#
+
 # Local environment files may contain database credentials and API keys.
 .env
 .env.*
