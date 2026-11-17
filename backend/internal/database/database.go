@@ -1206,7 +1206,7 @@ CREATE INDEX IF NOT EXISTS idx_deliveries_crop_status ON deliveries(crop_id, sta
 	if err := RunAdminMigration(db); err != nil {
 		return err
 	}
-	if err := RunPhoneMigration(db); err != nil {
+	if err := RunPhoneMigrationForStartup(db); err != nil {
 		return err
 	}
 	log.Println("✅ Agro-Shield fresh PostgreSQL schema created successfully")

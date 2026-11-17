@@ -154,9 +154,35 @@ no HTTP deletion endpoint and does not weaken normal account-closure protections
 All valid signup and phone-change contacts are stored as `234` followed by ten
 Nigerian mobile subscriber digits. Login and recovery accept ordinary formatting
 and resolve the same account. A normalized uniqueness index protects concurrent
-registrations and verified phone changes. The migration refuses ambiguous legacy
-ownership, preserves invalid legacy contacts for correction, and records its
-valid-contact backfill without disclosing numbers. Password matching stays exact.
+registrations and verified phone changes. Password matching stays exact.
+
+### Startup with existing phone conflicts
+
+Render's build can succeed while the process exits during startup with
+`phone standard migration: duplicate phone accounts require explicit cleanup`.
+This means separate legacy accounts use different formats of the same number.
+
+Startup now preserves those accounts, credentials, sessions and wallet records
+and completes without choosing an owner or deleting financial history. It
+installs the shared phone normalizer, a lookup index and a phone reservation
+table. A trigger reserves every newly claimed normalized phone using a primary
+key, so concurrent registrations, verified phone changes and account
+reactivations cannot introduce another collision, including at stronger
+transaction isolation levels. Releasing or changing a phone updates its
+reservation in the same transaction; a failed claim preserves the original
+ownership. Existing conflicting contacts stay unchanged, and phone login and
+password recovery still refuse to select an ambiguous account. Unrelated
+accounts continue to work.
+
+No Render setting or cleanup command is required to start the service. A warning
+describes the condition without logging phone numbers. Once existing conflicts
+are resolved through supported account operations, the next startup
+automatically canonicalizes valid contacts and replaces the temporary
+reservations with the normalized unique index. Invalid legacy contacts remain
+available for correction. The operator-only `RunPhoneMigration` and
+`RunPhoneMigrationInTx` remain strict, preserving the atomic cleanup contract.
+Database failures still stop startup; the application never runs without its
+phone ownership protection.
 
 
 ## Verification
