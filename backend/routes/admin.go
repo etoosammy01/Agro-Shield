@@ -11,10 +11,11 @@ import (
 // Every administrative route gets authentication and CSRF protection here,
 // including the existing wallet operations and JSON endpoints.
 func registerAdminRoutes(container *app.Container, wallet *handlers.WalletHandler) {
+	authenticator := middleware.NewAuthenticator(container.FarmerRepo, container.Sessions)
 	admin := handlers.NewAdminHandler(container.Admin)
 	handle := func(path string, handler http.HandlerFunc) {
 		http.Handle(path, middleware.CSRFProtect(middleware.OnlyPath(path,
-			middleware.RequireAuth(container.FarmerRepo, handler))))
+			authenticator.RequireAuth(handler))))
 	}
 	handle("/admin", admin.Page("overview"))
 	handle("/api/admin/overview", admin.Page("overview"))

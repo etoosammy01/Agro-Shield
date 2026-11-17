@@ -1,0 +1,368 @@
+{
+  "date": "2026-11-17",
+  "baseline": "ce4f8847d41e4db4429ca6ab140b9e9ad2f3a1cd",
+  "scope": "Local combined authentication, admin dispute/evidence, wallet escrow and refund implementation",
+  "go": "1.25.0",
+  "postgresql": "16.15",
+  "checks": {
+    "standard": {
+      "exit_code": 0,
+      "seconds": 215.36,
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "./..."
+      ],
+      "top_level_tests": 478,
+      "test_and_subtest_results": 925,
+      "failed": 0,
+      "skipped": 0,
+      "required_database": {
+        "required": 105,
+        "passed": 925,
+        "failed": 0,
+        "skipped": 0
+      }
+    },
+    "vet": {
+      "exit_code": 0,
+      "seconds": 13.52,
+      "command": [
+        "go",
+        "vet",
+        "./..."
+      ]
+    },
+    "checker": {
+      "exit_code": 0,
+      "seconds": 0.44,
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "scripts",
+        "-p",
+        "test_*.py"
+      ]
+    },
+    "build": {
+      "exit_code": 0,
+      "seconds": 13.83,
+      "command": [
+        "go",
+        "build",
+        "-o",
+        "/tmp/agro-outstanding/backend",
+        "."
+      ]
+    },
+    "race": {
+      "exit_code": 0,
+      "seconds": 401.56,
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-json",
+        "./..."
+      ],
+      "top_level_tests": 478,
+      "test_and_subtest_results": 925,
+      "failed": 0,
+      "skipped": 0,
+      "required_database": {
+        "required": 105,
+        "passed": 925,
+        "failed": 0,
+        "skipped": 0
+      }
+    }
+  },
+  "javascript_syntax": {
+    "command": "node --check frontend/js/wallet.js",
+    "exit_code": 0
+  },
+  "formatting_and_diff": {
+    "gofmt": "Changed Go sources formatted",
+    "git_diff_check_exit_code": 0
+  },
+  "browser": {
+    "renderer": "Chrome/Playwright",
+    "scope": "Synthetic server-rendered fixtures; layout and native confirmation validation. Endpoint workflows verified separately with PostgreSQL.",
+    "cases": 28,
+    "results": [
+      {
+        "page": "admin-detail",
+        "width": 320,
+        "overflow": 320,
+        "errors": []
+      },
+      {
+        "page": "admin-queue",
+        "width": 320,
+        "overflow": 320,
+        "errors": []
+      },
+      {
+        "page": "admin-refund",
+        "width": 320,
+        "overflow": 320,
+        "errors": []
+      },
+      {
+        "page": "admin-exceptions",
+        "width": 320,
+        "overflow": 320,
+        "errors": []
+      },
+      {
+        "page": "buyer-case",
+        "width": 320,
+        "overflow": 320,
+        "errors": []
+      },
+      {
+        "page": "new-case",
+        "width": 320,
+        "overflow": 320,
+        "errors": []
+      },
+      {
+        "page": "order",
+        "width": 320,
+        "overflow": 320,
+        "errors": []
+      },
+      {
+        "page": "admin-detail",
+        "width": 390,
+        "overflow": 390,
+        "errors": []
+      },
+      {
+        "page": "admin-queue",
+        "width": 390,
+        "overflow": 390,
+        "errors": []
+      },
+      {
+        "page": "admin-refund",
+        "width": 390,
+        "overflow": 390,
+        "errors": []
+      },
+      {
+        "page": "admin-exceptions",
+        "width": 390,
+        "overflow": 390,
+        "errors": []
+      },
+      {
+        "page": "buyer-case",
+        "width": 390,
+        "overflow": 390,
+        "errors": []
+      },
+      {
+        "page": "new-case",
+        "width": 390,
+        "overflow": 390,
+        "errors": []
+      },
+      {
+        "page": "order",
+        "width": 390,
+        "overflow": 390,
+        "errors": []
+      },
+      {
+        "page": "admin-detail",
+        "width": 768,
+        "overflow": 768,
+        "errors": []
+      },
+      {
+        "page": "admin-queue",
+        "width": 768,
+        "overflow": 768,
+        "errors": []
+      },
+      {
+        "page": "admin-refund",
+        "width": 768,
+        "overflow": 768,
+        "errors": []
+      },
+      {
+        "page": "admin-exceptions",
+        "width": 768,
+        "overflow": 768,
+        "errors": []
+      },
+      {
+        "page": "buyer-case",
+        "width": 768,
+        "overflow": 768,
+        "errors": []
+      },
+      {
+        "page": "new-case",
+        "width": 768,
+        "overflow": 768,
+        "errors": []
+      },
+      {
+        "page": "order",
+        "width": 768,
+        "overflow": 768,
+        "errors": []
+      },
+      {
+        "page": "admin-detail",
+        "width": 1440,
+        "overflow": 1440,
+        "errors": []
+      },
+      {
+        "page": "admin-queue",
+        "width": 1440,
+        "overflow": 1440,
+        "errors": []
+      },
+      {
+        "page": "admin-refund",
+        "width": 1440,
+        "overflow": 1440,
+        "errors": []
+      },
+      {
+        "page": "admin-exceptions",
+        "width": 1440,
+        "overflow": 1440,
+        "errors": []
+      },
+      {
+        "page": "buyer-case",
+        "width": 1440,
+        "overflow": 1440,
+        "errors": []
+      },
+      {
+        "page": "new-case",
+        "width": 1440,
+        "overflow": 1440,
+        "errors": []
+      },
+      {
+        "page": "order",
+        "width": 1440,
+        "overflow": 1440,
+        "errors": []
+      }
+    ]
+  },
+  "screenshots": [
+    "docs/test-evidence/admin-governance/disputes-admin-detail-1440.png",
+    "docs/test-evidence/admin-governance/disputes-admin-detail-390.png",
+    "docs/test-evidence/admin-governance/disputes-admin-refund-1440.png",
+    "docs/test-evidence/admin-governance/disputes-admin-refund-390.png",
+    "docs/test-evidence/admin-governance/disputes-buyer-case-1440.png",
+    "docs/test-evidence/admin-governance/disputes-buyer-case-390.png",
+    "docs/test-evidence/admin-governance/disputes-new-case-1440.png",
+    "docs/test-evidence/admin-governance/disputes-new-case-390.png"
+  ],
+  "implemented_workflows": [
+    "Persistent authentication and atomic OTP-verified password reset/session revocation",
+    "Generic recovery issuance and unsuccessful verification responses",
+    "Buyer paid-order complaints and withdrawals, seller responses, admin queue/details",
+    "Private validated evidence with access, size/count limits and integrity checks",
+    "Versioned decisions, current governance permissions and order participant exclusion",
+    "Paid wallet checkout escrow, available-balance spending protection and buyer receipt release",
+    "Exact partial/full wallet refunds with commission reversals, concurrency and idempotency",
+    "Audit rollback, retained approvals, unfunded exceptions and approved-record retries",
+    "Preserving refund-table migration, ambiguity rejection and required-test inventory agreement"
+  ],
+  "remaining_owner_work": {
+    "members_3_4_5": "Verified funding/settlement for direct-provider and historical payments without holds; original-payment-method refunds if required by product",
+    "member_5_product": "Review reason/quality evidence policy, dispute eligibility deadlines and any automatic release policy",
+    "member_2": "Independent authentication/recovery review and production delivery configuration",
+    "member_8_release": "Independent combined migration/deployment review, shared private evidence storage/backups, historical timezone policy, matched rollback rehearsal and hosted CI on the combined commit"
+  },
+  "release_status": "Implemented and locally verified; independent owner review, product policy and deployment/hosted CI remain pending",
+  "changed_source_sha256": {
+    "backend/handlers/admin.go": "6a96041bf00f3dd618e5f2aad4955d3e147c745f787f13f45d1c6075d240d78b",
+    "backend/handlers/admin_test.go": "2bd4d82416ff48554b5d92f6784da20d7eaa46db0497e258bab83213ffdda6bf",
+    "backend/handlers/dispute_evidence.go": "bff19e961e1acfdcfbf809194c638e96bfd9f4fccb01bc73fbca6d4e7e96ec59",
+    "backend/handlers/dispute_evidence_test.go": "57fe6658c0999cd3c211184f64d336c6215dd6488cee8e250fe9ab9a5853fe2c",
+    "backend/handlers/forgot_password.go": "b4079c1d026086cf49e562caaadd09f5c30fb3e998676462da76a6a6b30bff24",
+    "backend/handlers/forgot_password_test.go": "4b8549addf4cc9baf3b166cb24231455f9f27f54e3a783c87e7abeb397ee133b",
+    "backend/handlers/login.go": "9ce0cce23878491c1ac5f4dec2110db4f555333752c9bbef291eaae1972d7f3b",
+    "backend/handlers/logout.go": "573110fad1c460cf0050cca1fb71b24267d82ccc75818e08c9661ff6115aba36",
+    "backend/handlers/order.go": "2da4afcffa1b15b0ebba5244c572eaca8690dd7fc5f9a88224e019db99a04460",
+    "backend/handlers/order_dispute_handler.go": "bea19a4fa6a72717064593435761ce5fc2779a6482544842199508e6af306465",
+    "backend/handlers/profile_edit.go": "105e215347ceabcabb2720cef441026325b2a7db64200bfd3bceda66052e33f5",
+    "backend/handlers/register.go": "36799192558aea0fb33192b27a0f7bff7f5b7111bc088730c6ab5cf968031e58",
+    "backend/handlers/register_handler.go": "41a2c282c4c4d1cee06a56325763545fabb6ee8d4ec3d5c80473222119773a73",
+    "backend/handlers/transaction_pin.go": "a9a78f7ab6211dc54601046395b0342b931f797491f8f433c82b65b9d5a0b0d6",
+    "backend/handlers/verify_phone.go": "13e4372adebe9245980449a13990af070cefa12936cd69e734d68be4600fe2ba",
+    "backend/internal/appcontainer.go": "570d4dcc455db74d88269c7a3fc8506c5891b7309c29c02baea656583a1a77c3",
+    "backend/internal/database/admin.go": "1ac45c0f1d90ebb5812a98da64015488a5bac98b7bcfc2c54c23908d8e588a6d",
+    "backend/internal/database/database.go": "841aa8e5bd783942d7ad1419508c5338c4e5b2489d561ec468795f2bddc117ef",
+    "backend/internal/database/financial_integration.sql": "10df76cd055293cf03cef3d4c7d7fc82139adba9552a4467320645368f2fe61c",
+    "backend/internal/database/integration.go": "b9755bfe95303859f91b059ee9833bd0bc36ecee54879aef2a9fff8a069026d6",
+    "backend/internal/database/refunds.sql": "fdba83813a80360853b54b7499aec163c5cee85ee2dffda51557e00b544b2f40",
+    "backend/internal/escrow/escrow.go": "3d51d4c99e7fd44c1be52bef342411f7e09345f40f7932393374d04075ac9b63",
+    "backend/internal/escrow/escrow_test.go": "d81032d2f7d14648fe608621019382f2085da3a5ea250b10f73df6f7a4c444f9",
+    "backend/internal/models/admin.go": "527025bd03e9d098adfb6f5d70c8b9a4ba2ee980163b74351583505e42120f66",
+    "backend/internal/models/dispute_labels.go": "e10f33721a4bf79c6dfe603bbe54ff37b380a71757b0b9cff0538e4517696150",
+    "backend/internal/models/order_dispute.go": "ec4f05c7c4da2ea7b1a955a3d359daca4bf491d82733bc878db0f64dedb88a76",
+    "backend/internal/models/wallet.go": "98d36acfa656c1cffb8950b284a8fda59e47cdaef169d3688b1d048ba6ececc9",
+    "backend/internal/money/money.go": "417f1b6dbed551f244376b45e90550c7e835a5f2bcca60a05856779cda1739c2",
+    "backend/internal/money/money_test.go": "a8fe0f59a54569138fd5e4a941536e3cc6877fb20821d2b2d69858a5370a2f8f",
+    "backend/internal/repository/admin_dependency_integration_test.go": "6d0e4047730a3f5d4657c0e106fb3719fd6dd22499c000956a0f73bdf8514812",
+    "backend/internal/repository/dispute_review_access.go": "6811e594c0062bd0ff27fdbd4cb629c3953edc1904fb56f4248fc8a87879e4a9",
+    "backend/internal/repository/dispute_workflows.go": "5588e439ce9d22073a9409f755d12e2a5321686cbbf32306ebc09ecd85dd68e9",
+    "backend/internal/repository/escrow_integration_test.go": "d861bf1c345cf99e286c91471f061b49810bd4ebcb435216f01c29b83be5bf1e",
+    "backend/internal/repository/farmer_repository.go": "62feaa99f0ecd9295c1879a069899c6587ea833a8da2537b2ceaf97a39066833",
+    "backend/internal/repository/order_dispute_integration_test.go": "d0641f307972bb253956d13f78f3b31717aa8c70dd6d77480199b3ef1ff58ad7",
+    "backend/internal/repository/order_dispute_repository.go": "20e5e7ce96c2521629254f74a338753aafcb92663c8b1140f5769f1bddd0cb94",
+    "backend/internal/repository/order_refund_integration_test.go": "0bc23929369f6ec55c18fff03585b2c36b3e45e403038b929ec58f15d4ee6657",
+    "backend/internal/repository/order_refund_repository.go": "e73eb9be1c1a229edfb632838d49d55d3b5439812f184d2d84fe95b75198059e",
+    "backend/internal/repository/order_repository.go": "34a223d3a5d6f37d0f06f784dd91cf3a9ee100f5f378c26ef748f14f77d43799",
+    "backend/internal/repository/session_repository.go": "db4151156c4022729086c9fc54668040389a4f9c5cc8e96e28e9dc0df86ee916",
+    "backend/internal/repository/wallet_escrow.go": "fef3bb54fc418c566288d6bae9b6efb8e7c0959f4873afa2cd8040ea456ac40a",
+    "backend/internal/repository/wallet_integration_test.go": "faafa8a2d85be1079a765e463d9e22d99d7115596df224739767659951151b2f",
+    "backend/internal/repository/wallet_repository.go": "7133633f88ce8d17dc7a10ab18e303c9c0ab316d347d07e90749e4b11fa4f788",
+    "backend/internal/services/order_dispute_service.go": "39398f8c52eb47b54c1b65a37cdff53fc4cfb822c0e13e46695f190d4452d005",
+    "backend/internal/services/session.go": "4f181cc2941ec782d4352023b01cd140ba680f772d1b368c70982f61c9ce9376",
+    "backend/internal/services/wallet_service.go": "2002abc6deba7a44ebd2b177b5bae9cde2f088f5be93d022dd8d47c7cb9756bc",
+    "backend/internal/session/errors.go": "a465ae4919a252d3aebfdbe0f55528d797277ef3476038f94039cb76ec7766a4",
+    "backend/main.go": "8794ab617857954ecfb36f79722c5afef5053b200d0f9444991cb180beb2432d",
+    "backend/middleware/auth.go": "ae15575b02250e20d6c7236d2156479111f08530abf3ebf9b1e04b87c7a14026",
+    "backend/render/render.go": "299e1e278a3164eb240f0de944363235b29766426782e0ab14eaf177f49c0857",
+    "backend/routes/Routes.go": "166696f7946d5443fdb8099917623aac60423a3bf45ebbdf7200a78efdbbec93",
+    "backend/routes/admin.go": "867973f549ec7a477939f19c4bb2173027c054b61f8318219f47e5d0d740d2a9",
+    "backend/routes/admin_integration_test.go": "094e265ed48d06e26a92f9a7273b07fbd229ba7f0021579a50f535426de62c27",
+    "backend/routes/admin_session_integration_test.go": "ce7854806686e2e1988b23c9907554a11b6cb1bdebae75300af969b36408f623",
+    "backend/routes/disputes.go": "b9e232aa3be626d96e2fbdd979e796c94ab1c3a743ab5c6c0efd8863f2de9fad",
+    "backend/routes/disputes_integration_test.go": "dd1856ab8d2ad2589fb4ea86e6cc0f3118af86f42cc28318eb22a8c7f3b1c3f7",
+    "backend/routes/wallet_repair_selection_integration_test.go": "efa70899555307e7176388704f08230b8d3321fc822eded5537354a7362b1bdf",
+    "backend/routes/wallet_virtual_account_test.go": "a6a19960cc1b41698c4258d5afbcf3e9bdd7ab56c3203e044b3c3c543419cf06",
+    "frontend/css/disputes.css": "18af7100752dbbc2ea25edbd64536ca3b2a81046fff05056f51ed6bd79cd3f46",
+    "frontend/js/wallet.js": "d438dfe9b7955df3f43777a556d3540c964e6cb21ef2ebb695fd96d1c92a850a",
+    "frontend/pages/admin.html": "a166c449c59bdf57a9591e41e5e72bcdafa0186a2594d89649281d0a9999aab5",
+    "frontend/pages/disputes.html": "84e7ddfd149d8eb22651af4108cc748016eb3095d965dd5f88a09155e7028239",
+    "frontend/pages/order.html": "38a5205585caecaa783481b04160ed30ae524823397ba82a6c6dcd03fc7be2d0",
+    "frontend/pages/wallet.html": "d77395f9e5275a64c30395b5f813bf2f71757110a9d769a67d6ebbe3ea306f86",
+    "scripts/required_db_tests.json": "e5e88bf7ecdd03194e52fc0dbb9c4ec434d6ed22fb554aa3952daa59f4002a9d"
+  },
+  "document_links": {
+    "checked": 106,
+    "missing": []
+  }
+}

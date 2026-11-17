@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -13,7 +14,6 @@ import (
 	"backend/internal/repository"
 	"backend/internal/services"
 	"backend/internal/testdb"
-	"backend/middleware"
 )
 
 // Selecting a missing wallet must only fill the form. Repair remains a
@@ -44,9 +44,12 @@ func TestWalletRepairSelectionIsReadOnlyAndRequiresWalletAccess(t *testing.T) {
 	old := http.DefaultServeMux
 	http.DefaultServeMux = http.NewServeMux()
 	t.Cleanup(func() { http.DefaultServeMux = old })
-	registerAdminRoutes(&app.Container{FarmerRepo: farmers, Admin: repository.NewAdminRepository(db, nil)}, handlers.NewWalletHandler(wallet, nil, nil))
-	token := middleware.CreateSession(admin.ID)
-	t.Cleanup(func() { middleware.DeleteSession(token) })
+	sessions := services.NewSessionService(repository.NewSessionRepository(db))
+	registerAdminRoutes(&app.Container{FarmerRepo: farmers, Sessions: sessions, Admin: repository.NewAdminRepository(db, nil)}, handlers.NewWalletHandler(wallet, nil, nil))
+	token, _, err := sessions.Create(context.Background(), admin.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	request := func(query string) *httptest.ResponseRecorder {
 		r := httptest.NewRequest("GET", "/admin/wallet-withdrawals"+query, nil)
 		r.AddCookie(&http.Cookie{Name: "agroshield_session", Value: token})

@@ -209,7 +209,12 @@ func (h *Register) submitRegistration(w http.ResponseWriter, r *http.Request) {
 
 	// A temporary session allows onboarding, but cannot access protected pages
 	// until selfie capture, phone verification, and transaction PIN setup are complete.
-	sessionID := middleware.CreateSession(farmer.ID)
+	sessionID, _, err := h.sessions.Create(r.Context(), farmer.ID)
+	if err != nil {
+		log.Printf("create registration session: %v", err)
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
 	middleware.SetSessionCookie(w, r, sessionID)
 	h.notifyWelcomeEmail(farmer.ID, page.Email, page.FirstName)
 

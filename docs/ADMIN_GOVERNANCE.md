@@ -51,7 +51,7 @@ Staff roles are independent of the farmer/buyer account type and wallet approval
 | Read audit history | No | No | Yes | No |
 | Approve, reject, or repair wallets | No | No | Only with wallet access | Yes |
 
-`disputes.review` is reserved for administrators so Member 5 can use the same permission model. This change does not add dispute adjudication or refund business rules.
+`disputes.review` authorizes governance administrators independently of wallet access. The [integration handoff](ROLE_6_INTEGRATION_HANDOFF.md) provides Member 5's compatible service authorizer, transaction guard and HTTP boundary. Dispute events are protected and mirrored into the governance audit in the same transaction. The complete dispute workflow and refund settlement remain pending their owners' integration.
 
 Existing `farmers.is_admin` flags retain **wallet approval access only**. IDs explicitly configured in `WALLET_ADMIN_USER_IDS` bootstrap protected administrators with both governance and wallet access. Configuration is checked against a live, non-deleted, non-suspended account; a configured ID cannot reactivate a disabled account. Review the configured IDs when upgrading. No default password or staff account is created.
 
@@ -66,7 +66,9 @@ Administrators cannot change their own access or change a configured administrat
 3. Select the change and a reason, read its consequences, and tick the review confirmation before applying it.
 4. A saved banner confirms the change. If another administrator changed the record first, the request returns a conflict: reload and review the new state.
 
-Suspension disables login and authenticated browser/USSD access, hides the seller's marketplace listings, and blocks new purchases involving the account. Durable sessions are revoked in the same transaction. Existing in-memory sessions are invalidated against the account's revocation revision, including logins racing with suspension. Reactivation requires a fresh sign-in and does not remove individual listing blocks. Historical orders and financial records are preserved.
+Suspension disables login and authenticated browser/USSD access, hides the seller's marketplace listings, and blocks new purchases involving the account. Live browser sessions use PostgreSQL and are revoked in the same transaction. The authenticated account revision also rejects stale session creation and validation, including logins racing with suspension/reactivation. Reactivation requires a fresh sign-in and does not remove individual listing blocks. Historical orders and financial records are preserved.
+
+The OTP-verified password-reset flow changes the password and revokes all account sessions in one transaction. Old logins stop working across application instances; a login in progress using the old password cannot create a fresh session after reset. A failed revocation rolls back the password change. Member 2's separate recovery-response protection still needs integration.
 
 ### Review a listing
 
@@ -172,7 +174,22 @@ python3 ../scripts/check_db_tests.py /tmp/agro-admin-race.json
 
 Set `TEST_DATABASE_URL`, `REQUIRE_DB_TESTS=1`, and `TZ=UTC` as documented before running database checks. Tests cover the permission matrix, direct API and legacy-route access, CSRF, privacy and pagination, session invalidation, stale/concurrent decisions, audit failure rollback, append-only protections, repeated migration, wallet attribution, and purchase restrictions. Browser review should also exercise account and listing dialogs, cancellation, required confirmation, keyboard navigation, narrow screens, and role-specific navigation with synthetic accounts.
 
-### Local verification, November 16, 2026
+### Combined implementation verification, November 17, 2026
+
+The standard and race suites each passed **478 top-level Go tests / 925 test and
+subtest results**, including **all 105 required PostgreSQL tests**, with no
+failures or skips. Vet, the build, eight evidence-checker tests, JavaScript syntax
+and final diff checks passed. Chrome checked 28 synthetic page/viewport cases at
+320, 390, 768 and 1440 pixels, including mobile navigation and required native
+confirmation. Backend endpoint and money-movement checks use isolated PostgreSQL.
+See [combined evidence](test-evidence/admin-governance/outstanding-implementation.json).
+The browser previews use synthetic data; external provider payouts were not run.
+
+### Earlier session/audit integration verification, November 17, 2026
+
+Both standard and race runs passed **435 top-level Go tests / 867 test and subtest results**, including **all 89 required PostgreSQL integration tests**, with no failures or skips. Vet, the build, and all eight evidence-checker tests passed using Go 1.25.0 and PostgreSQL 16.15. These runs cover persistent live routes, multi-instance logout and password-reset revocation, stale login revisions, timezone-aware session expiry, and the dispute authorization/audit contract. See the [current evidence](test-evidence/admin-governance/role-integration.json) and [owner handoff](ROLE_6_INTEGRATION_HANDOFF.md). These counts describe the earlier session/audit-only integration. The combined dispute/refund implementation is documented in the current handoff and its separate evidence.
+
+### Historical local verification, November 16, 2026
 
 Both the standard and race runs passed **422 top-level Go tests / 852 test and subtest results**, including **all 81 required database tests**, with no failed or skipped tests. The latest runs cover Role 6, the listing-review correction and supported upgrade, explicit legacy import, wallet conversion, rollback/retry, simultaneous imports, physical connection schema selection, canonical phones, and atomic test duplicate cleanup, using Go 1.25.0 and PostgreSQL **16.15**, matching CI's PostgreSQL major version. Earlier standard and race runs also passed on PostgreSQL 18.6. `go vet ./...`, JavaScript syntax validation, all eight evidence-checker tests, and local links in both admin guides passed. Hosted push and PR CI subsequently passed for commit `db94ab1`; see the [dependency and requirement review](ROLE_6_DEPENDENCY_REVIEW.md) for the checked runs and remaining integration gates.
 
@@ -186,9 +203,30 @@ was restarted and Chrome verified 16 validation cases and four real sign-ins to
 the retained account, reaching its remaining profile setup. Passwords stayed
 exact, test sessions were logged out, and no JavaScript errors occurred.
 
-Before release, complete cross-branch integration and independent code review as required by the remediation plan, and rerun CI after integration changes. Coordinate the session changes with Member 2, migration and deployment ownership with Member 8, and the reserved dispute-review permission with Member 5. The [dependency review](ROLE_6_DEPENDENCY_REVIEW.md) records the specific session and dispute-contract gaps; passing this branch's CI does not close those gaps.
+The November 17 working tree connects persistent authentication to live routes and provides the dispute permission/audit bridge. Current verification is recorded separately in [integration evidence](test-evidence/admin-governance/role-integration.json). The historical test and hosted CI counts above refer to their dated commits. Dispute review/private evidence and wallet settlement are now implemented locally. Before release, complete the direct-provider/historical settlement dependencies, policy and deployment review described in the [handoff](ROLE_6_INTEGRATION_HANDOFF.md), then run CI on the combined code.
 
 - [Verification summary](test-evidence/admin-governance/results.json)
 - [Overview screenshot](test-evidence/admin-governance/overview.png)
 - [User directory screenshot](test-evidence/admin-governance/users.png)
 - [Mobile account review screenshot](test-evidence/admin-governance/mobile-review.png)
+
+## Dispute operations
+
+Governance administrators have **Disputes & refunds** and **Payment exceptions**
+in their sidebar. Wallet approval access alone does not grant dispute review.
+Open a case to see the order, both parties' accounts, complaint, response, private
+evidence and chronological history. An order participant cannot adjudicate it.
+Each decision requires confirmation and the current review version.
+
+Approval settles a refund to the buyer's wallet from verified held proceeds.
+Seller and commission reversals commit with the buyer credit and audit. Missing
+or closed holds leave the refund available for financial review; the exception
+links back to the case. **Retry approved settlement** reuses the existing refund.
+
+Buyers/sellers use **My disputes** to respond and upload private evidence. Buyers
+can withdraw an unreviewed complaint and confirm receipt when no dispute is
+active. The wallet shows available balance separately from held order proceeds.
+
+For current combined verification, see
+[outstanding implementation evidence](test-evidence/admin-governance/outstanding-implementation.json)
+and the [current handoff](ROLE_6_INTEGRATION_HANDOFF.md).

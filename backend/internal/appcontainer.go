@@ -159,6 +159,7 @@ func NewContainer(
 
 	walletService := services.NewWalletService(walletRepo, farmerRepo, bankLookupRepo, flutterwaveClient, walletAdminIDs, commissionBasisPoints, notificationService)
 	walletService.SetStaleDepositAfter(staleDepositAfter)
+	orderDisputeService.SetSettler(walletRepo)
 
 	paymentService := services.NewPaymentService(paymentRepo, orderRepo, farmerRepo, flutterwaveClient, walletService)
 

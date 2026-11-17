@@ -42,6 +42,7 @@
   <main class="container">
     <div class="page-header">
       <h1>{{if .IsBuyer}}My Purchases{{else}}My Sales{{end}}</h1>
+	  <a href="/disputes" class="btn btn-outline">My disputes</a>
       <p class="muted">
         {{if .IsBuyer}}Orders you have placed{{else}}Orders from your produce{{end}}
       </p>
@@ -176,6 +177,16 @@
         <p>Seller: {{.Order.SellerName}}</p>
       </div>
     </div>
+
+    {{if .SupportEnabled}}
+	<div class="card"><div class="card-body">
+	  <h3>Order support</h3>
+	  {{if .Dispute}}<p>Dispute #{{.Dispute.ID}} · {{.Dispute.StatusLabel}}</p><a class="btn btn-outline" href="/disputes/view?id={{.Dispute.ID}}">View case and evidence</a>{{end}}
+	  {{if .CanReportIssue}}<p>Something wrong with your order? Report the issue for review.</p><a class="btn btn-outline" href="/disputes/new?order_id={{.Order.ID}}">Report an issue</a>{{end}}
+	  {{if .CanConfirmReceipt}}<h3>Confirm receipt</h3><p>Confirm after receiving and checking your produce. This makes the remaining held funds available to the seller.</p><form method="post" action="/orders/confirm-receipt" class="stack"><input type="hidden" name="order_id" value="{{.Order.ID}}"><label><input type="checkbox" name="reviewed" value="1" required> I received and checked this order and confirm release of the remaining funds.</label><button type="submit" class="btn">Confirm receipt</button></form>{{else if .Escrow}}{{if eq .Escrow.Status "disputed"}}<p>Funds are held while the dispute is reviewed.</p>{{else if eq .Escrow.Status "closed"}}<p>This order's funds have been released or refunded.</p>{{end}}{{end}}
+	  <p><a href="/disputes">View all my disputes →</a></p>
+	</div></div>
+	{{end}}
 
     {{if .IsBuyer}}
     {{if .DeliveryError}}

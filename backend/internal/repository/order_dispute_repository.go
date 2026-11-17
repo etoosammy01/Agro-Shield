@@ -12,6 +12,7 @@ import (
 )
 
 var (
+	ErrActiveDisputeExists  = errors.New("an active dispute already exists for this order")
 	ErrDisputeOrderNotFound = errors.New("order not found")
 	ErrDisputeNotPaid       = errors.New("order has no confirmed wallet payment")
 	ErrDisputeNotBuyer      = errors.New("only the order buyer can open this dispute")
@@ -23,11 +24,22 @@ var (
 )
 
 type OrderDisputeRepository struct {
-	db *sql.DB
+	db     *sql.DB
+	review *DisputeReviewAccess
 }
 
 func NewOrderDisputeRepository(db *sql.DB) *OrderDisputeRepository {
 	return &OrderDisputeRepository{db: db}
+}
+
+// ConfigureReviewAccess is called during application construction, before any
+// request is served. Administrative mutations fail closed until it is set.
+func (r *OrderDisputeRepository) ConfigureReviewAccess(access *DisputeReviewAccess) {
+	r.review = access
+}
+
+func (r *OrderDisputeRepository) authorizeReview(ctx context.Context, tx *sql.Tx, actorID int) error {
+	return r.review.AuthorizeTx(ctx, tx, actorID)
 }
 
 type rowScanner interface {
@@ -38,7 +50,7 @@ const disputeColumns = `
 	id, order_id, delivery_id, buyer_id, seller_id,
 	reason_code, description, requested_amount::text, status,
 	seller_response, resolution_note, resolved_by, resolved_at,
-	created_at, updated_at
+	created_at, updated_at, version
 `
 
 func scanDispute(row rowScanner) (*models.OrderDispute, error) {
@@ -63,6 +75,7 @@ func scanDispute(row rowScanner) (*models.OrderDispute, error) {
 		&resolvedAt,
 		&d.CreatedAt,
 		&d.UpdatedAt,
+		&d.Version,
 	)
 	if err != nil {
 		return nil, err
@@ -124,14 +137,21 @@ func (r *OrderDisputeRepository) Create(
 	err = tx.QueryRowContext(ctx, `
 		SELECT
 			o.buyer_id,
-			c.farmer_id,
+			COALESCE(o.seller_id_snapshot,c.farmer_id),
 			o.total_price::numeric(12,2)::text,
 			EXISTS (
 				SELECT 1
 				FROM wallet_transactions wt
+				JOIN wallets w ON w.id=wt.wallet_id
 				WHERE wt.reference = 'order-payment:' || o.id::text
 				  AND wt.type = 'order_payment'
 				  AND wt.amount = o.total_price::numeric(12,2)
+				  AND w.farmer_id=o.buyer_id
+			)
+			OR EXISTS (
+				SELECT 1 FROM payments p WHERE p.order_id=o.id
+				AND p.status='successful' AND p.currency='NGN'
+				AND p.amount=o.total_price::numeric(12,2)
 			)
 		FROM orders o
 		JOIN crops c ON c.id = o.crop_id
@@ -150,6 +170,13 @@ func (r *OrderDisputeRepository) Create(
 	}
 	if !paid {
 		return ErrDisputeNotPaid
+	}
+	var active bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM order_disputes WHERE order_id=$1 AND status IN ('submitted','seller_responded','under_review'))`, d.OrderID).Scan(&active); err != nil {
+		return err
+	}
+	if active {
+		return ErrActiveDisputeExists
 	}
 
 	if d.DeliveryID != nil {
@@ -186,6 +213,30 @@ func (r *OrderDisputeRepository) Create(
 	}
 	if !amountValid {
 		return ErrDisputeAmount
+	}
+	// The order row is already locked. This check serializes dispute
+	// submissions for the same order before the unique index backstop.
+	var activeDisputeExists bool
+
+	err = tx.QueryRowContext(ctx, `
+    SELECT EXISTS (
+        SELECT 1
+        FROM order_disputes
+        WHERE order_id = $1
+          AND status IN ($2, $3, $4)
+    )
+`, d.OrderID,
+		models.DisputeSubmitted,
+		models.DisputeSellerResponded,
+		models.DisputeUnderReview,
+	).Scan(&activeDisputeExists)
+
+	if err != nil {
+		return fmt.Errorf("check active dispute: %w", err)
+	}
+
+	if activeDisputeExists {
+		return ErrActiveDisputeExists
 	}
 
 	d.SellerID = sellerID
@@ -228,6 +279,9 @@ func (r *OrderDisputeRepository) Create(
 		return err
 	}
 
+	if err := freezeEscrowTx(ctx, tx, d.OrderID, d.BuyerID, fmt.Sprintf("dispute:%d", d.ID)); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 
@@ -471,3 +525,185 @@ func (r *OrderDisputeRepository) ListEvents(
 
 // Keep the time import available for model-compatible timestamp handling.
 var _ = time.Time{}
+
+func (r *OrderDisputeRepository) StartAdminReview(
+	ctx context.Context,
+	disputeID int64,
+	adminID int,
+	version ...int64,
+) error {
+	if disputeID <= 0 || adminID <= 0 {
+		return fmt.Errorf("invalid dispute or administrator")
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := r.authorizeReview(ctx, tx, adminID); err != nil {
+		return err
+	}
+
+	var currentStatus string
+	var buyerID, sellerID int
+	var currentVersion int64
+	err = tx.QueryRowContext(ctx, `
+		SELECT status, buyer_id, seller_id, version FROM order_disputes
+		WHERE id = $1
+		FOR UPDATE
+	`, disputeID).Scan(&currentStatus, &buyerID, &sellerID, &currentVersion)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrDisputeNotFound
+	}
+	if err != nil {
+		return err
+	}
+
+	if len(version) > 0 && version[0] != currentVersion {
+		return ErrAdminConflict
+	}
+	if adminID == buyerID || adminID == sellerID {
+		return ErrSelfApproval
+	}
+	if currentStatus != models.DisputeSubmitted &&
+		currentStatus != models.DisputeSellerResponded {
+		return ErrDisputeState
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		UPDATE order_disputes
+		SET status = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2
+	`, models.DisputeUnderReview, disputeID)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO order_dispute_events (
+			dispute_id, actor_id, actor_role, event_type,
+			from_status, to_status, note
+		)
+		VALUES ($1, $2, 'admin', 'admin_review_started', $3, $4, $5)
+	`,
+		disputeID,
+		adminID,
+		currentStatus,
+		models.DisputeUnderReview,
+		"Administrator started reviewing this dispute",
+	)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (r *OrderDisputeRepository) Reject(
+	ctx context.Context,
+	disputeID int64,
+	adminID int,
+	reason string,
+	version ...int64,
+) error {
+	if disputeID <= 0 || adminID <= 0 {
+		return fmt.Errorf("invalid dispute or administrator")
+	}
+
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return fmt.Errorf("rejection reason is required")
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := r.authorizeReview(ctx, tx, adminID); err != nil {
+		return err
+	}
+	orderID, err := lockDisputeOrder(ctx, tx, disputeID)
+	if err != nil {
+		return err
+	}
+
+	var currentStatus string
+	var buyerID, sellerID int
+	var currentVersion int64
+	err = tx.QueryRowContext(ctx, `
+		SELECT status, buyer_id, seller_id, version FROM order_disputes
+		WHERE id = $1
+		FOR UPDATE
+	`, disputeID).Scan(&currentStatus, &buyerID, &sellerID, &currentVersion)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrDisputeNotFound
+	}
+	if err != nil {
+		return err
+	}
+
+	if len(version) > 0 && version[0] != currentVersion {
+		return ErrAdminConflict
+	}
+	if adminID == buyerID || adminID == sellerID {
+		return ErrSelfApproval
+	}
+	var approved bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM refunds WHERE dispute_id=$1 AND approved_amount IS NOT NULL)`, disputeID).Scan(&approved); err != nil {
+		return err
+	}
+	if approved {
+		return ErrRefundAlreadyExists
+	}
+	switch currentStatus {
+	case models.DisputeSubmitted,
+		models.DisputeSellerResponded,
+		models.DisputeUnderReview:
+	default:
+		return ErrDisputeState
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		UPDATE order_disputes
+		SET status = $1,
+		    resolution_note = $2,
+		    resolved_by = $3,
+		    resolved_at = CURRENT_TIMESTAMP,
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE id = $4
+	`,
+		models.DisputeResolvedRejected,
+		reason,
+		adminID,
+		disputeID,
+	)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO order_dispute_events (
+			dispute_id, actor_id, actor_role, event_type,
+			from_status, to_status, note
+		)
+		VALUES ($1, $2, 'admin', 'dispute_rejected', $3, $4, $5)
+	`,
+		disputeID,
+		adminID,
+		currentStatus,
+		models.DisputeResolvedRejected,
+		reason,
+	)
+	if err != nil {
+		return err
+	}
+
+	if err := unfreezeEscrowTx(ctx, tx, orderID, adminID, fmt.Sprintf("dispute:%d", disputeID)); err != nil {
+		return err
+	}
+	return tx.Commit()
+}

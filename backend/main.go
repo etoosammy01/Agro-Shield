@@ -346,6 +346,7 @@ func main() {
 	reconcileCtx, stopReconciliation := context.WithCancel(context.Background())
 	defer stopReconciliation()
 	go container.Wallet.RunReconciliation(reconcileCtx, services.DefaultReconciliationInterval)
+	go container.Sessions.RunCleanup(reconcileCtx, time.Hour)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,

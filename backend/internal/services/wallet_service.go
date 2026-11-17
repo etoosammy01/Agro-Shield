@@ -1611,6 +1611,13 @@ func (s *WalletService) preflightDebit(ctx context.Context, farmerID int, amount
 	if err != nil {
 		return fmt.Errorf("%w: read wallet balance: %v", ErrWalletUnavailable, err)
 	}
+	if wallet.HeldBalance != "" {
+		held, err := amountToCents(wallet.HeldBalance)
+		if err != nil || held > balance {
+			return ErrWalletUnavailable
+		}
+		balance -= held
+	}
 	requested, err := amountToCents(normalized)
 	if err != nil {
 		return err
@@ -2913,4 +2920,29 @@ func (s *WalletService) ProcessTransferWebhook(ctx context.Context, body []byte,
 		return false, err
 	}
 	return true, nil
+}
+
+// ConfigureReview installs the governance contract during application startup.
+func (s *WalletService) ConfigureReview(access *repository.DisputeReviewAccess) {
+	if repo, ok := s.repo.(interface {
+		ConfigureReviewAccess(*repository.DisputeReviewAccess)
+	}); ok {
+		repo.ConfigureReviewAccess(access)
+	}
+}
+func (s *WalletService) EscrowForOrder(ctx context.Context, id int64) (*repository.EscrowHold, error) {
+	if repo, ok := s.repo.(interface {
+		EscrowForOrder(context.Context, int64) (*repository.EscrowHold, error)
+	}); ok {
+		return repo.EscrowForOrder(ctx, id)
+	}
+	return nil, ErrWalletUnavailable
+}
+func (s *WalletService) ReleaseEscrow(ctx context.Context, id int64, actor int) error {
+	if repo, ok := s.repo.(interface {
+		ReleaseEscrow(context.Context, int64, int) error
+	}); ok {
+		return repo.ReleaseEscrow(ctx, id, actor)
+	}
+	return ErrWalletUnavailable
 }

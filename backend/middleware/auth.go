@@ -20,6 +20,34 @@ const farmerContextKey contextKey = "farmer"
 
 const sessionCookieName = "agroshield_session"
 
+type sessionRevoker interface {
+	Revoke(context.Context, string) error
+}
+
+type sessionBackendContextKey struct{}
+
+// EndSession uses the backend that authenticated this request. The legacy
+// path remains for existing component tests; live routes use Authenticator.
+func EndSession(w http.ResponseWriter, r *http.Request) error {
+	if token, ok := SessionIDFromRequest(r); ok {
+		if backend, ok := r.Context().Value(sessionBackendContextKey{}).(sessionRevoker); ok {
+			if err := backend.Revoke(r.Context(), token); err != nil {
+				return err
+			}
+		} else {
+			DeleteSession(token)
+		}
+	}
+	ClearSessionCookie(w, r)
+	return nil
+}
+
+func ForgetFarmerPresence(farmerID int) {
+	store.mu.Lock()
+	delete(store.lastSeen, farmerID)
+	store.mu.Unlock()
+}
+
 // In-memory session store: sessionID -> farmerID.
 // Good enough for a single-server setup. If you later scale to multiple
 // server instances, swap this for a shared store (e.g. Redis).
@@ -244,6 +272,10 @@ func (a *Authenticator) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		// Validate checks the hashed token against persistent session storage.
+		if a.sessions == nil {
+			http.Error(w, "Unable to verify session", http.StatusServiceUnavailable)
+			return
+		}
 		farmerID, err := a.sessions.Validate(r.Context(), token)
 
 		if errors.Is(err, session.ErrNotFound) {
@@ -253,7 +285,7 @@ func (a *Authenticator) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 		}
 		// A database failure is different from an invalid session.
 		if err != nil {
-			http.Error(w, "Unable to verify session", http.StatusInternalServerError)
+			http.Error(w, "Unable to verify session", http.StatusServiceUnavailable)
 			return
 		}
 
@@ -270,6 +302,20 @@ func (a *Authenticator) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, "Account suspended. Contact support.", http.StatusForbidden)
 			return
 		}
+		// A suspension/reactivation may have committed between token validation
+		// and account lookup. Recheck the stored revision before allowing access.
+		if farmer.SessionsRevokedAt.Valid {
+			id, err := a.sessions.Validate(r.Context(), token)
+			if errors.Is(err, session.ErrNotFound) || (err == nil && id != farmer.ID) {
+				ClearSessionCookie(w, r)
+				http.Redirect(w, r, "/login", http.StatusSeeOther)
+				return
+			}
+			if err != nil {
+				http.Error(w, "Unable to verify session", http.StatusServiceUnavailable)
+				return
+			}
+		}
 
 		if r.URL.Path != "/complete-profile" &&
 			r.URL.Path != "/verify-phone" &&
@@ -283,6 +329,7 @@ func (a *Authenticator) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 
 		// Make the authenticated farmer available to the next handler.
 		ctx := context.WithValue(r.Context(), farmerContextKey, farmer)
+		ctx = context.WithValue(ctx, sessionBackendContextKey{}, a.sessions)
 		next(w, r.WithContext(ctx))
 	}
 }

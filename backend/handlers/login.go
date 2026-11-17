@@ -17,12 +17,18 @@ type LoginPageData struct {
 }
 
 type Login struct {
-	service *services.AuthService
+	service  *services.AuthService
+	sessions *services.SessionService
 }
 
-func NewLoginHandler(service *services.AuthService) *Login {
+func NewLoginHandler(service *services.AuthService, sessions ...*services.SessionService) *Login {
+	var backend *services.SessionService
+	if len(sessions) > 0 {
+		backend = sessions[0]
+	}
 	return &Login{
-		service: service,
+		service:  service,
+		sessions: backend,
 	}
 }
 
@@ -59,7 +65,12 @@ func (h *Login) LoginHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		sessionID := middleware.CreateSession(farmer.ID, farmer.SessionsRevokedAt.Time)
+		sessionID, _, err := h.sessions.CreateForLogin(r.Context(), farmer.ID, farmer.SessionsRevokedAt.Time)
+		if err != nil {
+			log.Printf("create login session: %v", err)
+			http.Error(w, "Unable to sign in. Please try again.", http.StatusServiceUnavailable)
+			return
+		}
 		middleware.SetSessionCookie(w, r, sessionID)
 
 		http.Redirect(w, r, services.OnboardingPath(farmer), http.StatusSeeOther)

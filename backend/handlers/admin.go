@@ -42,22 +42,33 @@ type adminAccessContextKey struct{}
 func NewAdminHandler(store adminStore) *AdminHandler { return &AdminHandler{store: store} }
 
 type AdminPageData struct {
-	Section        string
-	Name           string
-	Initials       string
-	Access         models.AdminAccess
-	CanManageUsers bool
-	CanManageRoles bool
-	CanReadAudit   bool
-	ActorID        int
-	Summary        models.AdminSummary
-	Users          []models.AdminUser
-	Listings       []models.AdminListing
-	Events         []models.AdminAuditEvent
-	Query          string
-	Next           string
-	First          string
-	Success        bool
+	Section           string
+	Name              string
+	Initials          string
+	Access            models.AdminAccess
+	CanManageUsers    bool
+	CanManageRoles    bool
+	CanReadAudit      bool
+	CanReviewDisputes bool
+	CanDecide         bool
+	SettlementPending bool
+	Disputes          []models.OrderDispute
+	Dispute           *models.OrderDispute
+	Refund            *models.Refund
+	Evidence          []models.OrderDisputeEvidence
+	CaseEvents        []models.OrderDisputeEvent
+	Order             *models.Order
+	Exceptions        []repository.PaymentException
+	StatusFilter      string
+	ActorID           int
+	Summary           models.AdminSummary
+	Users             []models.AdminUser
+	Listings          []models.AdminListing
+	Events            []models.AdminAuditEvent
+	Query             string
+	Next              string
+	First             string
+	Success           bool
 }
 
 func adminJSON(r *http.Request) bool {
@@ -152,7 +163,7 @@ func (h *AdminHandler) Page(section string) http.HandlerFunc {
 			}
 		}
 		farmer, _ := middleware.FarmerFromContext(r)
-		d := AdminPageData{Section: section, Name: farmer.FullName, Initials: models.AdminInitials(farmer.FullName), ActorID: id, Access: access, CanManageUsers: access.Can(models.AdminManageUsers), CanManageRoles: access.Can(models.AdminManageRoles), CanReadAudit: access.Can(models.AdminReadAudit), Query: strings.TrimSpace(r.URL.Query().Get("q")), Success: r.URL.Query().Get("saved") == "1"}
+		d := AdminPageData{Section: section, Name: farmer.FullName, Initials: models.AdminInitials(farmer.FullName), ActorID: id, Access: access, CanManageUsers: access.Can(models.AdminManageUsers), CanManageRoles: access.Can(models.AdminManageRoles), CanReadAudit: access.Can(models.AdminReadAudit), CanReviewDisputes: access.Can(models.AdminReviewDisputes), Query: strings.TrimSpace(r.URL.Query().Get("q")), Success: r.URL.Query().Get("saved") == "1"}
 		if len(d.Query) > 100 {
 			adminError(w, r, repository.ErrAdminInvalid)
 			return
@@ -290,7 +301,7 @@ func (h *AdminHandler) Change(resource string) http.HandlerFunc {
 			return
 		}
 		if resource == "users" && c.Action == "suspend" {
-			middleware.DeleteFarmerSessions(c.TargetID)
+			middleware.ForgetFarmerPresence(c.TargetID)
 		}
 		if adminJSON(r) {
 			writeJSON(w, 200, map[string]string{"status": "saved"})
@@ -357,6 +368,18 @@ func (h *AdminHandler) WalletAccess(next http.HandlerFunc, action, resource, idF
 			}
 		}()
 		next(recorded, r)
+	}
+}
+
+// DisputeAccess is the HTTP boundary for Member 5's review actions. Refund
+// eligibility and settlement stay in their existing services/repositories.
+// Register this inside the same authentication/CSRF wrapper as other admin URLs.
+func (h *AdminHandler) DisputeAccess(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		_, _, ok := h.authorize(w, r, models.AdminReviewDisputes)
+		if ok {
+			next(w, r)
+		}
 	}
 }
 

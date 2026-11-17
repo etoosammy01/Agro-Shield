@@ -21,6 +21,13 @@ ALTER TABLE farmers ADD COLUMN IF NOT EXISTS admin_version BIGINT NOT NULL DEFAU
 ALTER TABLE crops ADD COLUMN IF NOT EXISTS moderation_blocked BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE crops ADD COLUMN IF NOT EXISTS moderation_version BIGINT NOT NULL DEFAULT 0;
 
+-- New live sessions have an unambiguous expiry and the revision authenticated
+-- at login. Historical naive timestamps are retained, without guessing their
+-- timezone; old tokens without the new expiry require a fresh sign-in.
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS expires_at_utc TIMESTAMPTZ;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS authentication_revision TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_sessions_expiry_utc ON sessions(expires_at_utc);
+
 -- Invalidate an open review when any displayed listing detail changes, including
 -- seller edits and stock changes made by checkout. Timestamps alone do not make
 -- a review stale. Keep this in the database so every write path participates.
@@ -63,6 +70,37 @@ END $$;
 CREATE OR REPLACE TRIGGER admin_audit_immutable
  BEFORE UPDATE OR DELETE OR TRUNCATE ON admin_audit_events
  FOR EACH STATEMENT EXECUTE FUNCTION reject_admin_audit_mutation();
+
+-- Member 5 retains the dispute event model and business transitions. Mirror
+-- committed events into the governance log in the SAME transaction, without
+-- copying complaint text, evidence keys, or other private free-form material.
+CREATE OR REPLACE TRIGGER dispute_history_immutable
+ BEFORE UPDATE OR DELETE OR TRUNCATE ON order_dispute_events
+ FOR EACH STATEMENT EXECUTE FUNCTION reject_admin_audit_mutation();
+
+CREATE OR REPLACE FUNCTION audit_dispute_event() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE audit_action TEXT;
+BEGIN
+ IF NEW.actor_role NOT IN ('admin', 'wallet') THEN
+  RETURN NEW;
+ END IF;
+ IF NEW.actor_role = 'admin' AND NEW.actor_id IS NULL THEN
+  RAISE EXCEPTION 'administrative dispute events require an actor';
+ END IF;
+ audit_action := CASE NEW.event_type
+  WHEN 'admin_review_started' THEN 'dispute.review'
+  WHEN 'dispute_rejected' THEN 'dispute.reject'
+  WHEN 'refund_approved' THEN 'dispute.refund_approve'
+  ELSE 'dispute.' || NEW.event_type
+ END;
+ INSERT INTO admin_audit_events(actor_id,action,resource,target_id,outcome,
+  reason,before_state,after_state)
+ VALUES (NEW.actor_id,audit_action,'order_disputes',NEW.dispute_id,'committed',
+  NEW.event_type,COALESCE(NEW.from_status,''),COALESCE(NEW.to_status,''));
+ RETURN NEW;
+END $$;
+CREATE OR REPLACE TRIGGER audit_dispute_history AFTER INSERT ON order_dispute_events
+ FOR EACH ROW EXECUTE FUNCTION audit_dispute_event();
 
 -- Record actual financial transitions inside the existing financial transaction.
 -- Actor is attributed only for the decision transition, never guessed for a

@@ -479,14 +479,38 @@ func (r *FarmerRepository) UpdateBankDetails(id int, bankName, bankCode, account
 	return err
 }
 
-// UpdatePassword sets a new password hash.
+// UpdatePassword changes the password and invalidates every existing login in
+// one transaction. Advancing the account revision also rejects a session being
+// created from password authentication that happened before this change.
 func (r *FarmerRepository) UpdatePassword(id int, passwordHash string) error {
-	_, err := r.db.Exec(
-		`UPDATE farmers SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	result, err := tx.Exec(
+		`UPDATE farmers SET password_hash = $1, updated_at = CURRENT_TIMESTAMP,
+            sessions_revoked_at = GREATEST(clock_timestamp(), sessions_revoked_at + interval '1 microsecond')
+         WHERE id = $2 AND deleted_at IS NULL`,
 		passwordHash,
 		id,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count != 1 {
+		return ErrAccountNotFound
+	}
+	if _, err := tx.Exec(`UPDATE sessions SET revoked_at = CURRENT_TIMESTAMP
+        WHERE farmer_id = $1 AND revoked_at IS NULL`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // DeleteAccount closes an account by anonymising it rather than removing the

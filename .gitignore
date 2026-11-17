@@ -4,6 +4,7 @@
 
 # User-uploaded files
 uploads/
+private/
 
 # Local environment files may contain database credentials and API keys.
 .env

@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -39,7 +40,8 @@ func TestDevelopmentOnboardingLoginReachesDashboardAndKeepsAdminPermissions(t *t
 	member := create("Development member", "2348000000103")
 	onboarding.Configure(true, []int{admin.ID, member.ID})
 	t.Cleanup(func() { onboarding.Configure(false, nil) })
-	login := handlers.NewLoginHandler(services.NewAuthService(farmers))
+	sessions := services.NewSessionService(repository.NewSessionRepository(db))
+	login := handlers.NewLoginHandler(services.NewAuthService(farmers), sessions)
 	signIn := func(f *models.Farmer, password string) *httptest.ResponseRecorder {
 		r := httptest.NewRequest("POST", "/login", strings.NewReader((url.Values{"phone": {f.Phone}, "password": {password}}).Encode()))
 		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -55,17 +57,16 @@ func TestDevelopmentOnboardingLoginReachesDashboardAndKeepsAdminPermissions(t *t
 	if len(cookies) != 1 {
 		t.Fatal("login did not create a session")
 	}
-	t.Cleanup(func() { middleware.DeleteSession(cookies[0].Value) })
 	old := http.DefaultServeMux
 	http.DefaultServeMux = http.NewServeMux()
 	t.Cleanup(func() { http.DefaultServeMux = old })
-	registerAdminRoutes(&app.Container{FarmerRepo: farmers, Admin: repository.NewAdminRepository(db, []int{admin.ID})}, handlers.NewWalletHandler(nil, nil, nil))
+	registerAdminRoutes(&app.Container{FarmerRepo: farmers, Sessions: sessions, Admin: repository.NewAdminRepository(db, []int{admin.ID})}, handlers.NewWalletHandler(nil, nil, nil))
 	request := func(path string, cookie *http.Cookie) *httptest.ResponseRecorder {
 		r := httptest.NewRequest("GET", path, nil)
 		r.AddCookie(cookie)
 		w := httptest.NewRecorder()
 		if path == "/dashboard" {
-			middleware.RequireAuth(farmers, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) })(w, r)
+			middleware.NewAuthenticator(farmers, sessions).RequireAuth(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) })(w, r)
 		} else {
 			http.DefaultServeMux.ServeHTTP(w, r)
 		}
@@ -79,7 +80,6 @@ func TestDevelopmentOnboardingLoginReachesDashboardAndKeepsAdminPermissions(t *t
 	if memberLogin.Header().Get("Location") != "/dashboard" || len(memberCookies) != 1 {
 		t.Fatal("selected development member could not log in")
 	}
-	t.Cleanup(func() { middleware.DeleteSession(memberCookies[0].Value) })
 	if request("/api/admin/users", memberCookies[0]).Code != 403 {
 		t.Fatal("onboarding skip granted administrative permissions")
 	}
@@ -119,9 +119,12 @@ func TestAdminRoutesRejectUnprivilegedAndCrossSiteRequests(t *testing.T) {
 	old := http.DefaultServeMux
 	http.DefaultServeMux = http.NewServeMux()
 	t.Cleanup(func() { http.DefaultServeMux = old })
-	registerAdminRoutes(&app.Container{FarmerRepo: farmers, Admin: repository.NewAdminRepository(db, nil)}, handlers.NewWalletHandler(nil, nil, nil))
-	token := middleware.CreateSession(f.ID)
-	t.Cleanup(func() { middleware.DeleteSession(token) })
+	sessions := services.NewSessionService(repository.NewSessionRepository(db))
+	registerAdminRoutes(&app.Container{FarmerRepo: farmers, Sessions: sessions, Admin: repository.NewAdminRepository(db, nil)}, handlers.NewWalletHandler(nil, nil, nil))
+	token, _, err := sessions.Create(context.Background(), f.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	request := func(method, path, origin string, loggedIn bool) *httptest.ResponseRecorder {
 		t.Helper()
 		r := httptest.NewRequest(method, path, strings.NewReader(fmt.Sprintf("target_id=%d&version=0&action=role_administrator&reason=staff_assignment", f.ID)))

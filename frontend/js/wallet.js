@@ -888,6 +888,7 @@ document.querySelectorAll(".wallet-check-form").forEach((form) => {
   const PRETTY = {
     deposit: "Deposit", deposit_reversal: "Deposit reversal",
     sale_credit: "Sale credit", order_payment: "Order payment",
+	order_refund: "Order refund", sale_reversal: "Sale reversal",
     withdrawal_reserved: "Withdrawal reserved", withdrawal_refund: "Withdrawal refund",
     transfer_in: "Transfer received", transfer_out: "Transfer sent",
     transfer_refund: "Transfer refund",

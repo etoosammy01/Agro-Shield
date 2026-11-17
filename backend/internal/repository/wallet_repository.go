@@ -93,8 +93,11 @@ func FormatBasisPoints(basisPoints int64) string {
 }
 
 type WalletRepository struct {
-	db *sql.DB
+	db     *sql.DB
+	review *DisputeReviewAccess
 }
+
+func (r *WalletRepository) ConfigureReviewAccess(access *DisputeReviewAccess) { r.review = access }
 
 func NewWalletRepository(db *sql.DB) *WalletRepository {
 	return &WalletRepository{db: db}
@@ -103,9 +106,9 @@ func NewWalletRepository(db *sql.DB) *WalletRepository {
 func (r *WalletRepository) GetWallet(ctx context.Context, farmerID int) (*models.Wallet, error) {
 	var wallet models.Wallet
 	err := r.db.QueryRowContext(ctx, `
-		SELECT id, farmer_id, balance::text, currency, created_at, updated_at, COALESCE(transaction_pin_hash, '') <> ''
+		SELECT id, farmer_id, balance::text, held_balance::text, (balance-held_balance)::text, currency, created_at, updated_at, COALESCE(transaction_pin_hash, '') <> ''
 		FROM wallets WHERE farmer_id = $1`, farmerID,
-	).Scan(&wallet.ID, &wallet.FarmerID, &wallet.Balance, &wallet.Currency, &wallet.CreatedAt, &wallet.UpdatedAt, &wallet.HasTransactionPIN)
+	).Scan(&wallet.ID, &wallet.FarmerID, &wallet.Balance, &wallet.HeldBalance, &wallet.AvailableBalance, &wallet.Currency, &wallet.CreatedAt, &wallet.UpdatedAt, &wallet.HasTransactionPIN)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrWalletNotFound
 	}
@@ -119,7 +122,7 @@ func (r *WalletRepository) GetStatus(ctx context.Context, farmerID int) (*models
 	var status models.WalletStatus
 	err := r.db.QueryRowContext(ctx, `
 		SELECT
-			w.balance::text,
+			(w.balance-w.held_balance)::text,
 			w.currency,
 			(SELECT COUNT(*) FROM wallet_deposits d
 				WHERE d.wallet_id = w.id AND d.status IN ('pending', 'processing')),
@@ -782,7 +785,7 @@ func (r *WalletRepository) ReverseVirtualAccountDeposit(ctx context.Context, pro
 		}
 		result, err := tx.ExecContext(ctx, `
 			UPDATE wallets SET balance = balance - $1::numeric, updated_at = $2
-			WHERE id = $3 AND balance >= $1::numeric`,
+			WHERE id = $3 AND balance - held_balance >= $1::numeric`,
 			amount, now, walletID)
 		if err != nil {
 			return false, err
@@ -841,7 +844,7 @@ func (r *WalletRepository) CreateWithdrawal(ctx context.Context, farmerID int, r
 
 	result, err := tx.ExecContext(ctx, `
 		UPDATE wallets SET balance = balance - $1::numeric, updated_at = $2
-		WHERE id = $3 AND balance >= $1::numeric`, amount, time.Now(), walletID)
+		WHERE id = $3 AND balance - held_balance >= $1::numeric`, amount, time.Now(), walletID)
 	if err != nil {
 		return err
 	}
@@ -884,6 +887,9 @@ func (r *WalletRepository) CreateWithdrawal(ctx context.Context, farmerID int, r
 // by subtracting the fee from the total rather than being rounded separately.
 // That makes buyer debit == seller credit + fee true by construction.
 func (r *WalletRepository) PayForOrder(ctx context.Context, buyerID, cropID int, quantity float64, checkoutToken string, commissionBasisPoints int64, expectedUnitPrice ...float64) (int64, bool, error) {
+	if commissionBasisPoints < 0 || commissionBasisPoints > 10000 {
+		return 0, false, fmt.Errorf("invalid commission rate")
+	}
 	if buyerID <= 0 || cropID <= 0 {
 		return 0, false, fmt.Errorf("invalid buyer or crop")
 	}
@@ -986,6 +992,10 @@ func (r *WalletRepository) PayForOrder(ctx context.Context, buyerID, cropID int,
 		return 0, false, fmt.Errorf("order total must be greater than zero")
 	}
 
+	if err := lockEscrowWallets(ctx, tx, buyerWalletID, sellerWalletID); err != nil {
+		return 0, false, err
+	}
+
 	feeKobo, netKobo := splitCommission(totalKobo, commissionBasisPoints)
 	total := koboToAmount(totalKobo)
 	net := koboToAmount(netKobo)
@@ -993,7 +1003,7 @@ func (r *WalletRepository) PayForOrder(ctx context.Context, buyerID, cropID int,
 
 	result, err := tx.ExecContext(ctx, `
 		UPDATE wallets SET balance = balance - $1::numeric, updated_at = $2
-		WHERE id = $3 AND balance >= $1::numeric`, total, time.Now(), buyerWalletID)
+		WHERE id = $3 AND balance - held_balance >= $1::numeric`, total, time.Now(), buyerWalletID)
 	if err != nil {
 		return 0, false, err
 	}
@@ -1007,9 +1017,9 @@ func (r *WalletRepository) PayForOrder(ctx context.Context, buyerID, cropID int,
 
 	var orderID int64
 	err = tx.QueryRowContext(ctx, `
-		INSERT INTO orders (buyer_id, crop_id, quantity, total_price, status, checkout_token)
-		VALUES ($1, $2, $3, $4::numeric, 'completed', $5)
-		RETURNING id`, buyerID, cropID, quantity, total, checkoutToken,
+		INSERT INTO orders (buyer_id, crop_id, quantity, total_price, status, checkout_token,seller_id_snapshot)
+		VALUES ($1, $2, $3, $4::numeric, 'completed', $5,$6)
+		RETURNING id`, buyerID, cropID, quantity, total, checkoutToken, sellerID,
 	).Scan(&orderID)
 	if err != nil {
 		return 0, false, err
@@ -1030,9 +1040,13 @@ func (r *WalletRepository) PayForOrder(ctx context.Context, buyerID, cropID int,
 		return 0, false, fmt.Errorf("produce quantity changed during checkout")
 	}
 
+	if err := createEscrowHold(ctx, tx, orderID, buyerWalletID, sellerWalletID, totalKobo, feeKobo, buyerID); err != nil {
+		return 0, false, err
+	}
+
 	// The seller's ledger records what actually landed, not the order total.
 	if _, err := tx.ExecContext(ctx, `
-		UPDATE wallets SET balance = balance + $1::numeric, updated_at = $2 WHERE id = $3`,
+		UPDATE wallets SET balance = balance + $1::numeric, held_balance = held_balance + $1::numeric, updated_at = $2 WHERE id = $3`,
 		net, time.Now(), sellerWalletID); err != nil {
 		return 0, false, err
 	}
@@ -1078,7 +1092,7 @@ func (r *WalletRepository) PlatformRevenueTotal(ctx context.Context) (string, in
 	var total string
 	var count int
 	err := r.db.QueryRowContext(ctx, `
-		SELECT COALESCE(SUM(amount), 0)::numeric(12,2)::text, COUNT(*)
+		SELECT (COALESCE(SUM(amount), 0) - COALESCE((SELECT SUM(amount) FROM platform_revenue_reversals),0))::numeric(12,2)::text, COUNT(*)
 		FROM platform_revenue`).Scan(&total, &count)
 	if err != nil {
 		return "", 0, err
@@ -1703,7 +1717,7 @@ func (r *WalletRepository) CreateTransfer(ctx context.Context, senderID, recipie
 
 	result, err := tx.ExecContext(ctx, `
 		UPDATE wallets SET balance = balance - $1::numeric, updated_at = $2
-		WHERE id = $3 AND balance >= $1::numeric`, amount, time.Now(), senderWalletID)
+		WHERE id = $3 AND balance - held_balance >= $1::numeric`, amount, time.Now(), senderWalletID)
 	if err != nil {
 		return err
 	}

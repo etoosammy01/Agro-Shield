@@ -123,6 +123,10 @@ func (e AdminAuditEvent) Label() string {
 		"wallet.withdrawal.reconcile": "Payout status check", "wallet.withdrawal.return": "Payout returned to queue",
 		"wallet.withdrawal.record": "Payout reference recorded", "wallet.transfer.approve": "Transfer approval",
 		"wallet.transfer.reject": "Transfer rejection", "wallet.repair": "Wallet repair",
+		"dispute.review": "Dispute review started", "dispute.reject": "Dispute rejected",
+		"dispute.refund_approve": "Refund approved", "dispute.refund_requested": "Refund requested",
+		"dispute.refund_processing": "Refund processing", "dispute.refund_succeeded": "Refund settled",
+		"dispute.refund_failed": "Refund failed", "dispute.refund_requires_review": "Refund needs review",
 	}
 	if label, ok := labels[e.Action]; ok {
 		return label
@@ -157,6 +161,12 @@ func (e AdminAuditEvent) ReasonLabel() string {
 		return "Review cleared"
 	case "staff_assignment":
 		return "Staff assignment"
+	case "admin_review_started":
+		return "Dispute review"
+	case "dispute_rejected":
+		return "Dispute decision"
+	case "refund_approved":
+		return "Refund approval"
 	default:
 		return e.Reason
 	}

@@ -58,34 +58,10 @@ func createTestUser(t *testing.T, db *sql.DB) *models.Farmer {
 	if err := NewFarmerRepository(db).Create(farmer); err != nil {
 		t.Fatalf("create test user: %v", err)
 	}
-	t.Cleanup(func() { deleteTestUser(t, db, farmer.ID) })
+	// The test owns an isolated schema; testdb drops it after all assertions.
 	return farmer
 }
 
-// deleteTestUser removes everything a test created, children before parents
-// because every wallet table references wallets with ON DELETE RESTRICT. A
-// failure here is logged rather than raised: it runs after the test body, and it
-// must not replace the assertion that actually failed with a cleanup error.
-func deleteTestUser(t *testing.T, db *sql.DB, farmerID int) {
-	t.Helper()
-
-	for _, stmt := range []string{
-		`DELETE FROM wallet_transactions WHERE wallet_id IN (SELECT id FROM wallets WHERE farmer_id = $1)`,
-		`DELETE FROM wallet_deposits     WHERE wallet_id IN (SELECT id FROM wallets WHERE farmer_id = $1)`,
-		`DELETE FROM wallet_virtual_accounts WHERE farmer_id = $1`,
-		`DELETE FROM wallet_withdrawals  WHERE farmer_id = $1`,
-		`DELETE FROM wallet_transfers    WHERE sender_id = $1 OR recipient_id = $1`,
-		`DELETE FROM wallets             WHERE farmer_id = $1`,
-		`DELETE FROM farmers             WHERE id = $1`,
-	} {
-		if _, err := db.Exec(stmt, farmerID); err != nil {
-			t.Logf("cleanup of user %d: %v", farmerID, err)
-		}
-	}
-}
-
-// uniqueRef keeps the UNIQUE columns on the wallet tables from colliding between
-// tests that run one after another in the same database.
 func uniqueRef(prefix string) string {
 	return fmt.Sprintf("%s-TEST-%d-%04d", prefix, time.Now().UnixNano(), rand.Intn(10_000))
 }

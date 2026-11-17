@@ -188,3 +188,15 @@ func TestAdminConsoleRendersRolesAndEscapesMemberContent(t *testing.T) {
 		}
 	}
 }
+
+func TestAdminDisputeBoundaryUsesGovernancePermission(t *testing.T) {
+	for _, access := range []models.AdminAccess{{}, {Wallet: true}, {Role: "moderator"}, {Role: "administrator"}} {
+		store := &fakeAdminStore{access: access}
+		called := false
+		handler := NewAdminHandler(store).DisputeAccess(func(w http.ResponseWriter, r *http.Request) { called = true; w.WriteHeader(204) })
+		w := adminRequest(t, handler, "POST", "/admin/disputes/review", "", "")
+		if called != access.Can(models.AdminReviewDisputes) || (called && w.Code != 204) || (!called && w.Code != 403) {
+			t.Fatal("dispute endpoint allowed the wrong role")
+		}
+	}
+}

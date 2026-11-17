@@ -102,10 +102,10 @@ func (h *VerifyPhone) finish(w http.ResponseWriter, r *http.Request, farmer *mod
 		http.Redirect(w, r, "/create-transaction-pin", http.StatusSeeOther)
 		return
 	}
-	if sessionID, ok := middleware.SessionIDFromRequest(r); ok {
-		middleware.DeleteSession(sessionID)
+	if err := middleware.EndSession(w, r); err != nil {
+		http.Error(w, "Phone verified, but unable to sign out. Please try again.", http.StatusServiceUnavailable)
+		return
 	}
-	middleware.ClearSessionCookie(w, r)
 	http.Redirect(w, r, "/login?verified=1", http.StatusSeeOther)
 }
 

@@ -1,12 +1,12 @@
 # Agro-Shield Role 6: Implementation Record and Admin User Guide
 
-**Workstream:** Administration and accountability — Role 6 only  
+**Workstream:** Administration, accountability and cross-role integration\
 **Issues:** AGRO-008, persistent administrative audit; AGRO-019, user management and listing moderation  
-**Documented on:** November 15, 2026; updated November 16, 2026  
+**Documented on:** November 15, 2026; updated November 17, 2026\
 **Implementation branch:** `feat/admin-governance`  
 **Implementation commit:** `1aba44c` — `feat(admin): implement governance and persistent audit`  
 **Baseline commit:** `8bc0a90`  
-**Delivery status:** Role 6 implementation is committed through `db94ab1` and locally verified. [PR #9](https://github.com/etoosammy01/Agro-Shield/pull/9) is open, and hosted push/PR CI passed for that commit. Authentication and dispute integration, migration coordination, independent review, and merge remain outstanding. See the [dependency and requirement review](docs/ROLE_6_DEPENDENCY_REVIEW.md).
+**Delivery status:** The committed branch includes the admin workspace, development onboarding controls, wallet repair lookup, and dashboard refinements through `ce4f884`. The November 17 working tree implements persistent authentication/recovery integration, dispute review and private evidence, and wallet escrow/refund settlement. Direct-provider and historical payment settlement, policy/deployment review and independent release review remain outstanding. See the [current integration handoff](docs/ROLE_6_INTEGRATION_HANDOFF.md) and [dependency review](docs/ROLE_6_DEPENDENCY_REVIEW.md). Hosted CI results for earlier commits remain historical evidence, rather than verification of these working-tree changes.
 
 This document records what was delivered, why the implementation was designed this way, how every admin screen works, and how the work was verified. It describes the core implementation at the commit above and the subsequent listing-review fix and explicitly requested legacy-data migration. The screenshots contain synthetic demonstration accounts and figures.
 
@@ -27,6 +27,7 @@ This document records what was delivered, why the implementation was designed th
 - [Verification record](#verification-record)
 - [Deployment and handoff](#deployment-and-handoff)
 - [Quick walkthrough](#quick-walkthrough)
+- [Disputes and refunds](#disputes-and-refunds)
 
 ## Scope and delivery record
 
@@ -41,9 +42,9 @@ The work follows Role 6 in the [eight-member remediation plan](AGRO_SHIELD_8_MEM
 | Admin interface | Responsive overview, user directory, listing moderation, audit history, review dialogs, and links to the existing wallet console. |
 | Verification and handoff | Authorization and database regressions, browser checks, screenshots, configuration guidance, and operational documentation. |
 
-The session, authentication, marketplace, and database-test edits support these Role 6 controls. For example, an account suspension must affect login and purchases to be effective. They do not constitute implementation of the other team members' assigned workstreams.
+The core session, authentication, marketplace, and database-test edits support Role 6 controls: account suspension must affect login and purchases to be effective. The later implementation also supplies the shared dispute, recovery and wallet-settlement dependencies requested by the owner.
 
-The existing refund/dispute business logic, wallet arithmetic, KYC policy, agricultural features, and broader timestamp/session redesign remain outside this delivery. The `disputes.review` permission is reserved for Member 5's integration; this console does not provide a dispute-adjudication page.
+The combined dispute workflow and adjudication screens now use `disputes.review`, transactional authorization and protected audit integration. New wallet orders use escrow and exact wallet refund settlement. KYC, agricultural features, historical timestamp interpretation, product policy and independent review retain their assigned owners; direct-provider/historical settlement still needs its verified funding contract.
 
 ### Work completed during the continuation
 
@@ -379,7 +380,7 @@ The wallet administration page existed before Role 6. Its payment operations and
 
 Open **Wallet approvals** from community navigation if it is available. Wallet-only staff reach this page directly when opening `/admin`. Staff with governance access see **Community console** to return to the new overview.
 
-The wallet screen retains its separate layout and has navigation links for **Overview**, **Withdrawals**, **Transfers**, **Deposits**, **Admins**, and **Revenue**. Most links scroll to sections within the same page. The account area provides profile and sign-out links.
+The wallet screen retains its separate layout and has navigation links for **Overview**, **Withdrawals**, **Transfers**, **Deposits**, **Admins**, **Revenue**, and **Wallet repair**. Most links scroll to sections within the same page. The account area provides profile and sign-out links.
 
 | Section | What staff see and do |
 | --- | --- |
@@ -391,7 +392,7 @@ The wallet screen retains its separate layout and has navigation links for **Ove
 | Wallet admins | Names and account IDs of wallet approvers, plus Configured/You labels. Full phone numbers were removed from this list. |
 | Login & security | **Change password** opens the existing password-reset flow; **My account** opens Profile. |
 | Unsettled deposits | Informational list of funding attempts waiting beyond the configured threshold. This section does not offer a manual success/credit action. |
-| Wallet repair | Existing account-ID form to recreate a missing, empty NGN wallet. It does not adjust an existing balance. |
+| Wallet repair | **Find account ID** opens the user directory, where each ID appears below the member's name. **Select for wallet repair** returns with that ID filled in. Submitting **Repair wallet** recreates a missing, empty NGN wallet and preserves an existing balance. Wallet-only staff ask a community administrator for the ID. |
 
 ### How wallet-access management changed
 
@@ -465,7 +466,9 @@ Listing review versions also advance for changes to produce name, ownership, loc
 
 ### Suspension and purchase enforcement
 
-The farmer model/repository expose suspension and revocation state. Login rejects suspended accounts. Authenticated browser and USSD access check suspension. Persistent sessions are revoked in the governance transaction. In-memory sessions retain the revocation revision read at login, so an old or racing session does not become valid again after reactivation.
+The farmer model/repository expose suspension and revocation state. Login rejects suspended accounts. Authenticated browser and USSD access check suspension. Live browser sessions use PostgreSQL and are revoked in the governance transaction. Their authenticated account revision prevents an old or racing login from becoming valid again after reactivation. Legacy in-memory helpers remain for older component tests and are not used by live route registration.
+
+OTP-verified password reset now updates the password and revokes all account sessions atomically. Existing logins stop across application instances, and stale password authentication cannot create a new login after reset. A failed session revocation rolls back the password change. Member 2's recovery-response enumeration protection remains a separate pending dependency.
 
 Marketplace listing queries, direct product visibility, wallet purchase, legacy order creation, and external payment creation enforce the account/listing restrictions. Transactional purchase checks lock the relevant records so a purchase and a governance change have a defined order.
 
@@ -485,7 +488,7 @@ Wallet request handling records intent before invoking a financial service. Its 
 | --- | --- | --- |
 | `farmers` | `admin_role` | Stores moderator/administrator access separately from marketplace account type. |
 | `farmers` | `suspended_at` | Stores account suspension state and time. |
-| `farmers` | `sessions_revoked_at` | Identifies session revocation across suspension/reactivation. |
+| `farmers` | `sessions_revoked_at` | Identifies session revocation across suspension/reactivation and password reset. |
 | `farmers` | `admin_version` | Detects stale account-management forms. |
 | `crops` | `moderation_blocked` | Stores moderation independently of seller-controlled sale status. |
 | `crops` | `moderation_version` | Detects stale listing decisions. |
@@ -550,9 +553,9 @@ Paths below link to the implementation files. This inventory covers the 46 files
 | [backend/internal/appcontainer.go](backend/internal/appcontainer.go) | Adds the admin repository dependency to the shared application container. |
 | [backend/main.go](backend/main.go) | Constructs the admin repository and provides startup check mode that exits before providers and background jobs. |
 | [backend/internal/models/farmer.go](backend/internal/models/farmer.go) | Adds suspension and session-revocation state needed by authentication. |
-| [backend/internal/repository/farmer_repository.go](backend/internal/repository/farmer_repository.go) | Loads those fields with account lookups so restrictions are based on persisted state. |
+| [backend/internal/repository/farmer_repository.go](backend/internal/repository/farmer_repository.go) | Loads persisted account restrictions and atomically updates passwords, advances authentication revisions, and revokes sessions. |
 | [backend/internal/services/auth_service.go](backend/internal/services/auth_service.go) | Rejects suspended accounts during login. |
-| [backend/handlers/login.go](backend/handlers/login.go) | Captures the account's revocation revision in the in-memory login session. |
+| [backend/handlers/login.go](backend/handlers/login.go) | Creates a hashed persistent login session against the account's authenticated revocation revision. |
 | [backend/middleware/auth.go](backend/middleware/auth.go) | Enforces suspension and stale-session revocation during authenticated requests. |
 | [backend/internal/repository/session_repository.go](backend/internal/repository/session_repository.go) | Prevents persistent session creation/use for inactive accounts and coordinates creation with account changes. |
 | [backend/ussd/handler.go](backend/ussd/handler.go) | Applies account suspension to USSD access. |
@@ -743,8 +746,7 @@ session cookie.
 | Requested migration supports Role 6 without new financial policies | Imported-record credentials, wallet-only legacy access, moderation/session controls, immutable audit, exact financial copying, conversion collisions, rollback/retry, and simultaneous imports passed. |
 
 Hosted CI subsequently passed for commit `db94ab1`, as recorded in the
-[dependency review](docs/ROLE_6_DEPENDENCY_REVIEW.md). Cross-branch integration,
-independent review, and merge remain outstanding. The local results establish
+[dependency review](docs/ROLE_6_DEPENDENCY_REVIEW.md). The dated evidence below precedes the combined implementation. Independent review, hosted CI for the final combined commit, and merge remain outstanding. The local results establish
 implementation evidence, not completion of those release gates.
 
 ### Browser checks
@@ -792,9 +794,9 @@ Local browser-preview and Playwright helper scripts were temporary tools under `
 
 ### Before merging or deploying
 
-The implementation is pushed through `db94ab1` in [PR #9](https://github.com/etoosammy01/Agro-Shield/pull/9). Hosted push/PR CI passed for that commit; no submitted PR reviews were found on November 16. Complete the integration and independent review gates described in the [dependency review](docs/ROLE_6_DEPENDENCY_REVIEW.md) before treating this as a combined release.
+The committed implementation is pushed through `ce4f884`. Earlier hosted push/PR CI passed for `db94ab1`; review status was checked on November 16. The November 17 integration changes are local working-tree changes. Complete the remaining integration and independent review gates in the [handoff](docs/ROLE_6_INTEGRATION_HANDOFF.md) before treating this as a combined release.
 
-Coordinate the supporting session changes with Member 2, the additive migration and deployment ownership with Member 8, and future use of `disputes.review` with Member 5. This coordination does not transfer ownership of their business logic to Role 6.
+Persistent authentication, generic recovery responses, dispute screens/private evidence and wallet escrow/refunds are now implemented locally. Members 3/4/5 still need verified funding/settlement for direct-provider and historical payments; product must confirm dispute/release policy, and Member 8 reviews deployment, shared evidence storage and historical timestamps. See the [current handoff](docs/ROLE_6_INTEGRATION_HANDOFF.md) for the implemented contracts and remaining owner work.
 
 Deploy the application and additive schema together through the existing startup migration procedure. Review the configured administrator IDs and ensure the intended staff accounts are active and fully onboarded.
 
@@ -807,10 +809,10 @@ Append-only triggers protect against ordinary application mutation, not a privil
 ### Known interface and delivery limits
 
 - Directories support search and pagination; the overview cards do not apply status filters.
-- There is no bulk user/listing action, audit export/search, or dispute-adjudication screen in this delivery.
+- Bulk user/listing action and audit export/search are not included. Dispute adjudication is available under **Disputes & refunds**.
 - Account/listing review dialogs require JavaScript; the page supplies a notice when it is disabled.
 - Audit actor labels use account IDs; the displayed **Admin #** wording also covers moderator-originated listing decisions.
-- The wallet page retains its existing financial workflow and separate layout. Its provider operations were not redesigned in this workstream.
+- The wallet page keeps its layout and provider controls. It now displays available and held proceeds; order refunds appear in wallet activity and receipts.
 - The temporary test servers used for the final PostgreSQL 16/browser verification were stopped. The screenshots do not represent a currently running preview deployment.
 
 ## Quick walkthrough
@@ -831,3 +833,28 @@ Use synthetic accounts and listings in a development/test environment for this d
 12. Use **Back to Agro-Shield** to leave the workspace or **Sign out** to end the session.
 
 For a shorter daily-operations reference, use [Administration and accountability](docs/ADMIN_GOVERNANCE.md). For recorded verification results, use [the evidence summary](docs/test-evidence/admin-governance/results.json).
+
+## Disputes and refunds
+
+Use **Orders → View → Report an issue** to submit a paid-order complaint, then
+**My disputes** to upload evidence and track responses. The admin sidebar has
+**Disputes & refunds** and **Payment exceptions**. Open a case, review the order,
+response and private evidence, and confirm before deciding. A buyer or seller on
+the order must use another authorized administrator. Changed evidence or status
+invalidates an older review page.
+
+Approved wallet refunds settle against verified held proceeds. The buyer receives
+the approved amount only when the refund status says **Settled to buyer wallet**.
+If settlement cannot complete, the approved record stays available for review
+and retry. A retry uses that same refund and cannot pay it twice.
+
+A buyer may withdraw an unreviewed complaint. **Confirm receipt** on the order
+releases remaining held funds when no active dispute exists. Evidence storage
+must be private and persistent; configure `DISPUTE_EVIDENCE_DIR` outside
+`frontend` and share it between application instances.
+
+Current verification is recorded in
+[combined implementation evidence](docs/test-evidence/admin-governance/outstanding-implementation.json),
+separate from the earlier admin-only results. See the
+[integration handoff](docs/ROLE_6_INTEGRATION_HANDOFF.md) for the remaining
+direct-provider/historical payment and deployment dependencies.

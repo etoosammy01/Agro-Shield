@@ -9,6 +9,8 @@ type Wallet struct {
 	ID                int64
 	FarmerID          int
 	Balance           string
+	HeldBalance       string
+	AvailableBalance  string
 	Currency          string
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
